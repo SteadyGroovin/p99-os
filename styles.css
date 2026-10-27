@@ -269,3 +269,4 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .txr:hover{background:var(--surf2)}
 .txd{padding:2px 0 12px 86px; border-bottom:1px solid var(--line)} .txd .t{margin:0 0 6px} .txd .t td{padding:4px 0}
 @media (max-width:520px){ .txd{padding-left:0} }
+.tabs2 .btn{padding:0 6px; font-size:14px; line-height:18px}

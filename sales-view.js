@@ -168,8 +168,9 @@ function pickRange(k) {
 }
 function viewSales() {
   if (!salesDay || !SD[salesDay]) salesDay = LAST_DAY;
-  const tabs = `<div class="seg tabs2"><button class="btn ${salesTab === "overview" ? "on" : ""}" onclick="salesTab='overview';render()">Overview</button><button class="btn ${salesTab === "txns" ? "on" : ""}" onclick="salesTab='txns';render()">Transactions</button></div>`;
+  const tabs = `<div class="seg tabs2"><button class="btn ${salesTab === "overview" ? "on" : ""}" onclick="salesTab='overview';render()">Overview</button><button class="btn ${salesTab === "txns" ? "on" : ""}" onclick="salesTab='txns';render()">Transactions</button><button class="btn ${salesTab === "run" ? "on" : ""}" onclick="salesTab='run';render()">Morning run</button></div>`;
   if (salesTab === "txns") return viewTxns(tabs);
+  if (salesTab === "run") return viewRuns(tabs);
   return salesRange === "day" ? viewSalesDay(tabs) : viewSalesRange(tabs);
 }
 function viewSalesRange(tabs) {
@@ -319,4 +320,25 @@ function viewTxns(tabs) {
   const list = shown.map((t, i) => (TX.sort === "new" || TX.sort === "old") && multi && (i === 0 || shown[i - 1].business_day !== t.business_day) ? `<div class="txday">${esc(dayName(t.business_day))} <span class="mut" style="text-transform:none;letter-spacing:0">· business day from 04:00</span></div>` + txRow(t, false) : txRow(t, multi && !(TX.sort === "new" || TX.sort === "old"))).join("");
   const body = `${chips}${ctl}<div class="txsum"><b class="num">${f.length}</b> transaction${f.length === 1 ? "" : "s"} · <b class="num">${peso(tot)}</b> in sales${f.length !== rows.length ? ` <span class="mut">(filtered from ${rows.length})</span>` : ""}</div>${extra}<section class="card txlist">${list || '<div class="mut" style="text-align:center;padding:12px 0">Nothing matches these filters.</div>'}${f.length > shown.length ? `<button class="btn full" style="margin-top:8px" onclick="TX.limit+=200;render()">Show ${Math.min(200, f.length - shown.length)} more (${f.length - shown.length} left)</button>` : ""}</section>`;
   return shell("Sales", `Transactions · ${esc(multi ? dayName(a) + " – " + dayName(b) : dayLong(a))}`, head + body);
+}
+
+/* ---------- Morning run: Cherry's Store walk, mirrored from the old Rocket OS (table walk_run) ---------- */
+const RUN = { rows: null, loading: false, err: null, open: {} };
+async function loadRuns() {
+  if (RUN.loading) return; RUN.loading = true; RUN.err = null; render();
+  try { const { data, error } = await sb.from("walk_run").select("id,day,fund,endorsed_by,received_by,quick_counts,booklet_no,bir_first5,bir_time,note,recorded_by,created,columnar_sales,cash_breakdown,cash_total,cash_sales").eq("store", "P99").order("day", { ascending: false }).limit(90); if (error) throw error; RUN.rows = data; } catch (e) { RUN.err = e.message || String(e); }
+  RUN.loading = false; render();
+}
+function viewRuns(tabs) {
+  if (!RUN.rows && !RUN.loading && !RUN.err) setTimeout(loadRuns, 0);
+  const head = tabs + syncBar();
+  if (!RUN.rows) return shell("Sales", "Morning run", head + (RUN.err ? `<div class="card"><span class="band-bad">Could not load: ${esc(RUN.err)}</span><div style="margin-top:8px"><button class="btn" onclick="RUN.err=null;render()">Try again</button></div></div>` : `<div class="card mut" style="text-align:center">Loading the morning runs…</div>`));
+  const rows = RUN.rows.map(r => { const pos = SD[addDays(r.day, -1)]; const pc = pos ? pos.pay.cash || 0 : null; return { ...r, pos: pc, diff: (r.cash_sales != null && pc != null) ? Math.round((r.cash_sales - pc) * 100) / 100 : null }; });
+  const last = rows[0], withD = rows.filter(r => r.diff != null), avgAbs = withD.length ? sum(withD.map(r => Math.abs(r.diff))) / withD.length : null, net = sum(withD.map(r => r.diff));
+  const dsp = d => d == null ? '<span class="mut">—</span>' : `<span class="dl ${Math.abs(d) < 1 ? "flat" : d > 0 ? "up" : "down"}"><i>${Math.abs(d) < 1 ? "▬" : d > 0 ? "▲" : "▼"}</i>${peso(Math.abs(d))}</span>`;
+  const top = last ? `<div class="grid2">${tile("Last run", esc(dayName(last.day)), `by ${esc(last.recorded_by || "—")} · ${last.created ? tTime(last.created) : ""}`, "")}${tile("Cash fund", peso(last.fund), `${esc(last.endorsed_by || "—")} → ${esc(last.received_by || "—")}`, "")}${tile("Avg cash gap", avgAbs != null ? peso(avgAbs) : "—", `per run, ${withD.length} runs`, "")}${tile("Net gap", `${net >= 0 ? "+" : "−"}${peso(Math.abs(net))}`, "counted − POS, all runs", "")}</div>` : "";
+  const list = rows.map(r => { const open = RUN.open[r.id]; const qc = (r.quick_counts || "").split(" · ").filter(Boolean);
+    return `<div class="txr" onclick="RUN.open['${r.id}']=!RUN.open['${r.id}'];render()" role="button" tabindex="0"><div class="a"><b>${esc(dayName(r.day).replace(/^\w+, /, ""))}</b><span class="mut">${r.created ? tTime(r.created) : ""}</span></div><div class="b"><span>${r.cash_sales != null ? `Counted ${peso(r.cash_sales)} · POS ${r.pos != null ? peso(r.pos) : "—"}` : '<span class="mut">no cash count</span>'}</span><div class="tiny mut">${esc(r.recorded_by || "—")} · fund ${peso(r.fund)}${r.bir_first5 ? " · first 5: " + esc(r.bir_first5) : ""}</div></div><div class="c num">${dsp(r.diff)}</div></div>
+    ${open ? `<div class="txd">${r.cash_total != null ? `<div class="small">Drawer ${peso(r.cash_total)} − fund ${peso(r.fund)} = ${peso(r.cash_sales)} counted for ${esc(dayName(addDays(r.day, -1)))}${r.columnar_sales != null ? ` · columnar ${peso(r.columnar_sales)}` : ""}</div>` : ""}${r.cash_breakdown ? `<div class="tiny mut" style="margin-top:4px">${Object.entries(r.cash_breakdown).sort((a, b) => b[0] - a[0]).map(([d, k]) => `${k}×₱${d}`).join(" · ")}</div>` : ""}${qc.length ? `<table class="t" style="margin-top:6px"><tbody>${qc.map(x => `<tr><td>${esc(x)}</td></tr>`).join("")}</tbody></table>` : ""}<div class="tiny mut">OR booklet ${esc(r.booklet_no || "—")} · BIR time ${esc(r.bir_time || "—")}${r.note ? " · " + esc(r.note) : ""}</div></div>` : ""}`; }).join("");
+  return shell("Sales", "Morning run · Cherry's store walk", head + top + `<section class="card txlist">${list || '<div class="mut" style="text-align:center;padding:12px 0">No runs yet.</div>'}</section><div class="tiny mut">Counted cash = the drawer counted in the morning less the fund, for the business day before; POS = UTAK cash for that day. A gap is a prompt to look (timing, cash expenses, a late ticket), not an error by itself. Mirrored from the old Rocket OS (Store walk).</div>`);
 }
