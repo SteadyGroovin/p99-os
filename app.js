@@ -85,7 +85,7 @@ function viewWho() {
 function pinKey(k) { if (k === "⌫") pinBuf = pinBuf.slice(0, -1); else if (pinBuf.length < 4) pinBuf += k; if (pinBuf.length === 4) { S.me = pinWho; save(); pinBuf = ""; go(role() === "walk" ? "#/walk" : "#/today"); } render(); }
 
 /* ---------- sales helpers (real UTAK history) ---------- */
-const SD = SALES_HISTORY.days; const SDAYS = Object.keys(SD).sort(); const LAST_DAY = SDAYS[SDAYS.length - 1];
+const SD = SALES_HISTORY.days; const SDAYS = Object.keys(SD).sort(); let LAST_DAY = SDAYS[SDAYS.length - 1];
 const dayTotal = d => SD[d] ? SD[d].total : null;
 function cmpWeek(d) { const p = addDays(d, -7); return SD[p] ? { prev: SD[p].total, pct: SD[d] && SD[p].total ? (SD[d].total - SD[p].total) / SD[p].total : null } : null; }
 const pctTxt = p => p == null ? "" : `${p >= 0 ? "▲" : "▼"} ${Math.round(Math.abs(p) * 100)}% vs last ${new Date().toLocaleDateString("en-PH", { weekday: "short" })}`;

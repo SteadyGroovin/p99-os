@@ -250,3 +250,22 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .tt .r{display:grid; grid-template-columns:14px 1fr auto; gap:6px; align-items:center} .tt .r i{width:12px; height:3px; border-radius:2px} .tt .r span{color:var(--mut)} .tt .r b{font-weight:600}
 .tt .f{margin-top:4px; color:var(--mut); font-size:12px}
 @media (min-width:900px){ .hero2 .big{font-size:56px; line-height:64px} .hero2 .spark{height:56px} }
+
+/* ---------- Sync bar + Transactions (2026-10-28) ---------- */
+.tabs2{margin-bottom:0} .tabs2 .btn{flex:1}
+.syncbar{display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--surf); border:1px solid var(--line); border-radius:var(--r-card); padding:12px 14px; box-shadow:var(--shadow-xs)}
+.syncbar.stale{border-color:var(--warn-dot); background:var(--warn-bg)}
+.syncbar .sb-t{min-width:0} .syncbar .btn{flex:none; min-width:112px}
+.warnbox{background:var(--warn-bg); border-color:var(--warn-dot)}
+.txctl{display:grid; grid-template-columns:1fr 1fr; gap:8px} .txctl .in{width:100%; min-width:0} .txctl input[type=search]{grid-column:1/-1}
+@media (min-width:900px){ .txctl{grid-template-columns:repeat(3,minmax(0,1fr)) 1.6fr} .txctl input[type=search]{grid-column:auto} }
+.txsum{font-size:15px; color:var(--ink2); padding:2px 2px}
+.txlist{padding:4px 14px}
+.txday{font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--mut); padding:14px 0 4px}
+.txr{display:grid; grid-template-columns:76px 1fr auto; gap:10px; align-items:start; padding:11px 0; border-bottom:1px solid var(--line); cursor:pointer; font-size:15px; line-height:21px}
+.txr:last-of-type{border-bottom:0} .txr .a{display:grid; font-size:13px; line-height:18px} .txr .a b{font-size:15px; color:var(--ink)}
+.txr .b{min-width:0; overflow-wrap:anywhere} .txr .c{font-weight:600; text-align:right}
+.txr.box{background:linear-gradient(90deg,var(--warn-bg),transparent 60%); margin:0 -14px; padding-left:14px; padding-right:14px}
+.txr:hover{background:var(--surf2)}
+.txd{padding:2px 0 12px 86px; border-bottom:1px solid var(--line)} .txd .t{margin:0 0 6px} .txd .t td{padding:4px 0}
+@media (max-width:520px){ .txd{padding-left:0} }

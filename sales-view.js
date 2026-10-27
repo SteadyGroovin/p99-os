@@ -5,7 +5,8 @@
 const WD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const wdOf = d => (new Date(d + "T00:00:00").getDay() + 6) % 7;
 const RANGES = [["day", "Day"], ["7", "7 days"], ["30", "30 days"], ["90", "90 days"], ["365", "12 months"], ["all", "All"]];
-let salesRange = "30", salesDay = null, salesItemBy = "gross", salesTable = false;
+let salesRange = "30", salesDay = null, salesItemBy = "gross", salesTable = false, salesTab = "overview", salesYestMiss = false;
+const bizToday = () => ymd(new Date(Date.now() - 4 * 3600e3)); const bizYesterday = () => addDays(bizToday(), -1);
 const kfmt = v => v >= 1e6 ? "₱" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : v >= 1e3 ? "₱" + (v / 1e3).toFixed(v >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "k" : "₱" + Math.round(v);
 const monthName = m => new Date(m + "-01T00:00:00").toLocaleDateString("en-PH", { month: "short", year: "numeric" });
 const sum = a => a.reduce((s, x) => s + x, 0);
@@ -154,13 +155,24 @@ function insights(a, p, h, days) {
 
 /* ---------- views ---------- */
 function rangeBar() {
-  return `<div class="rng" role="tablist">${RANGES.map(([k, l]) => `<button class="${salesRange === k ? "on" : ""}" role="tab" aria-selected="${salesRange === k}" onclick="salesRange='${k}';render()">${l}</button>`).join("")}</div>`;
+  const y = bizYesterday();
+  const chips = [["yest", "Yesterday", salesRange === "day" && salesDay === y], ["day", "Pick day", salesRange === "day" && salesDay !== y]].concat(RANGES.slice(1).map(([k, l]) => [k, l, salesRange === k]));
+  return `<div class="rng" role="tablist">${chips.map(([k, l, on]) => `<button class="${on ? "on" : ""}" role="tab" aria-selected="${on}" onclick="pickRange('${k}')">${l}</button>`).join("")}</div>`;
+}
+function pickRange(k) {
+  const y = bizYesterday(); salesYestMiss = false;
+  if (k === "yest") { salesRange = "day"; if (SD[y]) salesDay = y; else { salesDay = LAST_DAY; salesYestMiss = true; } }
+  else if (k === "day") { salesRange = "day"; if (salesDay === y || !SD[salesDay]) salesDay = SD[addDays(y, -1)] ? addDays(y, -1) : LAST_DAY; }
+  else salesRange = k;
+  render(); window.scrollTo(0, 0);
 }
 function viewSales() {
   if (!salesDay || !SD[salesDay]) salesDay = LAST_DAY;
-  return salesRange === "day" ? viewSalesDay() : viewSalesRange();
+  const tabs = `<div class="seg tabs2"><button class="btn ${salesTab === "overview" ? "on" : ""}" onclick="salesTab='overview';render()">Overview</button><button class="btn ${salesTab === "txns" ? "on" : ""}" onclick="salesTab='txns';render()">Transactions</button></div>`;
+  if (salesTab === "txns") return viewTxns(tabs);
+  return salesRange === "day" ? viewSalesDay(tabs) : viewSalesRange(tabs);
 }
-function viewSalesRange() {
+function viewSalesRange(tabs) {
   const R = rangeOf(salesRange, LAST_DAY); const a = agg(R.days), p = R.prev ? agg(R.prev) : null; const size = R.n > 120 ? 7 : 1;
   const pts = bucket(R.days, size), pp = R.prev ? bucket(R.prev, size) : null; const h = heat(R.days);
   const lab = salesRange === "all" ? "" : `vs previous ${R.n} days`;
@@ -187,9 +199,9 @@ function viewSalesRange() {
     const mx = Math.max(...rows.map(r => r.total), 1);
     months = `<section class="card"><h2>By month</h2><table class="t mt"><thead><tr><th>Month</th><th class="n">Sales</th><th class="n">vs month before</th><th class="n">Avg ticket</th></tr></thead><tbody>${rows.slice().reverse().map((r, i, arr) => { const prv = arr[i + 1]; return `<tr><td>${monthName(r.m)}<div class="mbar"><i style="width:${(100 * r.total / mx).toFixed(0)}%"></i></div></td><td class="n num">${peso(r.total)}</td><td class="n">${prv ? delta(r.perDay, prv.perDay) : ""}</td><td class="n num">${peso(r.avgTicket)}</td></tr>`; }).join("")}</tbody></table><div class="tiny mut">Month-on-month compares sales per open day, so a short month is not penalised.</div></section>`;
   }
-  return shell("Sales", `${esc(dn(from))} – ${esc(dn(to))}`, rangeBar() + hero + tiles + chart + `<section class="card"><h2>What the numbers say</h2>${insights(a, p, h, R.days)}</section>` + when + sells + months + `<div class="tiny mut">Source: ${esc(SALES_HISTORY.source)}. Tickets exclude cash-box openings.</div>`);
+  return shell("Sales", `${esc(dn(from))} – ${esc(dn(to))}`, tabs + syncBar() + rangeBar() + hero + tiles + chart + `<section class="card"><h2>What the numbers say</h2>${insights(a, p, h, R.days)}</section>` + when + sells + months + `<div class="tiny mut">Source: ${esc(SALES_HISTORY.source)}. Tickets exclude cash-box openings.</div>`);
 }
-function viewSalesDay() {
+function viewSalesDay(tabs) {
   const d = SD[salesDay], i = SDAYS.indexOf(salesDay), prev = SDAYS[i - 1], next = SDAYS[i + 1];
   const nav = `<div class="daynav"><button class="btn" ${prev ? "" : "disabled"} onclick="salesDay='${prev}';render()" aria-label="Previous day">${ic("chevron-left")}</button><input class="in" type="date" value="${salesDay}" min="${SDAYS[0]}" max="${LAST_DAY}" onchange="if(SD[this.value]){salesDay=this.value;render()}"><button class="btn" ${next ? "" : "disabled"} onclick="salesDay='${next}';render()" aria-label="Next day">${ic("chevron-right")}</button></div>`;
   const w = wdOf(salesDay); const same = []; for (let k = 1; same.length < 8 && k <= 80; k++) { const x = addDays(salesDay, -7 * k); if (SD[x]) same.push(x); } const sa = agg(same); const typ = same.length ? sa.total / same.length : null;
@@ -203,11 +215,108 @@ function viewSalesDay() {
   const cats = {}; d.items.forEach(([cat, item, q, g]) => { const c = cats[cat] = cats[cat] || { cat, qty: 0, gross: 0, rows: [] }; c.qty += q; c.gross += g; c.rows.push([item, q, g]); });
   const co = Object.values(cats).sort((a, b) => b.gross - a.gross); const slices = (cats["Pizza Slice"] || { qty: 0 }).qty, wholes = (cats["Pizza Whole"] || { qty: 0 }).qty;
   const tix = d.tickets;
-  return shell("Sales", dayLong(salesDay), rangeBar() + nav + `
+  return shell("Sales", dayLong(salesDay), tabs + syncBar() + yestBanner() + rangeBar() + nav + `
     <section class="card hero2"><div class="lab">${esc(WD[w])} sales</div><div class="big num">${peso(d.total)}</div><div class="trend">${typ != null ? delta(d.total, typ, `vs a usual ${WD[w]} (${peso(typ)}, last ${same.length})`) : '<span class="mut">no earlier same weekday</span>'}</div></section>
     <div class="grid2">${tile("Tickets", tix, `avg ${peso(d.total / Math.max(1, tix))}`, "")}${tile("Pizzas", `${fmt(slices + wholes)}`, `${fmt(slices)} slices · ${fmt(wholes)} whole`, "")}${tile("Cash box", d.cashbox_opens + "×", "opened without a sale", "")}${tile("Cashiers", d.cashiers.length, d.cashiers.map(([n, k]) => `${esc(n || "—")} ${k}`).join(" · "), "")}</div>
     <section class="card"><h2>By hour <span class="tiny mut">dashed = a usual ${WD[w]}</span></h2><svg class="chart trend" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Sales by hour">${grid}${ty}${bars}${xl}</svg></section>
     <section class="card"><h2>Payment</h2>${stackBar([{ name: "Cash", v: d.pay.cash || 0, c: CATC[0] }, { name: "GCash", v: d.pay.gcash || 0, c: CATC[1] }, { name: "Card", v: d.pay.card || 0, c: CATC[2] }], peso)}</section>
     ${co.map(c => `<section class="card"><h2>${esc(c.cat)} <span class="tiny mut">${fmt(c.qty)} · ${peso(c.gross)}</span></h2><div class="hb items">${c.rows.sort((a, b) => b[2] - a[2]).map(([item, q, g]) => `<div class="hbr" data-tt="${esc(item)}|${fmt(q)} · ${peso(g)}"><span class="nm">${esc(item)}</span><span class="tr"><i style="width:${(100 * g / (c.rows[0][2] || 1)).toFixed(1)}%"></i></span><span class="vl num">${fmt(q)}<small>${kfmt(g)}</small></span></div>`).join("")}</div></section>`).join("")}
     <div class="tiny mut">Source: ${esc(SALES_HISTORY.source)}. Item lines before discount; totals after.</div>`);
+}
+
+/* ---------- sync with UTAK (Supabase edge function utak-sync) ---------- */
+const SYNC = { busy: false, msg: "", last: null, loaded: false };
+async function loadSyncInfo() {
+  try { const { data } = await sb.from("sync_log").select("at,trigger,ok,through_day,tickets,detail").order("at", { ascending: false }).limit(1); SYNC.last = data && data[0] || null; } catch (e) { /* the label just says never */ }
+  render();
+}
+function syncBar() {
+  if (typeof sb === "undefined") return "";
+  if (!SYNC.loaded) { SYNC.loaded = true; loadSyncInfo(); }
+  const y = bizYesterday(); const behind = LAST_DAY < y ? Math.round((new Date(y + "T00:00:00") - new Date(LAST_DAY + "T00:00:00")) / 864e5) : 0;
+  const l = SYNC.last; const when = l ? new Date(l.at).toLocaleString("en-PH", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" }) + " · " + (l.trigger === "nightly" ? "nightly" : "button") + (l.ok ? "" : " · failed") : "no sync recorded yet";
+  return `<div class="syncbar ${behind ? "stale" : ""}"><div class="sb-t"><b>Data to ${esc(dayName(LAST_DAY))}</b> ${behind ? `<span class="dl down"><i>▼</i>${behind} day${behind > 1 ? "s" : ""} behind</span>` : `<span class="dl up"><i>●</i>up to date</span>`}<div class="tiny mut">Last sync: ${esc(when)}${SYNC.msg ? " · " + esc(SYNC.msg) : ""}</div></div><button class="btn ${behind ? "primary" : ""}" ${SYNC.busy ? "disabled" : ""} onclick="syncNow()">${SYNC.busy ? "Syncing…" : "Sync now"}</button></div>`;
+}
+const yestBanner = () => salesYestMiss ? `<div class="card warnbox">${chip("warn", "Yesterday is not synced yet")}<div class="small" style="margin-top:6px">${esc(dayLong(bizYesterday()))} is not in the database. This shows the last synced day. Press <b>Sync now</b> above.</div></div>` : "";
+async function syncNow() {
+  if (SYNC.busy) return; SYNC.busy = true; SYNC.msg = "reading UTAK…"; render();
+  try {
+    let more = true, n = 0, tk = 0;
+    while (more && n++ < 8) {
+      const { data, error } = await sb.functions.invoke("utak-sync", { body: {} });
+      let r = data;
+      if (error) { try { r = await error.context.json(); } catch (e) { r = { ok: false, errors: [error.message] }; } }
+      if (!r || !r.ok) throw new Error((r && (r.error || (r.errors || []).join("; "))) || "sync failed");
+      tk += r.tickets; more = r.more; SYNC.msg = `${tk} tickets read…`; render();
+    }
+    const { data: sh, error: e2 } = await sb.rpc("sales_history", { p_store: "P99" }); if (e2) throw e2;
+    const nd = Object.assign({}, sh.days); window.SALES_HISTORY = sh; Object.keys(SD).forEach(k => delete SD[k]); Object.assign(SD, nd); SDAYS.length = 0; SDAYS.push(...Object.keys(SD).sort()); LAST_DAY = SDAYS[SDAYS.length - 1];
+    TX.cache = {}; SYNC.msg = `done, ${tk} tickets checked`;
+  } catch (e) { SYNC.msg = "failed: " + (e.message || e); }
+  SYNC.busy = false; await loadSyncInfo();
+}
+
+/* ---------- Transactions: every ticket, filter + sort; cash box opened without a sale ---------- */
+const TX = { range: "7", day: null, kind: "all", pay: "all", cashier: "all", disc: false, q: "", sort: "new", cache: {}, loading: false, err: null, errKey: null, open: {}, limit: 100 };
+const payKind = p => { p = String(p || "").toLowerCase(); return p.includes("gcash") ? "gcash" : p.includes("cash") ? "cash" : (p.includes("card") || p.includes("maya")) ? "card" : "other"; };
+const MNL = { timeZone: "Asia/Manila" };
+const tTime = iso => new Date(iso).toLocaleTimeString("en-PH", { hour: "2-digit", minute: "2-digit", hour12: false, ...MNL });
+const tDay = iso => new Date(iso).toLocaleDateString("en-PH", { weekday: "short", day: "numeric", month: "short", ...MNL });
+function txRange() { const y = bizYesterday(), t = bizToday(); if (TX.range === "today") return [t, t]; if (TX.range === "yest") return [y, y]; if (TX.range === "day") { const d = TX.day || y; return [d, d]; } const n = +TX.range; return [addDays(t, -(n - 1)), t]; }
+async function loadTx() {
+  const [a, b] = txRange(), key = a + "|" + b; if (TX.cache[key] || TX.loading) return;
+  TX.loading = true; TX.err = null; render();
+  try {
+    const rows = [];
+    for (let f = 0; ; f += 1000) { const { data, error } = await sb.from("pos_ticket").select("txn_key,business_day,rung_at,receipt_no,cashier,payment_type,total,cash_box_open,note").eq("store", "P99").gte("business_day", a).lte("business_day", b).order("rung_at", { ascending: false }).range(f, f + 999); if (error) throw error; rows.push(...data); if (data.length < 1000) break; }
+    const by = {};
+    for (let f = 0; ; f += 1000) { const { data, error } = await sb.from("pos_ticket_line").select("txn_key,line,category,item,option,qty,price,line_gross,item_discount_pct,item_discount_type,ticket_discount_pct,ticket_discount_type,item_note").eq("store", "P99").gte("business_day", a).lte("business_day", b).order("txn_key").order("line").range(f, f + 999); if (error) throw error; data.forEach(l => (by[l.txn_key] = by[l.txn_key] || []).push(l)); if (data.length < 1000) break; }
+    rows.forEach(t => { t.lines = by[t.txn_key] || []; t.disc = t.lines.some(l => (l.item_discount_pct || 0) > 0 || (l.ticket_discount_pct || 0) > 0); t.pk = payKind(t.payment_type); t.ts = new Date(t.rung_at).getTime(); });
+    TX.cache[key] = rows;
+  } catch (e) { TX.err = e.message || String(e); TX.errKey = key; }
+  TX.loading = false; render();
+}
+const txSet = (k, v) => { TX[k] = v; TX.limit = 100; if (k === "range" && v !== "day") TX.day = null; render(); };
+function txFilter(rows) {
+  const q = TX.q.trim().toLowerCase();
+  const f = rows.filter(t => (TX.kind === "all" || (TX.kind === "box" ? t.cash_box_open : !t.cash_box_open)) && (TX.pay === "all" || t.pk === TX.pay) && (TX.cashier === "all" || t.cashier === TX.cashier) && (!TX.disc || t.disc)
+    && (!q || String(t.receipt_no).includes(q) || (t.cashier || "").toLowerCase().includes(q) || (t.note || "").toLowerCase().includes(q) || t.lines.some(l => (l.item || "").toLowerCase().includes(q))));
+  const cmp = { new: (a, b) => b.ts - a.ts, old: (a, b) => a.ts - b.ts, high: (a, b) => (b.total || 0) - (a.total || 0), low: (a, b) => (a.total || 0) - (b.total || 0) }[TX.sort];
+  return f.sort(cmp);
+}
+function txRow(t, multi) {
+  const open = TX.open[t.txn_key], box = t.cash_box_open;
+  const sumLines = t.lines.filter(l => l.category !== "Open Cash Box"); const sm = sumLines.slice(0, 3).map(l => `${fmt(l.qty)}× ${esc(l.item)}`).join(", ") + (sumLines.length > 3 ? ` +${sumLines.length - 3}` : "");
+  const pk = { cash: "Cash", gcash: "GCash", card: "Card", other: esc(t.payment_type || "—") }[t.pk];
+  return `<div class="txr ${box ? "box" : ""}" onclick="TX.open[${t.txn_key}]=!TX.open[${t.txn_key}];render()" role="button" tabindex="0">
+    <div class="a"><b class="num">#${t.receipt_no ?? "—"}</b><span class="mut num">${multi ? esc(tDay(t.rung_at)) + " · " : ""}${tTime(t.rung_at)}</span></div>
+    <div class="b">${box ? chip("warn", "Cash box opened, no sale") : `<span>${sm || '<span class="mut">no items</span>'}</span>`}<div class="tiny mut">${esc(t.cashier || "—")} · ${box ? "" : pk}${t.disc ? " · discount" : ""}${t.note ? " · " + esc(t.note) : ""}</div></div>
+    <div class="c num">${box ? '<span class="mut">—</span>' : peso(t.total)}</div></div>
+    ${open ? `<div class="txd">${t.lines.length ? `<table class="t"><tbody>${t.lines.map(l => `<tr><td>${fmt(l.qty)}× ${esc(l.item)}${l.option ? `<div class="tiny mut">${esc(l.option)}</div>` : ""}${(l.item_discount_pct || l.ticket_discount_pct) ? `<div class="tiny band-warn">${esc(l.item_discount_type || l.ticket_discount_type || "discount")} ${l.item_discount_pct || l.ticket_discount_pct}%</div>` : ""}${l.item_note ? `<div class="tiny mut">${esc(l.item_note)}</div>` : ""}</td><td class="n num">${peso(l.line_gross)}</td></tr>`).join("")}${(() => { const d = (t.total || 0) - sum(t.lines.map(l => l.line_gross || 0)); return Math.abs(d) >= 0.5 ? `<tr><td class="mut">Service charge / discounts</td><td class="n num mut">${d > 0 ? "+" : "−"}${peso(Math.abs(d))}</td></tr>` : ""; })()}</tbody></table>` : '<div class="mut small">No lines.</div>'}<div class="tiny mut">Ticket key ${t.txn_key} · ${esc(tDay(t.rung_at))} ${tTime(t.rung_at)} · ${esc(t.payment_type || "")}</div></div>` : ""}`;
+}
+function viewTxns(tabs) {
+  const [a, b] = txRange(), key = a + "|" + b, rows = TX.cache[key];
+  if (!rows && !TX.loading && TX.errKey !== key) setTimeout(loadTx, 0);
+  const R = [["today", "Today"], ["yest", "Yesterday"], ["7", "7 days"], ["30", "30 days"], ["90", "90 days"], ["day", "Pick day"]];
+  const rng = `<div class="rng">${R.map(([k, l]) => `<button class="${TX.range === k ? "on" : ""}" onclick="txSet('range','${k}')">${l}</button>`).join("")}</div>${TX.range === "day" ? `<input class="in" type="date" value="${TX.day || bizYesterday()}" max="${bizToday()}" onchange="TX.day=this.value;TX.limit=100;render()">` : ""}`;
+  const head = tabs + syncBar() + rng;
+  if (!rows) return shell("Sales", "Transactions", head + (TX.err && TX.errKey === key ? `<div class="card"><span class="band-bad">Could not load: ${esc(TX.err)}</span><div style="margin-top:8px"><button class="btn" onclick="TX.errKey=null;render()">Try again</button></div></div>` : `<div class="card mut" style="text-align:center">Loading transactions…</div>`));
+  const boxN = rows.filter(t => t.cash_box_open).length, saleN = rows.length - boxN;
+  const cashiers = [...new Set(rows.map(t => t.cashier).filter(Boolean))].sort();
+  const kinds = [["all", `All ${rows.length}`], ["sale", `Sales ${saleN}`], ["box", `Cash box, no sale ${boxN}`]];
+  const chips = `<div class="rng">${kinds.map(([k, l]) => `<button class="${TX.kind === k ? "on" : ""}" onclick="txSet('kind','${k}')">${l}</button>`).join("")}<button class="${TX.disc ? "on" : ""}" onclick="txSet('disc',${!TX.disc})">Discounted</button></div>`;
+  const sel = (id, opts, cur, fn) => `<select class="in" onchange="${fn}(this.value)" aria-label="${id}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+  const ctl = `<div class="txctl">${sel("Payment", [["all", "Any payment"], ["cash", "Cash"], ["gcash", "GCash"], ["card", "Card / Maya"]], TX.pay, "(v=>txSet('pay',v))")}${sel("Cashier", [["all", "Any cashier"], ...cashiers.map(c => [c, c])], TX.cashier, "(v=>txSet('cashier',v))")}${sel("Sort", [["new", "Newest first"], ["old", "Oldest first"], ["high", "Highest total"], ["low", "Lowest total"]], TX.sort, "(v=>txSet('sort',v))")}<input class="in" type="search" placeholder="Receipt #, item, cashier, note" value="${esc(TX.q)}" onchange="TX.q=this.value;TX.limit=100;render()"></div>`;
+  const f = txFilter(rows), shown = f.slice(0, TX.limit), multi = a !== b;
+  const tot = sum(f.filter(t => !t.cash_box_open).map(t => t.total || 0));
+  let extra = "";
+  const bx = f.filter(t => t.cash_box_open);
+  if (bx.length) {
+    const byC = {}, byH = Array(24).fill(0); bx.forEach(t => { byC[t.cashier || "—"] = (byC[t.cashier || "—"] || 0) + 1; byH[+new Date(t.rung_at).toLocaleString("en-GB", { hour: "2-digit", hour12: false, ...MNL })]++; });
+    const days = new Set(bx.map(t => t.business_day)).size, hmax = Math.max(...byH), hbest = byH.indexOf(hmax);
+    extra = `<section class="card"><h2>Cash box opened without a sale <span class="tiny mut">${bx.length} times in ${days} day${days > 1 ? "s" : ""}</span></h2><div class="hb items">${Object.entries(byC).sort((x, y) => y[1] - x[1]).map(([c, n]) => `<div class="hbr" data-tt="${esc(c)}|${n} openings"><span class="nm">${esc(c)}</span><span class="tr"><i style="width:${(100 * n / bx.length).toFixed(0)}%"></i></span><span class="vl num">${n}</span></div>`).join("")}</div><div class="tiny mut" style="margin-top:8px">About ${(bx.length / days).toFixed(1)} a day; most at ${pad2(hbest)}:00 (${hmax}). Each one is a till opened with no ticket rung: change, a refund, or something to check.</div></section>`;
+  }
+  const list = shown.map((t, i) => (TX.sort === "new" || TX.sort === "old") && multi && (i === 0 || shown[i - 1].business_day !== t.business_day) ? `<div class="txday">${esc(dayName(t.business_day))} <span class="mut" style="text-transform:none;letter-spacing:0">· business day from 04:00</span></div>` + txRow(t, false) : txRow(t, multi && !(TX.sort === "new" || TX.sort === "old"))).join("");
+  const body = `${chips}${ctl}<div class="txsum"><b class="num">${f.length}</b> transaction${f.length === 1 ? "" : "s"} · <b class="num">${peso(tot)}</b> in sales${f.length !== rows.length ? ` <span class="mut">(filtered from ${rows.length})</span>` : ""}</div>${extra}<section class="card txlist">${list || '<div class="mut" style="text-align:center;padding:12px 0">Nothing matches these filters.</div>'}${f.length > shown.length ? `<button class="btn full" style="margin-top:8px" onclick="TX.limit+=200;render()">Show ${Math.min(200, f.length - shown.length)} more (${f.length - shown.length} left)</button>` : ""}</section>`;
+  return shell("Sales", `Transactions · ${esc(multi ? dayName(a) + " – " + dayName(b) : dayLong(a))}`, head + body);
 }
