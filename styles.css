@@ -204,3 +204,49 @@ svg.chart .vb.hi{fill:var(--brand700)} :root[data-theme="dark"] svg.chart .vb.hi
 .ic{width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:middle} .ic.sm{width:18px; height:18px}
 .btn .ic{width:20px; height:20px} .chev .ic{width:18px; height:18px}
 .grid2 .card{padding:14px 16px}
+
+/* ---------- Sales v2 (2026-10-28): chart tokens, validated with the dataviz palette script ---------- */
+:root{ --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --sother:#898781; --sgrid:var(--line) }
+:root[data-theme="dark"]{ --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --sother:#898781 }
+.rng{display:flex; gap:6px; overflow-x:auto; padding:2px 0 4px; scrollbar-width:none} .rng::-webkit-scrollbar{display:none}
+.rng button{flex:none; height:36px; padding:0 14px; border-radius:999px; border:1px solid var(--line2); background:var(--surf); color:var(--ink2); font-size:14px; font-weight:600}
+.rng button.on{background:var(--p99); border-color:var(--p99); color:var(--on-accent)}
+.hero2 .big{font-size:44px; line-height:52px; font-weight:600; letter-spacing:-.03em; margin-top:4px}
+.hero2 .lab,.kt .lab{font-size:13px; line-height:18px; color:var(--mut); font-weight:500}
+.hero2 .sub{font-size:14px; color:var(--mut); margin:6px 0 10px}
+.hero2 .trend,.kt .trend{font-size:14px; line-height:20px; margin-top:2px}
+.hero2 .spark{width:100%; height:46px; display:block}
+.kt .val{font-size:26px; line-height:34px; font-weight:600; letter-spacing:-.02em; margin-top:2px}
+.kt .sp{margin-top:8px; height:28px}
+.spark path{fill:none; stroke:var(--s1); stroke-width:2; stroke-linecap:round; stroke-linejoin:round} .spark circle{fill:var(--s1); stroke:var(--surf); stroke-width:2}
+.dl{font-weight:600; white-space:nowrap} .dl i{font-style:normal; font-size:11px; margin-right:3px}
+.dl.up{color:var(--ok)} .dl.down{color:var(--bad)} .dl.flat{color:var(--mut)}
+svg.chart.trend .sbar{fill:var(--s1); opacity:.9} svg.chart.trend .sbar.on,svg.chart.trend .sbar:hover{opacity:1; filter:brightness(1.15)}
+svg.chart.trend .area{fill:var(--s1); opacity:.14} svg.chart.trend .line{fill:none; stroke:var(--s1); stroke-width:2; stroke-linejoin:round}
+svg.chart.trend .prev{fill:none; stroke:var(--mut); stroke-width:1.75; stroke-dasharray:5 4; opacity:.9}
+svg.chart.trend .xh{stroke:var(--ink2); stroke-width:1; stroke-dasharray:2 3} svg.chart.trend .xd{fill:var(--s1); stroke:var(--surf); stroke-width:2}
+svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
+.legend{display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:10px; font-size:13px; line-height:18px; color:var(--ink2)}
+.legend b{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px} .legend b.dash{height:0; width:16px; border-top:2px dashed var(--mut); border-radius:0}
+.stack{display:flex; gap:2px; height:22px; border-radius:6px; overflow:hidden} .stack i{display:block; min-width:3px; cursor:default}
+.tbl{margin-top:10px} .tbl summary{cursor:pointer; font-size:14px; font-weight:600; color:var(--p99); padding:6px 0}
+.tbl .t{margin-top:6px} .tbl[open]{max-height:none}
+.heat{display:grid; grid-template-columns:34px repeat(var(--cols),minmax(0,1fr)); gap:2px; align-items:stretch}
+.heat .hr{font-size:12px; line-height:26px; color:var(--mut)} .heat .ha{font-size:11px; color:var(--mut); text-align:center; line-height:18px; white-space:nowrap}
+.heat .hc{height:26px; border-radius:4px; background:color-mix(in srgb,var(--s1) var(--f),var(--surf2)); outline-offset:1px} .heat .hc:hover,.heat .hc:focus{outline:2px solid var(--ink2)}
+.hl{display:flex; align-items:center; gap:8px; margin-top:10px; font-size:12px; color:var(--mut)} .hl i{width:84px; height:8px; border-radius:4px; background:linear-gradient(90deg,var(--surf2),var(--s1))}
+.hb{display:grid; gap:8px} .hb .hbr{display:grid; grid-template-columns:40px 1fr 52px; gap:10px; align-items:center; min-height:32px}
+.hb.items .hbr{grid-template-columns:minmax(110px,38%) 1fr 58px}
+.hb .nm{font-size:14px; line-height:18px; color:var(--ink2); overflow-wrap:anywhere} .hb .nm small{display:block; font-size:12px; color:var(--mut)}
+.hb .tr{height:12px; border-radius:6px; background:var(--surf2); overflow:hidden} .hb .tr i{display:block; height:100%; border-radius:6px; background:color-mix(in srgb,var(--s1) 38%,var(--surf2))}
+.hb .hbr.best .tr i,.hb.items .tr i{background:var(--s1)}
+.hb .vl{font-size:14px; font-weight:600; text-align:right; line-height:16px} .hb .vl small{display:block; font-weight:400; font-size:12px; color:var(--mut)}
+.hb .hbr:hover .tr i{filter:brightness(1.12)}
+.split{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px} .split h2{margin:0}
+.seg.sm .btn{min-height:32px; height:32px; padding:0 12px; flex:none}
+.ins{list-style:none; margin:0; padding:0; display:grid; gap:10px} .ins li{display:grid; grid-template-columns:22px 1fr; gap:8px; font-size:15px; line-height:22px; color:var(--ink2)} .ins li>span{color:var(--s1); font-size:13px; text-align:center; line-height:22px} .ins b{color:var(--ink)}
+.mt td{vertical-align:middle} .mbar{height:4px; border-radius:2px; background:var(--surf2); margin-top:4px; max-width:140px} .mbar i{display:block; height:100%; border-radius:2px; background:var(--s1)}
+.tt{position:fixed; z-index:60; display:none; pointer-events:none; background:var(--surf); color:var(--ink); border:1px solid var(--line2); border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.18); padding:8px 10px; font-size:13px; line-height:18px; max-width:260px}
+.tt .r{display:grid; grid-template-columns:14px 1fr auto; gap:6px; align-items:center} .tt .r i{width:12px; height:3px; border-radius:2px} .tt .r span{color:var(--mut)} .tt .r b{font-weight:600}
+.tt .f{margin-top:4px; color:var(--mut); font-size:12px}
+@media (min-width:900px){ .hero2 .big{font-size:56px; line-height:64px} .hero2 .spark{height:56px} }

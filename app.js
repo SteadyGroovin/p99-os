@@ -96,42 +96,7 @@ function svgBars(vals, labels, { w = 560, h = 150, hi = -1, fmtv = v => fmt(Math
   const lab = labels.map((l, i) => i % step === 0 ? `<text x="${pad.l + i * bw + bw / 2}" y="${h - 6}" text-anchor="middle">${l}</text>` : "").join("");
   return `<svg class="chart" viewBox="0 0 ${w} ${h}" width="100%" role="img">${[0, .5, 1].map(f => `<line class="grid" x1="${pad.l}" x2="${w - pad.r}" y1="${h - pad.b - (h - pad.t - pad.b) * f}" y2="${h - pad.b - (h - pad.t - pad.b) * f}"/><text x="${pad.l - 6}" y="${h - pad.b - (h - pad.t - pad.b) * f + 4}" text-anchor="end">${fmtv(max * f)}</text>`).join("")}${bars}${lab}</svg>`;
 }
-let salesDay = null, salesView = "day";
-function viewSales() {
-  if (!salesDay || !SD[salesDay]) salesDay = LAST_DAY; const d = SD[salesDay]; const c = cmpWeek(salesDay);
-  const i = SDAYS.indexOf(salesDay); const prev = SDAYS[i - 1], next = SDAYS[i + 1];
-  const hours = []; const hl = []; for (let k = 4; k < 28; k++) { hours.push(d.hours[k % 24]); hl.push(`${pad2(k % 24)}`); }
-  const cats = {}; d.items.forEach(([cat, item, q, g]) => { (cats[cat] = cats[cat] || []).push([item, q, g]); });
-  const catOrder = Object.keys(cats).sort((a, b) => cats[b].reduce((s, r) => s + r[2], 0) - cats[a].reduce((s, r) => s + r[2], 0));
-  const slices = d.items.filter(r => r[0] === "Pizza Slice").reduce((s, r) => s + r[2], 0), wholes = d.items.filter(r => r[0] === "Pizza Whole").reduce((s, r) => s + r[2], 0);
-  const nav = `<div class="daynav"><button class="btn" ${prev ? "" : "disabled"} onclick="salesDay='${prev}';render()">${ic("chevron-left")}</button><input class="in" type="date" value="${salesDay}" min="${SDAYS[0]}" max="${LAST_DAY}" onchange="salesDay=this.value;render()"><button class="btn" ${next ? "" : "disabled"} onclick="salesDay='${next}';render()">${ic("chevron-right")}</button></div>`;
-  const seg = `<div class="seg"><button class="btn ${salesView === "day" ? "on" : ""}" onclick="salesView='day';render()">Day</button><button class="btn ${salesView === "week" ? "on" : ""}" onclick="salesView='week';render()">2 weeks</button><button class="btn ${salesView === "month" ? "on" : ""}" onclick="salesView='month';render()">Month</button></div>`;
-  let body = "";
-  if (salesView === "day") {
-    body = `
-    <div class="grid2">
-      ${card(kpi("Sales", peso(d.total), c ? pctTxt(c.pct) : "no data a week earlier", c && c.pct != null ? (c.pct >= 0 ? "band-ok" : "band-bad") : ""))}
-      ${card(kpi("Tickets", d.tickets, `avg ${peso(d.total / Math.max(1, d.tickets))}`))}
-      ${card(kpi("Cash / GCash", `${peso(d.pay.cash || 0)}`, `GCash ${peso(d.pay.gcash || 0)}${d.pay.card ? " · card " + peso(d.pay.card) : ""}`))}
-      ${card(kpi("Pizzas", `${slices} <span class="small mut">slices</span>`, `${wholes} whole · cash box opened ${d.cashbox_opens}×`))}
-    </div>
-    <section class="card"><h2>By hour <span class="tiny mut">business day from 04:00</span></h2>${svgBars(hours, hl, { hi: -1, fmtv: v => peso(v) })}</section>
-    ${catOrder.map(cat => `<section class="card"><h2>${esc(cat)} <span class="tiny mut">${fmt(cats[cat].reduce((s, r) => s + r[1], 0))} · ${peso(cats[cat].reduce((s, r) => s + r[2], 0))}</span></h2><table class="t"><tbody>${cats[cat].sort((a, b) => b[1] - a[1]).map(([item, q, g]) => `<tr><td>${esc(item)}</td><td class="n num">${fmt(q)}</td><td class="n num mut">${peso(g)}</td></tr>`).join("")}</tbody></table></section>`).join("")}
-    <div class="tiny mut">Cashiers: ${d.cashiers.map(([n, k]) => `${esc(n || "—")} ${k}`).join(" · ")}. Source: UTAK, item lines before discount; totals after. ${esc(SALES_HISTORY.source)}</div>`;
-  } else if (salesView === "week") {
-    const days = []; for (let k = 13; k >= 0; k--) days.push(addDays(salesDay, -k));
-    const vals = days.map(x => dayTotal(x) || 0); const labels = days.map(x => new Date(x + "T00:00:00").toLocaleDateString("en-PH", { weekday: "short" }).slice(0, 2) + " " + x.slice(8));
-    body = `<section class="card"><h2>Daily sales, 14 days to ${dayName(salesDay)}</h2>${svgBars(vals, labels, { hi: 13, fmtv: v => peso(v) })}<table class="t"><thead><tr><th>Day</th><th class="n">Sales</th><th class="n">Tickets</th><th class="n">vs week before</th></tr></thead><tbody>${days.slice().reverse().map(x => { const dd = SD[x]; const cc = cmpWeek(x); return `<tr class="tap" onclick="salesDay='${x}';salesView='day';render()"><td>${dayName(x)}</td><td class="n num">${dd ? peso(dd.total) : "<span class='mut'>no data</span>"}</td><td class="n num">${dd ? dd.tickets : ""}</td><td class="n ${cc && cc.pct != null ? (cc.pct >= 0 ? "band-ok" : "band-bad") : "mut"}">${cc && cc.pct != null ? (cc.pct >= 0 ? "+" : "") + Math.round(cc.pct * 100) + "%" : "—"}</td></tr>`; }).join("")}</tbody></table></section>`;
-  } else {
-    const m = salesDay.slice(0, 7); const days = SDAYS.filter(x => x.startsWith(m)); const vals = days.map(x => SD[x].total); const tot = vals.reduce((a, b) => a + b, 0);
-    const byItem = {}; days.forEach(x => SD[x].items.forEach(([cat, item, q, g]) => { const k = cat + "|" + item; byItem[k] = byItem[k] || [cat, item, 0, 0]; byItem[k][2] += q; byItem[k][3] += g; }));
-    const top = Object.values(byItem).sort((a, b) => b[3] - a[3]).slice(0, 15);
-    body = `<div class="grid2">${card(kpi("Month to date", peso(tot), `${days.length} trading days · avg ${peso(tot / Math.max(1, days.length))}/day`))}${card(kpi("Tickets", days.reduce((s, x) => s + SD[x].tickets, 0), `avg ${peso(tot / Math.max(1, days.reduce((s, x) => s + SD[x].tickets, 0)))}`))}</div>
-    <section class="card"><h2>${new Date(m + "-01T00:00:00").toLocaleDateString("en-PH", { month: "long", year: "numeric" })}</h2>${svgBars(vals, days.map(x => x.slice(8)), { hi: days.indexOf(salesDay), fmtv: v => peso(v) })}<div class="tiny mut">Tap a bar's day in the 2-weeks view to open it.</div></section>
-    <section class="card"><h2>Top items this month</h2><table class="t"><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Gross</th></tr></thead><tbody>${top.map(([cat, item, q, g]) => `<tr><td>${esc(item)}<div class="tiny mut">${esc(cat)}</div></td><td class="n num">${fmt(q)}</td><td class="n num">${peso(g)}</td></tr>`).join("")}</tbody></table></section>`;
-  }
-  return shell("Sales", dayLong(salesDay), nav + seg + body);
-}
+/* viewSales lives in sales-view.js (v2) */
 
 /* ---------- TODAY ---------- */
 function runFor(cl, day = today()) { const k = cl.id + ":" + day; return S.runs[k] || (S.runs[k] = { done: {} }); }
