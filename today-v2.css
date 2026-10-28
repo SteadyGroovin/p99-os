@@ -1,0 +1,13 @@
+/* today-v2.css — styles for the rebuilt today section. Reuse the tokens and classes from styles.css and the Sales v2 block at its end (--s1..--s4, .tile/.kt, .hb, .heat, .legend, .stack, .dl, .spark, .rng, .txr). */
+.tapc{cursor:pointer} .tapc:active{background:var(--surf2)}
+.attnlist{display:grid; gap:8px}
+.attn{display:grid; grid-template-columns:30px 1fr auto; gap:10px; align-items:center; width:100%; text-align:left; padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:var(--surf2); min-height:52px}
+.attn .ai{width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-size:14px; font-weight:700; background:var(--surf); border:1px solid var(--line2); color:var(--ink2)}
+.attn .at{display:grid; gap:1px; min-width:0} .attn .at b{font-size:15px; line-height:20px} .attn .at .tiny{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.attn.bad{border-color:var(--bad-dot); background:var(--bad-bg)} .attn.bad .ai{color:var(--bad); border-color:var(--bad-dot)}
+.attn.warn{border-color:var(--warn-dot); background:var(--warn-bg)} .attn.warn .ai{color:var(--warn); border-color:var(--warn-dot)}
+.attn.info .ai{color:var(--info); border-color:var(--info-dot)}
+.okline{display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center}
+.mg{padding:14px 14px 6px} .mg h3{margin:0 0 6px 4px}
+.sw{flex:none; width:44px; height:26px; border-radius:13px; background:var(--n300); position:relative; transition:background .15s} .sw i{position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.3); transition:left .15s} .sw.on{background:var(--p99)} .sw.on i{left:21px}
+.health .hrow{padding:10px 0; border-bottom:1px solid var(--line)} .health .hrow:last-child{border-bottom:0} .health .hn{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap} .health .hn b{font-size:15px} .health .chip{white-space:nowrap}

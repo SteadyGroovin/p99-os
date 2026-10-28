@@ -52,6 +52,6 @@ async function start() {
   window.SALES_HISTORY = data;
   window.DB_USER = session.user.email;
   bootEl.innerHTML = "";
-  for (const s of ["data.js", "icons.js", "sales-view.js", "app.js"]) await loadScript(s);
+  for (const s of ["data.js", "icons.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "app.js"]) await loadScript(s);
 }
 start().catch(e => bootScreen(`<span class="band-bad">${bootEsc(e.message)}</span>`));

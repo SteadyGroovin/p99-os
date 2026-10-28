@@ -1,0 +1,93 @@
+/* stock-v2.css — Stock section v2 (2026-10-28). Builds on the tokens in styles.css and the Sales v2 block (--s1, .kt, .hb, .rng, .legend, .tbl, .txday, .txctl).
+   One blue (--s1) for magnitude; ok/warn/bad only on chips and flags that also carry a word or an arrow. */
+
+/* quick actions */
+.skact{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+.skact .btn{min-height:52px; font-size:16px}
+
+/* level bar: stock vs par, par = tick in the middle */
+.lvl{position:relative; display:block; height:10px; border-radius:5px; background:var(--surf2); margin-top:8px; overflow:visible; min-width:60px}
+.lvl > i{position:absolute; left:0; top:0; bottom:0; border-radius:5px; background:var(--s1)}
+.lvl > b{position:absolute; left:50%; top:-3px; bottom:-3px; width:2px; margin-left:-1px; background:var(--ink2); border-radius:1px}
+.lvl.none{background:repeating-linear-gradient(90deg,var(--surf2) 0 6px,transparent 6px 10px)}
+.legend b.tick{width:2px; height:12px; border-radius:1px; background:var(--ink2)}
+.skrow .right{min-width:92px}
+.skrow .right .chip{font-size:13px; padding:0 8px 0 6px; min-height:22px}
+
+/* levels board rows */
+.lvls{margin-top:4px}
+.lvr{display:grid; grid-template-columns:minmax(0,1.5fr) minmax(56px,1fr) 70px; gap:12px; align-items:center; width:100%; min-height:52px; padding:7px 0; border:0; border-bottom:1px solid var(--line); background:transparent; text-align:left; cursor:pointer; color:inherit}
+.lvr:hover{background:var(--surf2)}
+.lvr .nm{font-size:15px; line-height:20px; font-weight:600; color:var(--ink); overflow-wrap:anywhere}
+.lvr .lvl{margin-top:0}
+.lvr .vl{text-align:right; font-weight:600; font-size:15px; line-height:18px} .lvr .vl small{display:block; font-size:12px; font-weight:400; color:var(--mut)}
+.lvr .st{display:flex; flex-wrap:nowrap; gap:6px; align-items:center; margin-top:2px; font-weight:400} .lvr .st .chip{font-size:12px; line-height:18px; min-height:20px; padding:0 8px 0 6px}
+@media (min-width:640px){ .lvr{grid-template-columns:minmax(0,1fr) minmax(160px,1.3fr) 96px} .lvr .nm{display:flex; align-items:center; gap:8px; flex-wrap:wrap} .lvr .st{margin-top:0} }
+
+/* count */
+.skhead{display:flex; align-items:center; gap:16px}
+.ring.big{width:72px; height:72px; font-size:16px; flex:none} .ring.big > b{width:58px; height:58px}
+.skhead .kt .val{font-size:24px; line-height:32px}
+.steps{list-style:none; margin:0; padding:0; display:grid; gap:8px}
+.bottom-act.two{display:grid; gap:8px}
+@media (min-width:640px){ .bottom-act.two{grid-template-columns:1fr 1fr} }
+.cprog{display:flex; align-items:center; gap:10px} .cprog .bar{flex:1}
+.crow{display:flex; align-items:center; gap:10px; min-height:60px; padding:6px 10px 6px 0; background:var(--surf); border:1px solid var(--line); border-radius:var(--r-card); box-shadow:var(--shadow-xs)}
+.crow .cmain{flex:1; min-width:0; border:0; background:transparent; text-align:left; padding:6px 0 6px 14px; min-height:48px; cursor:pointer}
+.crow .name{font-size:16px; line-height:22px; font-weight:600} .crow .meta{font-size:13px; line-height:18px; color:var(--mut); margin-top:2px}
+.crow.done{background:var(--surf2)} .crow.done .name{color:var(--ink2)}
+.crow.skipped .name{color:var(--mut); text-decoration:line-through}
+.crow .cval{flex:none; display:flex; align-items:center}
+.crow .cv{display:grid; justify-items:end; border:0; background:transparent; min-height:44px; min-width:64px; padding:0 6px; cursor:pointer} .crow .cv b{font-size:20px; line-height:24px} .crow .cv small{font-size:12px; color:var(--mut)}
+.crow button.chip{border:0; min-height:36px; cursor:pointer}
+.btn.sm{min-height:40px; padding:0 14px; font-size:14px}
+.skpad .units .btn{min-height:52px; flex-direction:column; gap:0; line-height:18px} .skpad .units .btn b{font-size:18px}
+.skpad .pad button{min-height:60px; font-size:28px}
+.skpad .disp .big{font-size:36px; line-height:44px}
+.padact{display:grid; grid-template-columns:1fr 1.6fr; gap:8px; margin-top:10px} .padact .btn{min-height:52px}
+.chips{display:flex; flex-wrap:wrap; gap:8px} .chips .chip{border:0; cursor:pointer; min-height:36px; font-size:14px} .chips button.chip{border:1px solid var(--line2)}
+.chips .chip.info{border-color:var(--info-dot)}
+
+/* variance: diverging bars around expected */
+.dv{display:grid; gap:4px}
+.dvr{display:grid; grid-template-columns:minmax(90px,30%) 1fr 64px 76px; gap:8px; align-items:center; min-height:36px; border-bottom:1px solid var(--line)}
+.dvr:last-child{border-bottom:0}
+.dvr .nm{font-size:14px; line-height:18px; color:var(--ink2); overflow-wrap:anywhere}
+.dvr .tr{position:relative; height:14px; background:var(--surf2); border-radius:4px}
+.dvr .tr > i{position:absolute; top:0; bottom:0; background:var(--s1); border-radius:3px}
+.dvr .tr > i.neg{border-radius:3px 0 0 3px} .dvr .tr > i.pos{border-radius:0 3px 3px 0}
+.dvr .tr > b{position:absolute; left:50%; top:-3px; bottom:-3px; width:2px; margin-left:-1px; background:var(--ink2)}
+.dvr .vl{font-size:14px; font-weight:600; text-align:right; line-height:16px} .dvr .vl small{display:block; font-weight:400; font-size:12px; color:var(--mut)}
+.dvr .st{justify-self:end} .dvr .st .chip{font-size:12px; min-height:20px; padding:0 8px 0 6px}
+@media (max-width:420px){ .dvr{grid-template-columns:minmax(72px,27%) 1fr 50px 66px; gap:6px} .dvr .nm{font-size:13px} .dvr .st .chip{padding:0 6px 0 5px; gap:4px} }
+
+/* receive */
+.rsteps{list-style:none; margin:0; padding:0; display:flex; gap:6px}
+.rsteps li{flex:1; display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--mut); padding:6px 8px; border-radius:var(--r-ctl); background:var(--surf2)}
+.rsteps li span{width:22px; height:22px; border-radius:50%; display:grid; place-items:center; background:var(--surf); border:1px solid var(--line2); font-size:12px; flex:none}
+.rsteps li.ok{color:var(--ok); background:var(--ok-bg)} .rsteps li.ok span{border-color:var(--ok-dot); color:var(--ok)}
+.rline{display:grid; grid-template-columns:1fr auto; gap:4px 8px; align-items:center; padding:10px 4px 10px 12px; border:1px solid var(--line); border-radius:var(--r-card); background:var(--surf)}
+.rline .main{min-width:0} .rline .name{font-weight:600} .rline .meta{font-size:13px; color:var(--mut)}
+.rline .rx{min-width:44px; padding:0}
+.rprice{grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px}
+.rpin{display:flex; align-items:center; gap:6px} .rpin .in{width:96px; min-height:44px; text-align:right; padding:0 10px}
+.pflag{margin-top:2px; min-height:18px}
+.pf{font-size:13px; font-weight:600; white-space:nowrap; cursor:default} .pf i{font-style:normal; font-size:11px; margin-right:3px}
+.pf.up{color:var(--bad)} .pf.down{color:var(--ok)} .pf.flat{color:var(--mut); font-weight:500} .pf.big{text-decoration:underline; text-underline-offset:3px}
+
+/* receipts */
+.rrow{display:grid; grid-template-columns:44px 1fr auto; gap:10px; align-items:start; padding:10px 0; border-bottom:1px solid var(--line)}
+.rrow .name{font-weight:600; font-size:15px} .rrow .meta{font-size:13px; line-height:19px; color:var(--mut); margin-top:2px; overflow-wrap:anywhere} .rrow .meta a{font-weight:500}
+.rrow .right{text-align:right} .rrow .right .v{font-weight:600} .rrow .right .l{font-size:12px; color:var(--mut)}
+.nophoto{width:44px; height:44px; border-radius:8px; border:1px dashed var(--line2); display:grid; place-items:center; color:var(--mut)}
+.hbtn{border:0; background:transparent; width:100%; text-align:left; padding:0; cursor:pointer; color:inherit}
+.txctl:has(> :nth-child(2):last-child){grid-template-columns:1fr 1fr}
+@media (min-width:900px){ .txctl:has(> :nth-child(2):last-child){grid-template-columns:1fr 1fr} }
+
+/* phone: keep rows readable at 375 px */
+@media (max-width:420px){ .skrow .right{min-width:84px} }
+
+/* tables never push the page wider than the phone */
+.tscroll{overflow-x:auto; contain:inline-size; margin:0 -4px; padding:0 4px} .tscroll .chip,.tbl .chip{font-size:12px; line-height:18px; min-height:20px; padding:0 8px 0 6px}
+.tbl{overflow-x:auto; contain:inline-size}
+@media (min-width:900px){ .list.soon{display:grid; grid-template-columns:1fr 1fr} .skact .btn{min-height:56px} }

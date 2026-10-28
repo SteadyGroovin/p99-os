@@ -1,0 +1,123 @@
+/* clean-v2.css — Clean, Report, Tasks, Cash (2026-10-28). Builds on the tokens in styles.css and its Sales v2 block (--s1..--s4, .kt, .hb, .legend, .rng, .tbl, .tt).
+   Kitchen rules: tap targets >= 44px, body text >= 15px, status colour always with an icon and a word. */
+
+/* shared */
+.c2filt{display:grid; gap:6px}
+.c2empty{padding:10px 2px}
+.c2big{min-height:52px; font-size:16px}
+.c2picks{display:flex; flex-wrap:wrap; gap:8px; margin-top:10px}
+.c2picks button{min-height:44px; padding:0 14px; border-radius:999px; border:1px solid var(--line2); background:var(--surf); color:var(--ink2); font-size:15px; font-weight:500}
+.c2picks button.on{background:var(--p99-soft); border-color:var(--p99); color:var(--p99-deep); font-weight:600}
+:root[data-theme="dark"] .c2picks button.on{color:var(--brand300)}
+.c2picks.sm{margin-top:0} .c2picks.sm button{min-height:40px; font-size:14px; padding:0 12px}
+.c2kv{display:grid; grid-template-columns:1fr 1fr; gap:10px 16px; margin-top:12px}
+.c2kv > div{display:grid; gap:2px} .c2kv span{font-size:13px; line-height:18px; color:var(--mut)} .c2kv b{font-size:17px; line-height:24px; font-weight:600}
+@media (min-width:700px){ .c2kv{grid-template-columns:repeat(4,1fr)} }
+.c2sug{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; margin:10px 0; font-weight:400; font-size:15px; line-height:21px}
+.c2sug .btn{flex:none; background:var(--surf)}
+.c2log{list-style:none; margin:0; padding:0; display:grid; gap:10px} .c2log li{display:grid; grid-template-columns:120px 1fr; gap:10px; font-size:15px; line-height:21px; color:var(--ink2)} .c2log li > span{padding-top:2px}
+@media (max-width:420px){ .c2log li{grid-template-columns:1fr; gap:0} }
+.c2tkh{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px}
+.c2note{font-size:16px; line-height:24px; margin:12px 0 0; white-space:pre-wrap}
+.c2ph{display:grid; gap:8px} .c2ph .photo{width:100%; min-height:56px; justify-content:center}
+.btn.sm{min-height:36px; padding:0 12px; font-size:14px}
+
+/* chart (c2Bars) */
+svg.c2ch .cb{fill:var(--s1); opacity:.88} svg.c2ch .cb.neg{fill:var(--bad-dot)} svg.c2ch .cb.pos{fill:var(--warn-dot)} svg.c2ch .cb.zero{fill:var(--sother)}
+svg.c2ch .hitb{fill:transparent; cursor:pointer} svg.c2ch .hitb:hover{fill:var(--ink); fill-opacity:.05}
+svg.c2ch .thr{stroke:var(--mut); stroke-width:1; stroke-dasharray:4 4} svg.c2ch .thl{fill:var(--mut); font-size:12px}
+svg.c2ch .grid.zero{stroke:var(--line2); stroke-width:1.5}
+
+/* clean: shift board */
+.c2shifts{display:grid; gap:12px} @media (min-width:700px){ .c2shifts{grid-template-columns:1fr 1fr} }
+.c2shift{display:grid; gap:12px} .c2shift.now{border-color:var(--info-dot); box-shadow:0 0 0 1px var(--info-dot)} .c2shift.late{border-color:var(--bad-dot); box-shadow:0 0 0 1px var(--bad-dot)}
+.c2sh-h{display:flex; align-items:center; gap:12px} .c2sh-h .main{flex:1; min-width:0} .c2sh-h .name{font-size:17px; line-height:24px; font-weight:600} .c2sh-h .meta{font-size:14px; line-height:20px; color:var(--mut)}
+.c2sh-f{display:flex; align-items:center; justify-content:space-between; gap:10px} .c2cta{flex:none; pointer-events:none}
+.c2two{display:grid; gap:12px} @media (min-width:1240px){ .c2two{grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr); align-items:start} }
+
+/* clean: 14-day strip */
+.c2strip{display:grid; grid-template-columns:72px repeat(var(--cols),minmax(0,1fr)); gap:3px; align-items:center}
+.c2strip .hr{font-size:13px; color:var(--ink2); font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.c2strip .ha{font-size:11px; line-height:13px; color:var(--mut); text-align:center} .c2strip .ha.td{color:var(--ink); font-weight:700}
+.c2c{height:34px; border-radius:5px; display:grid; place-items:center; font-size:13px; font-weight:700; cursor:default; background:var(--surf2); color:var(--mut)}
+.c2c.full{background:var(--s1); color:#fff} .c2c.part{background:color-mix(in srgb,var(--s1) var(--f),var(--surf2)); color:var(--ink)}
+.c2c.open{background:repeating-linear-gradient(135deg,var(--surf2) 0 4px,color-mix(in srgb,var(--s1) 22%,var(--surf2)) 4px 8px)}
+.c2c.miss{background:var(--surf2); color:var(--mut); border:1px solid var(--line2)}
+.c2c.nod{background:transparent; border:1px dashed var(--line)}
+.c2c:hover{outline:2px solid var(--ink2); outline-offset:1px}
+.c2lg-miss{background:var(--surf2)!important; border:1px solid var(--line2)} .c2lg-nod{background:transparent!important; border:1px dashed var(--line2)}
+@media (max-width:420px){ .c2strip{grid-template-columns:56px repeat(var(--cols),minmax(0,1fr)); gap:2px} .c2c{height:30px; font-size:11px} .c2strip .ha{font-size:10px} }
+
+/* clean: readings + hygiene */
+.c2rds{display:grid; gap:2px}
+.c2rd{display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--line)} .c2rd:last-child{border-bottom:0}
+.c2rd .main{flex:1; min-width:0} .c2rd .name{font-size:15px; font-weight:600} .c2rd .meta{font-size:13px; color:var(--mut)} .c2rd .meta .chip{font-size:12px; min-height:20px; padding:0 8px}
+.c2rd .right{text-align:right; min-width:52px} .c2rd .right .v{font-size:18px; font-weight:600} .c2rd .right .l{font-size:12px; color:var(--mut)}
+.c2hyg-top{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px}
+.c2hyg-top .big,.c2top .big,.c2cash .big{font-size:36px; line-height:44px; font-weight:600; letter-spacing:-.02em}
+.c2hyg-top .big .mut{font-size:20px} .c2top .big .mut{font-size:20px; font-weight:500}
+.hb .hbr.c2area{grid-template-columns:minmax(118px,40%) 1fr 36px}
+.hb .hbr.c2age,.hb .hbr.c2load{grid-template-columns:84px 1fr 56px}
+.hb .hbr.c2age .tr i,.hb .hbr.c2load .tr i{background:var(--s1)}
+
+/* checklist run */
+.c2top-h{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px}
+.c2tasks{display:grid; gap:8px}
+.c2task{display:flex; align-items:flex-start; gap:12px; padding:12px 8px 12px 12px; background:var(--surf); border:1px solid var(--line); border-radius:var(--r-card); box-shadow:var(--shadow-xs)}
+.c2task.tapr{cursor:pointer} .c2task.tapr:active{background:var(--surf2)}
+.c2task .main{flex:1; min-width:0} .c2task .name{font-size:17px; line-height:24px; font-weight:600} .c2task .meta{font-size:14px; line-height:20px; color:var(--mut); margin-top:2px} .c2task .meta b{color:var(--ink)}
+.c2task.done{background:var(--surf2)} .c2task.done .name{color:var(--ink2)}
+.c2tick{flex:none; width:52px; height:52px; border-radius:50%; border:2px solid var(--line2); background:var(--surf); color:transparent; display:grid; place-items:center; padding:0}
+.c2tick .ic{width:26px; height:26px} .c2tick:not(:disabled):hover{border-color:var(--p99); color:var(--p99)}
+.c2tick.on{background:var(--ok-dot); border-color:var(--ok-dot); color:#fff}
+.c2tick:disabled{opacity:.45; border-style:dashed; cursor:not-allowed}
+.c2prob{flex:none; width:44px; height:44px; border:0; background:transparent; color:var(--mut); border-radius:var(--r-ctl); display:grid; place-items:center} .c2prob:hover{color:var(--bad); background:var(--bad-bg)}
+.c2val{display:grid; gap:4px; flex:1; min-width:120px} .c2val span{font-size:13px; color:var(--ink2); font-weight:500} .c2val .in{font-size:20px; min-height:48px}
+.c2need{margin-top:6px}
+.c2done h2{display:flex; align-items:center; gap:8px}
+
+/* tickets */
+.c2board{display:grid; gap:16px} @media (min-width:900px){ .c2board{grid-template-columns:repeat(3,minmax(0,1fr)); align-items:start} }
+.c2col h3 .num{display:inline-grid; place-items:center; min-width:22px; height:20px; border-radius:10px; background:var(--surf2); color:var(--ink2); font-size:12px; padding:0 6px; margin-left:4px}
+.c2tk{display:flex; gap:12px; align-items:flex-start; width:100%; text-align:left; padding:10px; background:var(--surf); border:1px solid var(--line); border-left:4px solid var(--line2); border-radius:var(--r-card); box-shadow:var(--shadow-xs); min-height:64px}
+.c2tk:hover{background:var(--surf2)} .c2tk.p-high{border-left-color:var(--bad-dot)} .c2tk.p-medium{border-left-color:var(--warn-dot)} .c2tk.done{border-left-color:var(--ok-dot)} .c2tk.done{opacity:.75}
+.c2tk img,.c2tk .noph{flex:none; width:56px; height:56px; border-radius:8px; object-fit:cover; background:var(--surf2); display:grid; place-items:center; color:var(--mut)}
+.c2tk .b{display:grid; gap:4px; min-width:0} .c2tk .b > b{font-size:16px; line-height:22px; font-weight:600; overflow-wrap:anywhere} .c2tk .m{display:flex; flex-wrap:wrap; gap:4px}
+.c2tk .chip,.c2ts .chip{font-size:13px; min-height:22px; padding:0 8px}
+.c2pri{display:grid; gap:8px} @media (min-width:600px){ .c2pri{grid-template-columns:repeat(3,1fr)} }
+.c2pri button{display:grid; gap:2px; text-align:left; padding:10px 14px; min-height:56px; border-radius:var(--r-ctl); border:1px solid var(--line2); background:var(--surf); color:var(--ink2)}
+.c2pri button b{font-size:16px} .c2pri button span{font-size:13px; color:var(--mut)}
+.c2pri button.on.high{background:var(--bad-bg); border-color:var(--bad-dot); color:var(--bad)} .c2pri button.on.medium{background:var(--warn-bg); border-color:var(--warn-dot); color:var(--warn)} .c2pri button.on.low{background:var(--surf2); border-color:var(--n400); color:var(--ink)}
+.c2pri button.on b::before{content:"✓ "}
+
+/* tasks */
+.c2qa{display:grid; gap:10px} .c2qa-r{display:flex; gap:8px} .c2qa-r .in{flex:1; font-size:16px; min-height:48px} .c2qa-r .btn{min-width:72px; min-height:48px}
+.c2qa-r2{display:flex; gap:8px; flex-wrap:wrap; align-items:center} .c2qa-r2 select{width:auto; min-width:120px; flex:none}
+.c2grp h3 .num{display:inline-grid; place-items:center; min-width:22px; height:20px; border-radius:10px; background:var(--surf2); color:var(--ink2); font-size:12px; padding:0 6px; margin-left:4px}
+.c2grp.overdue h3{color:var(--bad)} .c2grp.today h3{color:var(--warn)}
+.c2ts{display:flex; align-items:stretch; background:var(--surf); border:1px solid var(--line); border-radius:var(--r-card); box-shadow:var(--shadow-xs); overflow:hidden}
+.c2ts.overdue{border-left:4px solid var(--bad-dot)} .c2ts.today{border-left:4px solid var(--warn-dot)} .c2ts.blocked{border-left:4px solid var(--n400)} .c2ts.done{opacity:.7}
+.c2ts .b{flex:1; min-width:0; display:grid; gap:4px; padding:10px 12px 10px 4px; border:0; background:transparent; text-align:left}
+.c2ts .b > b{font-size:16px; line-height:22px; font-weight:600; overflow-wrap:anywhere} .c2ts.done .b > b{text-decoration:line-through; color:var(--mut)}
+.c2ts .m{display:flex; flex-wrap:wrap; gap:6px; align-items:center} .c2ts .b:hover{background:var(--surf2)}
+.c2chk{flex:none; width:56px; border:0; background:transparent; display:grid; place-items:center; padding:0; color:transparent}
+.c2chk .ic{width:22px; height:22px; box-sizing:content-box; padding:6px; border-radius:50%; border:2px solid var(--line2)}
+.c2chk:hover .ic{border-color:var(--ok-dot); color:var(--ok-dot)} .c2chk.on .ic{background:var(--ok-dot); border-color:var(--ok-dot); color:#fff}
+.c2own{display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:500; color:var(--ink2)} .c2own i{font-style:normal; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; background:var(--brand100); color:var(--brand700); font-size:12px; font-weight:600}
+:root[data-theme="dark"] .c2own i{background:var(--p99-soft); color:var(--brand300)} .c2own.none{color:var(--mut)} .c2own.none i{background:var(--surf2); color:var(--mut)}
+
+/* cash */
+.c2cash .lab{font-size:13px; color:var(--mut); font-weight:500} .c2cash .big{font-size:44px; line-height:52px}
+.c2cash-st{margin-top:12px; display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.c2den{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px} @media (min-width:700px){ .c2den{grid-template-columns:repeat(5,minmax(0,1fr))} }
+.c2den button{display:grid; gap:2px; justify-items:start; text-align:left; padding:10px 12px; min-height:76px; border-radius:var(--r-ctl); border:1px solid var(--line2); background:var(--surf); box-shadow:var(--shadow-xs); color:var(--ink)}
+.c2den button.has{border-color:var(--p99); background:var(--p99-soft)}
+.c2den .dn{font-size:18px; font-weight:600} .c2den .pc{font-size:13px; color:var(--ink2)} .c2den .sv{font-size:13px; color:var(--mut); min-height:18px}
+.c2den button:not(.has) .pc{color:var(--mut)}
+.c2reason.short{border-color:var(--bad-dot)} .c2reason.over{border-color:var(--warn-dot)} .c2reason textarea{margin-top:8px}
+.c2cx{display:grid}
+.c2cx details{border-bottom:1px solid var(--line)} .c2cx details:last-child{border-bottom:0}
+.c2cx summary{list-style:none; display:grid; grid-template-columns:1fr auto auto; gap:10px; align-items:center; padding:10px 0; cursor:pointer; min-height:48px} .c2cx summary::-webkit-details-marker{display:none}
+.c2cx summary .a{display:grid} .c2cx summary .c{font-weight:600} .c2cx summary .chip{font-size:13px}
+.c2cxd{padding:0 0 12px; display:grid; gap:8px}
+@media (max-width:420px){ .c2cx summary{grid-template-columns:1fr auto} .c2cx summary .chip{grid-column:1/-1; justify-self:start} }

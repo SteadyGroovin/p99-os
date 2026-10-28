@@ -102,7 +102,7 @@ function svgBars(vals, labels, { w = 560, h = 150, hi = -1, fmtv = v => fmt(Math
 function runFor(cl, day = today()) { const k = cl.id + ":" + day; return S.runs[k] || (S.runs[k] = { done: {} }); }
 function taskTitle(cl, t) { return t.rota != null ? ROTA[wd(today())][t.rota] : t.t; }
 function clProgress(cl) { const r = runFor(cl); const d = cl.tasks.filter(t => r.done[t.id]).length; return { done: d, total: cl.tasks.length, pct: cl.tasks.length ? d / cl.tasks.length * 100 : 0 }; }
-function viewToday() {
+function viewToday_v1() {
   const p = me(); const d = today(); const yd = addDays(d, -1); const y = SD[yd]; const cy = cmpWeek(yd);
   const nightly = ITEMS.filter(i => i.nightly); const openT = S.tickets.filter(t => t.status !== "done"); const high = openT.filter(t => t.priority === "high").length;
   const dueTasks = S.tasks.filter(t => t.status !== "done"); const recToday = S.receipts.filter(r => r.day === d); const draft = S.draft; const counted = draft ? Object.keys(draft.lines).length : 0;
@@ -120,7 +120,7 @@ function viewToday() {
 let countScope = "nightly";
 function itemsIn(placeId) { return ITEMS.filter(i => i.place === placeId && (countScope === "all" || i.nightly)); }
 function startDraft() { if (!S.draft) { S.draft = { kind: countScope === "nightly" ? "closing" : "full", started: nowISO(), by: S.me, lines: {}, text: {} }; save(); } }
-function viewCount() {
+function viewCount_v1() {
   startDraft(); const draft = S.draft; const scoped = ITEMS.filter(i => countScope === "all" || i.nightly); const done = scoped.filter(i => draft.lines[i.id] != null).length;
   const rows = PLACES.map(pl => { const its = itemsIn(pl.id); if (!its.length) return ""; const c = its.filter(i => draft.lines[i.id] != null).length; const pct = c / its.length * 100; return `<button class="row tap" onclick="go('#/count/${pl.id}')">${ring(pct, pct >= 100)}<div class="main"><div class="name">${pl.name}</div><div class="meta">${c} of ${its.length} counted</div></div><span class="chev">${ic("chevron-right")}</span></button>`; }).join("");
   return shell("Count", `${dayName(today())} · started ${timeOf(draft.started)} by ${esc(Store.person(draft.by).short)}`, `
@@ -130,7 +130,7 @@ function viewCount() {
     <button class="btn ghost full danger" onclick="if(confirm('Throw away this count?')){S.draft=null;save();render()}">Discard count</button>`, { back: canManage() ? "#/stock" : "#/today" });
 }
 function qtyText(it, packs, loose) { const parts = []; if (packs) parts.push(`${fmt(packs)} ${it.packUnit}`); if (loose || !packs) parts.push(`${fmt(loose || 0)} ${it.unit}`); return parts.join(" + "); }
-function viewCountPlace(placeId) {
+function viewCountPlace_v1(placeId) {
   startDraft(); const pl = PLACES.find(p => p.id === placeId); if (!pl) return viewCount(); const its = itemsIn(placeId); const draft = S.draft;
   const withItems = PLACES.filter(p => itemsIn(p.id).length); const nextPl = withItems[withItems.findIndex(p => p.id === placeId) + 1];
   const rows = its.map(it => { const q = draft.lines[it.id]; const ex = Store.expected(it.id);
@@ -161,7 +161,7 @@ function padHTML() {
     <div class="pad">${keys}</div>
     <button class="btn primary full" style="margin-top:10px" onclick="padEnter()">${pad.mode === "receive" ? "Add" : "Save and next"}</button></div></div>`;
 }
-function viewCountSummary() {
+function viewCountSummary_v1() {
   const draft = S.draft; if (!draft) return viewCount(); const ids = Object.keys(draft.lines);
   const cls = id => { const ex = Store.expected(id); return band(draft.lines[id], ex ? ex.value : null).cls; };
   const bad = ids.filter(id => cls(id) === "bad").length, warn = ids.filter(id => cls(id) === "warn").length;
@@ -179,19 +179,19 @@ function submitCount() { const d = S.draft; d.note = $("#cnote").value; d.id = "
 
 /* ---------- STOCK hub ---------- */
 function stockNow(it) { const ex = Store.expected(it.id); if (!ex) return null; return ex.value != null ? ex.value : ex.base.qty; }
-function viewStock() {
+function viewStock_v1() {
   const below = ITEMS.filter(i => { const v = stockNow(i); return v != null && i.par && v < i.par; });
   const row = (name, meta, href, extra = "") => `<button class="row tap" onclick="go('${href}')"><div class="main"><div class="name">${name}</div><div class="meta">${meta}</div></div>${extra}<span class="chev">${ic("chevron-right")}</span></button>`;
   return shell("Stock", "Pizza 99", `<div class="list">${row("Count", S.draft ? "a count is in progress" : "short list nightly, everything on Sunday", "#/count")}${row("Receive", "delivery, cash purchase or pull-out", "#/receive")}${row("Items", `${ITEMS.length} items · ${below.length} below par`, "#/items", below.length ? chip("warn", below.length) : "")}${row("Variance", "last count vs expected", "#/variance")}${row("Deliveries log", `${S.receipts.length} receipts since ${dayName(S.receipts[0].day)}`, "#/receipts")}</div>`);
 }
-function viewReceipts() {
+function viewReceipts_v1() {
   const rs = S.receipts.slice().sort((a, b) => a.day < b.day ? 1 : -1);
   return shell("Deliveries log", "as posted by the crew (chat, 18 Aug–9 Sep) and in this app", `<div class="list">${rs.map(r => `<div class="row"><div class="main"><div class="name">${esc(r.supplier)} ${chip("", RECEIPT_KINDS.find(k => k[0] === r.kind)[1])}</div><div class="meta">${dayName(r.day)} · ${esc(Store.person(r.by) ? Store.person(r.by).short : "")} · ${r.lines.map(l => `${esc(Store.item(l.item).name)} ${fmt(l.qty)} ${esc(Store.item(l.item).unit)}${l.text ? " (" + esc(l.text) + ")" : ""}`).join(" · ")}</div></div>${thumb(r.photo)}</div>`).join("")}</div>`, { back: "#/stock" });
 }
 
 /* ---------- RECEIVE ---------- */
 let rc = null;
-function viewReceive() {
+function viewReceive_v1() {
   if (!rc) rc = { kind: "delivery", supplier: "", lines: [], photo: null, amount: "" };
   const lines = rc.lines.map((l, i) => { const it = Store.item(l.item); const lp = Store.lastPrice(l.item); const d = lp && l.price ? (l.price - lp.price) / lp.price : null;
     return `<div class="row"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">${esc(l.text)}${l.price ? ` · ${peso(l.price)} per ${it.unit}` : ""}${d != null && Math.abs(d) >= 0.005 ? ` · <span class="${d > 0 ? "band-bad" : "band-ok"}">${d > 0 ? "▲" : "▼"} ${Math.round(Math.abs(d) * 100)}% vs ${dayName(lp.day)}</span>` : ""}</div></div><button class="btn ghost danger" onclick="rc.lines.splice(${i},1);render()">${ic("x-close")}</button></div>`; }).join("");
@@ -212,7 +212,7 @@ function rcSave() { S.receipts.push({ id: "r-" + Date.now(), day: today(), kind:
 
 /* ---------- ITEMS ---------- */
 let itemQ = "";
-function viewItems() {
+function viewItems_v1() {
   const q = itemQ.toLowerCase();
   const groups = PLACES.map(pl => { const its = ITEMS.filter(i => i.place === pl.id && (!q || i.name.toLowerCase().includes(q))); if (!its.length) return ""; return `<section class="card"><h3>${pl.name}</h3><div class="list">${its.map(it => { const s = stockNow(it); const low = s != null && it.par && s < it.par; return `<button class="row tap" onclick="go('#/item/${it.id}')"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">${it.supplier ? esc(it.supplier) + " · " : ""}par ${fmt(it.par)} ${it.unit}${it.nightly ? " · nightly" : ""}</div></div><div class="right">${s != null ? `<div class="v num ${low ? "band-warn" : ""}">${fmt(s)}</div><div class="l">${it.unit}</div>` : `<div class="l">no count</div>`}</div></button>`; }).join("")}</div></section>`; }).join("");
   return shell("Items", `${ITEMS.length} items`, `<input class="in" placeholder="Search" value="${esc(itemQ)}" oninput="itemQ=this.value;render();const i=document.querySelector('main input');i.focus();i.setSelectionRange(99,99)">${groups}`, { back: "#/stock" });
@@ -223,7 +223,7 @@ function svgLine(pts, w = 560, h = 150) {
   const X = i => pad.l + i * (w - pad.l - pad.r) / (pts.length - 1), Y = v => pad.t + (h - pad.t - pad.b) * (1 - (v - min) / (max - min || 1));
   return `<svg class="chart" viewBox="0 0 ${w} ${h}" width="100%">${[0, .5, 1].map(f => { const v = min + (max - min) * f; return `<line class="grid" x1="${pad.l}" x2="${w - pad.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${pad.l - 6}" y="${Y(v) + 4}" text-anchor="end">${fmt(Math.round(v))}</text>`; }).join("")}<path class="ln" d="${pts.map((p, i) => `${i ? "L" : "M"}${X(i)},${Y(p.y)}`).join(" ")}"/>${pts.map((p, i) => `<circle class="pt" cx="${X(i)}" cy="${Y(p.y)}" r="4"><title>${p.x}: ${peso(p.y)}</title></circle>`).join("")}${pts.map((p, i) => (i === 0 || i === pts.length - 1) ? `<text x="${X(i)}" y="${h - 6}" text-anchor="middle">${p.x.slice(5)}</text>` : "").join("")}</svg>`;
 }
-function viewItem(id) {
+function viewItem_v1(id) {
   const it = Store.item(id); if (!it) return viewItems(); const s = stockNow(it); const ex = Store.expected(id); const prices = Store.prices(id); const use = Store.usageWeeks(id);
   const perDay = use ? use.slice(-4).reduce((a, b) => a + b, 0) / 28 : null; const cover = perDay && s != null ? s / perDay : null;
   const recs = S.receipts.filter(r => r.lines.some(l => l.item === id)).sort((a, b) => a.day < b.day ? 1 : -1).slice(0, 8); const low = s != null && it.par && s < it.par;
@@ -239,7 +239,7 @@ function viewItem(id) {
     <section class="card"><h2>Deliveries</h2>${recs.length ? `<div class="list">${recs.map(r => { const l = r.lines.find(x => x.item === id); return `<div class="row"><div class="main"><div class="name">${fmt(l.qty)} ${esc(it.unit)}${l.text ? ` <span class="small mut">${esc(l.text)}</span>` : ""}</div><div class="meta">${dayName(r.day)} · ${esc(r.supplier)} · ${esc(Store.person(r.by) ? Store.person(r.by).short : "")}</div></div><div class="right"><div class="v num">${l.price ? peso(l.price) : ""}</div></div></div>`; }).join("")}</div>` : `<div class="mut small">None recorded.</div>`}</section>
     <section class="card"><h2>Settings</h2><table class="t"><tr><td>Counted as</td><td class="n">${it.pack ? `${it.packUnit} of ${it.pack} ${it.unit} ${it.verify ? chip("warn", "verify") : ""}` : it.unit}</td></tr><tr><td>Nightly short list</td><td class="n">${it.nightly ? "yes" : "no"}</td></tr><tr><td>Sold as-is on the POS</td><td class="n">${it.pos ? esc(it.pos) : "via recipes (not yet)"}</td></tr></table></section>`, { back: "#/items" });
 }
-function viewVariance() {
+function viewVariance_v1() {
   const cs = S.counts.filter(c => c.var).sort((a, b) => a.submitted < b.submitted ? 1 : -1); const c = cs[0];
   if (!c) return shell("Variance", "", `<div class="card mut">No count sent from this app yet. The first closing count shows here against the seed count of 14 Oct, with the real UTAK sales in between.</div>`, { back: "#/stock" });
   const order = { bad: 0, warn: 1, ok: 2, "": 3 };
@@ -248,12 +248,12 @@ function viewVariance() {
 }
 
 /* ---------- CLEAN ---------- */
-function viewClean() {
+function viewClean_v1() {
   const d = today(); const rows = CHECKLISTS.map(cl => { const pr = clProgress(cl); return `<button class="row tap" onclick="go('#/clean/${cl.id}')">${ring(pr.pct, pr.pct >= 100)}<div class="main"><div class="name">${cl.name}</div><div class="meta">${cl.from}–${cl.to} · ${pr.done} of ${pr.total} · ${esc(ROTA[wd(d)][cl.id === "open" ? 0 : 1])}</div></div><span class="chev">${ic("chevron-right")}</span></button>`; }).join("");
   const rota = [1, 2, 3, 4, 5, 6, 0].map(k => `<tr class="${k === wd(d) ? "hi" : ""}"><td>${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][k]}</td><td>${esc(ROTA[k][0])}</td><td>${esc(ROTA[k][1])}</td></tr>`).join("");
   return shell("Clean", dayLong(d), `<div class="list">${rows}</div><section class="card"><h2>Weekly rota <span class="tiny mut">from the crew's own reports, Aug–Sep</span></h2><table class="t"><thead><tr><th>Day</th><th>Morning shift</th><th>Closing shift</th></tr></thead><tbody>${rota}</tbody></table></section>`);
 }
-function viewChecklist(id) {
+function viewChecklist_v1(id) {
   const cl = CHECKLISTS.find(c => c.id === id); if (!cl) return viewClean(); const r = runFor(cl); const pr = clProgress(cl);
   const rows = cl.tasks.map(t => { const d = r.done[t.id]; const title = taskTitle(cl, t); const vals = t.values || [];
     const valueInputs = vals.map((v, i) => `<input class="in num" style="flex:1;min-width:90px" inputmode="decimal" placeholder="${esc(v)}" id="v-${t.id}-${i}" value="${d && d.values ? d.values[i] : ""}">`).join("");
@@ -273,12 +273,12 @@ function tick(clId, tId) { const cl = CHECKLISTS.find(c => c.id === clId); const
 
 /* ---------- REPORT (tickets) ---------- */
 let nt = null;
-function viewReport() {
+function viewReport_v1() {
   const order = { high: 0, medium: 1, low: 2 }; const open = S.tickets.filter(t => t.status !== "done").sort((a, b) => order[a.priority] - order[b.priority]); const done = S.tickets.filter(t => t.status === "done");
   const row = t => `<button class="row tap" onclick="go('#/report/${t.id}')">${thumb(t.photo)}<div class="main"><div class="name">${esc(t.title)}</div><div class="meta">${chip(t.priority === "high" ? "bad" : t.priority === "medium" ? "warn" : "", t.priority)} ${t.status.replace("_", " ")}${t.scheduled ? " · " + dayName(t.scheduled) : ""} · ${ageDays(t.created)} d · ${esc(Store.person(t.by) ? Store.person(t.by).short : "")}</div></div><span class="chev">${ic("chevron-right")}</span></button>`;
   return shell("Report a problem", `${open.length} open`, `<button class="btn primary full" onclick="nt={priority:'',title:'',note:'',photo:null};go('#/report/new')">New ticket</button>${open.length ? `<div class="list">${open.map(row).join("")}</div>` : `<div class="mut small">Nothing open. Broken, leaking, not working: take a photo and send it here, it goes to maintenance.</div>`}${done.length ? `<h3 style="margin-top:8px">Done</h3><div class="list">${done.map(row).join("")}</div>` : ""}`);
 }
-function viewNewTicket() {
+function viewNewTicket_v1() {
   if (!nt) nt = { priority: "", title: "", note: "", photo: null };
   return shell("New ticket", "photo, what, how urgent", `
     <div>${photoBtn("Take a photo (required)", "nt.photo=id;render()", nt.photo)}${thumb(nt.photo, "big")}</div>
@@ -287,7 +287,7 @@ function viewNewTicket() {
     <div class="field"><label>Details</label><textarea class="in" oninput="nt.note=this.value">${esc(nt.note)}</textarea></div>
     <div class="bottom-act"><button class="btn primary full" ${nt.photo && nt.title.trim() && nt.priority ? "" : "disabled"} onclick="S.tickets.unshift({id:'t-'+Date.now(),title:nt.title.trim(),note:nt.note,priority:nt.priority,status:'open',by:S.me,created:nowISO(),photo:nt.photo});nt=null;save();toast('Ticket sent.');go('#/report')">Send ticket</button></div>`, { back: "#/report" });
 }
-function viewTicket(id) {
+function viewTicket_v1(id) {
   const t = S.tickets.find(x => x.id === id); if (!t) return viewReport(); window._set = (f, v) => { t[f] = v; if (f === "status" && v === "done") t.closed = nowISO(); save(); render(); };
   return shell(t.title, `${t.priority} · ${t.status.replace("_", " ")} · ${dayName(t.created.slice(0, 10))} · ${esc(Store.person(t.by) ? Store.person(t.by).short : "")}`, `${thumb(t.photo, "big")}${t.note ? `<section class="card">${esc(t.note)}</section>` : ""}
     ${canManage() ? `<section class="card"><h3>Status</h3><div class="seg">${["open", "scheduled", "in_progress", "done"].map(s => `<button class="btn ${t.status === s ? "on" : ""}" onclick="_set('status','${s}')">${s.replace("_", " ")}</button>`).join("")}</div>${t.status === "scheduled" ? `<div class="field" style="margin-top:10px"><label>Scheduled day</label><input class="in" type="date" value="${t.scheduled || ""}" onchange="_set('scheduled',this.value)"></div>` : ""}</section>` : `<div class="mut small">Maintenance updates the status; you see it change here.</div>`}`, { back: "#/report" });
@@ -295,12 +295,12 @@ function viewTicket(id) {
 
 /* ---------- TASKS ---------- */
 let ntask = null;
-function viewTasks() {
+function viewTasks_v1() {
   const groups = [["in_progress", "In progress"], ["open", "Open"], ["blocked", "Blocked"], ["done", "Done"]];
   const row = t => `<button class="row tap" onclick="go('#/task/${t.id}')"><div class="main"><div class="name">${esc(t.title)}</div><div class="meta">${t.owner ? esc(Store.person(t.owner).short) : "no owner"}${t.due ? ` · due ${dayName(t.due)}` : ""}${t.due && t.due < today() && t.status !== "done" ? ` · <span class="band-bad">overdue</span>` : ""} · ${esc(t.source || "")}</div></div>${chip(t.status === "blocked" ? "bad" : t.status === "in_progress" ? "info" : t.status === "done" ? "ok" : "", t.status.replace("_", " "))}</button>`;
   return shell("Tasks", "Pizza 99 to-do list", `<button class="btn primary full" onclick="ntask={title:'',detail:'',owner:S.me,due:'',status:'open'};go('#/task/new')">New task</button>${groups.map(([s, l]) => { const ts = S.tasks.filter(t => t.status === s); return ts.length ? `<section class="card"><h3>${l} (${ts.length})</h3><div class="list">${ts.map(row).join("")}</div></section>` : ""; }).join("")}`);
 }
-function viewTask(id) {
+function viewTask_v1(id) {
   const owners = cur => PEOPLE.map(p => `<option value="${p.id}" ${cur === p.id ? "selected" : ""}>${esc(p.short)}</option>`).join("");
   if (id === "new") { if (!ntask) ntask = { title: "", detail: "", owner: S.me, due: "", status: "open" };
     return shell("New task", "", `<div class="field"><label>Task</label><input class="in" value="${esc(ntask.title)}" oninput="ntask.title=this.value"></div><div class="field"><label>Detail</label><textarea class="in" oninput="ntask.detail=this.value">${esc(ntask.detail)}</textarea></div><div class="field"><label>Owner</label><select class="in" onchange="ntask.owner=this.value">${owners(ntask.owner)}</select></div><div class="field"><label>Due</label><input class="in" type="date" value="${ntask.due}" onchange="ntask.due=this.value"></div>
@@ -323,7 +323,7 @@ const sumDenoms = t => DENOMS.reduce((s, d) => s + d * (t.d[d] || 0), 0);
 
 /* ---------- CASH (closing) ---------- */
 let cash = null;
-function viewCash() {
+function viewCash_v1() {
   if (!cash) cash = { d: {}, fund: FUND, gcash: "", ref: "", photo: null, reason: "" };
   const total = sumDenoms(cash); const sales = total - cash.fund; const pos = SD[today()] ? SD[today()].pay.cash || 0 : null; const varc = pos != null ? sales - pos : null; const short = total > 0 && varc != null && varc < -5;
   window.openCashPad1 = d => openCashPad(cash, d);
@@ -376,7 +376,7 @@ function walkSubmit() { const total = sumDenoms(walk); const scored = walk.score
   walk = null; save(); toast("Morning run sent."); go("#/walk"); }
 
 /* ---------- MORE ---------- */
-function viewMore() {
+function viewMore_v1() {
   const p = me(); const links = [];
   if (role() === "lead") links.push(["Cash — closing count", "#/cash"], ["Tickets", "#/report"], ["Tasks", "#/tasks"], ["Variance", "#/variance"]);
   if (isOffice()) links.push(["Store walk (morning run)", "#/walk"], ["Tasks (to-do list)", "#/tasks"], ["Tickets", "#/report"], ["Cash — closing count", "#/cash"], ["Variance", "#/variance"], ["Receive", "#/receive"]);
@@ -416,6 +416,7 @@ function render() {
     default: html = role() === "walk" ? viewWalk() : viewToday();
   }
   $("#app").innerHTML = html;
+  if (render._h !== location.hash) { render._h = location.hash; window.scrollTo(0, 0); } /* a new page opens at the top; a re-render of the same page keeps its place */
   if (pad || cpad) { const s = $(".sheet"); if (s) s.scrollIntoView({ block: "end" }); }
 }
 window.addEventListener("hashchange", render);
