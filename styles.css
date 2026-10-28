@@ -74,6 +74,7 @@ h3{font-size:14px; line-height:20px; margin:0 0 8px; color:var(--mut); font-weig
 /* badges (Untitled: pill, 50 bg + 700 text, 8px dot) */
 .chip{display:inline-flex; align-items:center; gap:6px; padding:2px 10px 2px 8px; border-radius:16px; font-size:14px; line-height:20px; font-weight:500; background:var(--n100); color:var(--n700); min-height:24px; white-space:nowrap}
 :root[data-theme="dark"] .chip{background:var(--n800); color:var(--n300)}
+:root[data-theme="dark"] .chip.ok{background:var(--ok-bg); color:var(--ok)} :root[data-theme="dark"] .chip.warn{background:var(--warn-bg); color:var(--warn)} :root[data-theme="dark"] .chip.bad{background:var(--bad-bg); color:var(--bad)} :root[data-theme="dark"] .chip.info{background:var(--info-bg); color:var(--info)} /* the plain dark chip used to outrank these, so status chips lost their colour in dark mode */
 .chip.ok{background:var(--ok-bg); color:var(--ok)} .chip.ok .dot{background:var(--ok-dot)}
 .chip.warn{background:var(--warn-bg); color:var(--warn)} .chip.warn .dot{background:var(--warn-dot)}
 .chip.bad{background:var(--bad-bg); color:var(--bad)} .chip.bad .dot{background:var(--bad-dot)}

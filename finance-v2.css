@@ -1,0 +1,81 @@
+/* finance-v2.css — Finance (2026-10-28). Builds on the tokens in styles.css and the Sales v2 block (--s1..--s4, .rng, .hb, .tbl, .tt). */
+.fnav{margin-bottom:-2px}
+.fsrc{line-height:18px}
+.fof{font-size:18px; font-weight:500}
+.fcoming{border-style:dashed; box-shadow:none; background:transparent} .fcoming .val{font-size:20px}
+.fdates{display:grid; grid-template-columns:1fr 1fr; gap:8px} .fdates label{display:grid; gap:4px; color:var(--ink2)} .fdates .in{min-width:0}
+.fscroll{overflow-x:auto; -webkit-overflow-scrolling:touch}
+.chip.fst{gap:5px; font-size:13px; min-height:22px; padding:1px 9px 1px 7px} .chip.fst i{font-style:normal; font-size:12px; line-height:1; width:12px; text-align:center}
+.trend .chip.fst{vertical-align:1px}
+.flinks{padding:8px; display:grid; gap:6px} .flinks .row{box-shadow:none}
+.fwarnline{display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; padding:12px 14px}
+
+/* stacked day chart */
+svg.fchart .fseg{opacity:.92} svg.fchart .fseg:hover{opacity:1; filter:brightness(1.12)}
+svg.fchart .fpt{fill:var(--s1); stroke:var(--surf); stroke-width:2; cursor:pointer} svg.fchart .fpt:hover,svg.fchart .fpt:focus{r:7; outline:none}
+.hb .hbr.tap{cursor:pointer}
+
+/* book grid: one blue ramp, blank cells stay blank */
+.fbook{padding-bottom:12px; min-width:0}
+.wrap > .card:has(.fgw,.fscroll,.fchart){min-width:0}
+.fgw{overflow:auto; max-height:70vh; margin:0 -16px; padding:0 16px; -webkit-overflow-scrolling:touch}
+table.fg{border-collapse:separate; border-spacing:2px; font-size:12px; line-height:16px; font-variant-numeric:tabular-nums}
+table.fg th{font-weight:500; color:var(--mut); white-space:nowrap; padding:4px 6px; text-align:right; max-width:84px; overflow:hidden; text-overflow:ellipsis}
+table.fg thead th{position:sticky; top:0; z-index:2; background:var(--surf)}
+table.fg .st{position:sticky; left:0; z-index:1; background:var(--surf); text-align:left; color:var(--ink2); max-width:120px}
+table.fg thead .st{z-index:3}
+table.fg tr.sun .st{color:var(--ink); font-weight:600}
+table.fg td{height:28px; min-width:52px; padding:0 6px; text-align:right; border-radius:4px; white-space:nowrap}
+table.fg td.hx{background:color-mix(in srgb,var(--s1) var(--f),var(--surf2)); color:var(--ink); cursor:pointer}
+table.fg td.hx.hi{color:#fff}
+table.fg td.hx:hover,table.fg td.hx:focus{outline:2px solid var(--ink2); outline-offset:-1px}
+table.fg td.hx0{background:transparent; border:1px dashed var(--line)}
+table.fg td.tot,table.fg th.tot{font-weight:600; color:var(--ink); background:var(--surf2)}
+table.fg tr.ftot td,table.fg tr.ftot th{font-weight:600; color:var(--ink); background:var(--surf2)}
+table.fg .fdue{color:var(--mut); background:transparent; border-left:1px solid var(--line); font-size:11px}
+table.fg tr.fduer th{font-weight:500}
+.flink{border:0; background:none; padding:0; font:inherit; font-weight:600; color:var(--p99); cursor:pointer}
+
+/* sheet with a book cell's lines */
+.fsheet{max-height:82vh; overflow:auto}
+.fsheet .split h2{font-size:16px}
+.fsheet-list{display:grid}
+
+/* expense lines */
+.fday{padding:4px 0 6px}
+.fdh{display:flex; justify-content:space-between; gap:10px; align-items:baseline; font-size:14px; padding:12px 0 4px; border-bottom:1px solid var(--line2)}
+.frow{display:grid; grid-template-columns:44px 1fr auto; gap:10px; align-items:start; padding:9px 0; border:0; border-bottom:1px solid var(--line); background:none; width:100%; text-align:left; font-size:15px; line-height:20px; color:var(--ink)}
+.frow > div{min-width:0; overflow-wrap:anywhere} .frow > .num:last-child{font-weight:600; text-align:right}
+.frow.tap{cursor:pointer} .frow.tap:hover{background:var(--surf2)}
+.frow b{font-weight:500}
+
+/* payables */
+.frun .split{align-items:flex-start}
+.fprog{height:10px; border-radius:5px; background:var(--surf2); overflow:hidden; margin:10px 0 6px} .fprog i{display:block; height:100%; background:var(--s1); border-radius:5px}
+.fnums{display:flex; flex-wrap:wrap; gap:4px 16px; font-size:14px; color:var(--mut)} .fnums b{color:var(--ink); font-weight:600}
+.fsup{margin-top:8px}
+.fsup .frow{grid-template-columns:1fr auto auto; align-items:center}
+.fsup .frow:last-child{border-bottom:0}
+
+/* P&L */
+table.fpl td{vertical-align:top}
+table.fpl tr.fhd td{font-weight:600; color:var(--mut); font-size:13px; text-transform:uppercase; letter-spacing:.04em; background:var(--surf2); padding-top:10px}
+table.fpl tr.fsub td{font-weight:600; border-top:1px solid var(--line2)}
+table.fpl tr.fsec td{font-size:15px}
+table.fpl tr.fres td{font-weight:600; font-size:16px; border-top:2px solid var(--ink2); border-bottom:0}
+table.fpl td:first-child{min-width:150px}
+.fmeter{padding:8px 0 22px}
+.fmeter .tr{position:relative; height:12px; border-radius:6px; background:var(--surf2)}
+.fmeter .tr i{position:absolute; top:0; bottom:0; left:0} .fmeter .z1{background:var(--ok-bg); border-radius:6px 0 0 6px} .fmeter .z2{background:var(--warn-bg)}
+.fmeter .tr b{position:absolute; top:-4px; width:4px; height:20px; margin-left:-2px; border-radius:2px; background:var(--ink)}
+.fmeter .ax{position:relative; height:16px; font-size:11px; color:var(--mut)} .fmeter .ax span{position:absolute; top:4px; transform:translateX(-50%)} .fmeter .ax span:first-child{transform:none} .fmeter .ax span:last-child{transform:translateX(-100%)}
+
+@media (min-width:900px){
+  table.fg td{min-width:60px}
+  .frow{grid-template-columns:56px 1fr auto}
+}
+.nw{white-space:nowrap}
+table.fpl .fchip{margin-top:4px}
+/* dark: styles.css's ":root[data-theme=dark] .chip" outranks .chip.ok etc., so status chips lost their colour; restore them for Finance */
+:root[data-theme="dark"] .chip.fst.ok{background:var(--ok-bg); color:var(--ok)} :root[data-theme="dark"] .chip.fst.warn{background:var(--warn-bg); color:var(--warn)}
+:root[data-theme="dark"] .chip.fst.bad{background:var(--bad-bg); color:var(--bad)} :root[data-theme="dark"] .chip.fst.info{background:var(--info-bg); color:var(--info)}

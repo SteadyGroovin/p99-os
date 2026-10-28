@@ -48,7 +48,7 @@ const TABS = {
 };
 const tabsFor = () => TABS[role() === "crew" ? "crew" : role() === "lead" ? "lead" : role() === "walk" ? "walk" : "office"];
 function tabOf(route) { const seg = route.split("/")[1] || "today"; const ids = tabsFor().map(t => t[0]);
-  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
+  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", task: "tasks", tasks: "more", finance: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
   if (ids.includes(seg)) return seg; const m = map[seg]; if (m && ids.includes(m)) return m; return "more"; }
 
 /* ---------- shell ---------- */
@@ -412,6 +412,7 @@ function render() {
     case "task": html = viewTask(seg[1]); break;
     case "cash": html = viewCash(); break;
     case "walk": html = seg[1] ? viewWalkForm() : viewWalk(); break;
+    case "finance": html = viewFinance(seg[1], seg[2]); break;
     case "more": html = viewMore(); break;
     default: html = role() === "walk" ? viewWalk() : viewToday();
   }
