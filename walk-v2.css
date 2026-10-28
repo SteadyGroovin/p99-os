@@ -1,0 +1,77 @@
+/* walk-v2.css — the morning run (2026-10-29). Builds on the tokens in styles.css and its Sales v2 block.
+   Store rules: tap targets >= 48px, body text >= 16px, one hand on a phone, also a 10" tablet; light and dark via the tokens. */
+
+/* board */
+.mr-row{align-items:flex-start} .mr-row > .chip{margin-top:2px}
+.mr-chips{display:flex; flex-wrap:wrap; gap:6px; margin-top:8px}
+.mr-q{background:var(--warn-bg); border-color:var(--warn-dot)}
+.mr-qh{display:flex; align-items:center; justify-content:space-between; gap:12px} .mr-qh .btn{flex:none; min-height:48px}
+.mr-qe{border-top:1px solid var(--warn-dot); margin-top:10px; padding-top:10px} .mr-qa{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap}
+.mr-fsl{display:grid; gap:14px}
+.mr-fs{display:grid; gap:6px; padding-bottom:12px; border-bottom:1px solid var(--line)} .mr-fs:last-child{border-bottom:0; padding-bottom:0}
+.mr-fsf{display:grid; grid-template-columns:1fr 1fr; gap:8px} .mr-fsf .in{min-height:48px; min-width:0}
+.mr-fsf .btn{min-height:48px}
+@media (min-width:700px){ .mr-fsf{grid-template-columns:140px 170px 1fr auto} }
+
+/* form */
+.mr-sec,.mr-res{scroll-margin-top:76px; min-width:0}
+.mr-sec h2{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.mr-req{font-size:12px; line-height:18px; font-weight:600; color:var(--bad); background:var(--bad-bg); border-radius:999px; padding:0 8px}
+.mr-edit{background:var(--info-bg); border-color:var(--info-dot)}
+.mr-flash{animation:mrflash 1.2s ease-out}
+@keyframes mrflash{0%{box-shadow:0 0 0 4px var(--brand300)} 100%{box-shadow:var(--shadow-xs)}}
+.mr-sum{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin:12px 0 6px}
+.mr-sum > div{display:grid; gap:2px; background:var(--surf2); border-radius:var(--r-ctl); padding:10px; min-width:0}
+.mr-sum span{font-size:13px; line-height:18px; color:var(--mut)} .mr-sum b{font-size:clamp(16px,4.6vw,22px); line-height:30px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600; letter-spacing:-.02em; overflow-wrap:anywhere}
+#mr-salesl{min-height:20px} .card > details.tbl{margin-top:0}
+.mr-dens{display:grid; gap:6px; margin-top:10px; max-width:480px}
+.mr-den{display:grid; grid-template-columns:64px auto 1fr; align-items:center; gap:10px; min-height:52px}
+.mr-dl{font-weight:600; font-size:16px}
+.mr-ds{text-align:right; color:var(--ink2); font-size:15px}
+.mr-step{display:flex; align-items:stretch; border:1px solid var(--line2); border-radius:var(--r-ctl); overflow:hidden; background:var(--surf); box-shadow:var(--shadow-xs)}
+.mr-step button{width:48px; min-height:48px; border:0; background:var(--surf2); font-size:22px; font-weight:500; color:var(--ink)}
+.mr-step button:active{background:var(--line2)}
+.mr-step .in{width:72px; min-height:48px; border:0; border-radius:0; box-shadow:none; text-align:center; font-size:18px; font-weight:600; padding:0 4px}
+.mr-step .in:focus{box-shadow:inset 0 0 0 2px var(--brand300)}
+.mr-fundrow{display:flex; gap:8px} .mr-fundrow .in{flex:1; min-height:48px; font-size:18px; font-weight:600} .mr-fundrow .btn{flex:none; min-height:48px}
+#mr-fundchip{min-height:24px}
+.mr-two{display:grid; grid-template-columns:1fr; gap:12px; margin-top:10px}
+@media (min-width:640px){ .mr-two{grid-template-columns:1fr 1fr} }
+.mr-two .in,.mr-sec > .in,.mr-sec select.in{min-height:48px}
+.mr-other{display:grid; gap:4px; margin-top:6px} .mr-other[hidden]{display:none}
+.mr-qcs{display:grid; gap:4px; margin-top:8px}
+.mr-qc{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--line)} .mr-qc:last-child{border-bottom:0}
+.mr-qn{min-width:0; flex:1} .mr-qn .name{font-size:16px; line-height:22px; font-weight:600}
+.mr-qi{display:flex; gap:6px; flex:none}
+.mr-qi label{display:grid; justify-items:center; gap:0; font-size:12px; line-height:16px; color:var(--mut)}
+.mr-qi .in{width:68px; min-height:48px; text-align:center; font-size:18px; font-weight:600; padding:0 4px}
+.mr-htot{margin:10px 0; min-height:30px} .mr-hbig{font-size:28px; line-height:34px; letter-spacing:-.02em; margin-right:2px}
+.mr-areas{display:grid; gap:10px}
+@media (min-width:900px){ .mr-areas{grid-template-columns:1fr 1fr} }
+.mr-area{border:1px solid var(--line); border-radius:var(--r-card); padding:12px 14px; background:var(--surf)}
+.mr-area .name{font-size:16px; line-height:22px; font-weight:600}
+.mr-guide{margin:4px 0 8px; padding-left:18px; font-size:14px; line-height:20px; color:var(--ink2)}
+.mr-sc{display:grid; grid-template-columns:repeat(5,1fr); gap:6px}
+.mr-sc button{min-height:48px; border-radius:var(--r-ctl); border:1px solid var(--line2); background:var(--surf); color:var(--ink); font-size:18px; font-weight:600; box-shadow:var(--shadow-xs)}
+.mr-sc button.on{color:#fff; border-color:transparent}
+.mr-sc button.on.s1,.mr-sc button.on.s2{background:var(--r500)} .mr-sc button.on.s3{background:var(--y700)} .mr-sc button.on.s4,.mr-sc button.on.s5{background:var(--g700)}
+.mr-low{color:var(--warn); margin-top:6px} .mr-low[hidden],#mr-hlow[hidden],.mr-gap[hidden]{display:none}
+.mr-kv{display:grid; grid-template-columns:1fr; gap:0; margin:0 0 12px}
+.mr-kv > div{display:grid; grid-template-columns:150px 1fr; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); align-items:center}
+.mr-kv dt{color:var(--mut); font-size:14px; line-height:20px} .mr-kv dd{margin:0; font-size:16px; line-height:22px; overflow-wrap:anywhere}
+@media (max-width:420px){ .mr-kv > div{grid-template-columns:118px 1fr} }
+.mr-chk{border-radius:var(--r-card); padding:10px 14px; margin-bottom:10px; font-size:15px; line-height:21px}
+.mr-chk ul{margin:6px 0 0; padding-left:18px} .mr-chk li{margin:2px 0}
+.mr-chk li button{border:0; background:none; padding:6px 0; text-align:left; color:inherit; text-decoration:underline; text-underline-offset:3px; font-size:15px; line-height:21px; min-height:36px}
+.mr-chk.bad{background:var(--bad-bg); color:var(--bad)} .mr-chk.warn{background:var(--warn-bg); color:var(--warn)} .mr-chk.ok{background:var(--ok-bg); color:var(--ok)}
+.mr-gap{margin-bottom:10px}
+.mr-send{min-height:56px; font-size:17px}
+.mr-bar{z-index:4}
+.mr-barin{display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--surf); border:1px solid var(--line2); border-radius:var(--r-card); padding:8px 8px 8px 14px; box-shadow:0 4px 16px rgba(0,0,0,.12)}
+.mr-bt{display:grid; line-height:20px; font-size:15px} .mr-barin .btn{min-height:48px; flex:none}
+@media (min-width:900px){ .mr-bar{bottom:12px} }
+
+/* result */
+.mr-res h2{font-size:18px; line-height:26px}
+.mr-hres{margin-top:12px; padding-top:12px; border-top:1px solid var(--line)}
+.mr-btns{display:grid; gap:8px} .mr-btns .btn{min-height:52px; font-size:16px}

@@ -4,8 +4,9 @@ const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const pad2 = n => String(n).padStart(2, "0");
 const ymd = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-const today = () => ymd(new Date());
-const nowISO = () => { const d = new Date(); return `${today()}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+/* The working day runs from 09:00 to 04:00 the next morning (UTAK cutoff 04:00): today() is the BUSINESS day, so a closing done at 00:40 still belongs to the day that opened at 09:00. nowISO() is the real clock. */
+const today = () => ymd(new Date(Date.now() - 4 * 3600e3));
+const nowISO = () => { const d = new Date(); return `${ymd(d)}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
 const addDays = (s, n) => { const d = new Date(s + "T00:00:00"); d.setDate(d.getDate() + n); return ymd(d); };
 const wd = s => new Date(s + "T00:00:00").getDay();
 const dayName = d => new Date(d + "T00:00:00").toLocaleDateString("en-PH", { weekday: "short", day: "numeric", month: "short" });
@@ -21,7 +22,7 @@ const me = () => Store.person(S.me);
 /* ROLES_ON = false (Stefan, 2026-10-17 via the plugin message): the app runs as a one-person show — whoever is signed in sees and encodes everything.
    The name is kept only for "who did it". Flip to true to restore crew / lead / walk / office views. */
 const ROLES_ON = false;
-const role = () => !me() ? "crew" : ROLES_ON ? me().role : "master";
+const role = () => window.DB_ROLE ? window.DB_ROLE : (!me() ? "crew" : ROLES_ON ? me().role : "master"); /* signed in: the role comes from the database */
 const isOffice = () => ["walk", "admin", "master"].includes(role());
 const canManage = () => role() !== "crew";
 
@@ -39,16 +40,17 @@ function openPhoto(id) { const d = document.createElement("div"); d.className = 
 const photoBtn = (label, onId, has) => `<button class="photo ${has ? "has" : ""}" onclick="takePhoto(id=>{${onId}})">${ic("camera-01")} ${has ? "Retake" : label}</button>`;
 
 /* ---------- roles & tabs ---------- */
-const ICON = { home: "home-02", check: "clipboard-check", grid: "grid-01", box: "package", alert: "alert-triangle", cash: "bank-note-01", dots: "dots-horizontal", list: "list" };
+const ICON = { home: "home-02", check: "clipboard-check", grid: "grid-01", box: "package", alert: "alert-triangle", cash: "bank-note-01", dots: "dots-horizontal", list: "list", finance: "wallet-02" };
 const TABS = {
   crew: [["today", "Today", "home", "#/today"], ["clean", "Clean", "check", "#/clean"], ["count", "Count", "grid", "#/count"], ["receive", "Receive", "box", "#/receive"], ["report", "Report", "alert", "#/report"]],
-  lead: [["today", "Today", "home", "#/today"], ["sales", "Sales", "cash", "#/sales"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["more", "More", "dots", "#/more"]],
-  walk: [["walk", "Walk", "check", "#/walk"], ["sales", "Sales", "cash", "#/sales"], ["stock", "Stock", "grid", "#/stock"], ["tasks", "Tasks", "list", "#/tasks"], ["more", "More", "dots", "#/more"]],
+  lead: [["today", "Today", "home", "#/today"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["more", "More", "dots", "#/more"]],
+  walk: [["walk", "Walk", "check", "#/walk"], ["tasks", "Tasks", "list", "#/tasks"], ["report", "Report", "alert", "#/report"], ["more", "More", "dots", "#/more"]], /* Cherry: the morning run, her tasks, problems; no sales, stock levels or finance */
   office: [["today", "Today", "home", "#/today"], ["sales", "Sales", "cash", "#/sales"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["more", "More", "dots", "#/more"]],
 };
 const tabsFor = () => TABS[role() === "crew" ? "crew" : role() === "lead" ? "lead" : role() === "walk" ? "walk" : "office"];
 function tabOf(route) { const seg = route.split("/")[1] || "today"; const ids = tabsFor().map(t => t[0]);
-  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", task: "tasks", tasks: "more", finance: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
+  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
+  if (seg === "finance") return role() === "master" ? "finance" : "more";
   if (ids.includes(seg)) return seg; const m = map[seg]; if (m && ids.includes(m)) return m; return "more"; }
 
 /* ---------- shell ---------- */
@@ -57,7 +59,7 @@ function shell(title, sub, body, { back } = {}) {
   const openT = S.tickets.filter(t => t.status !== "done").length;
   const tabHTML = tabs.map(([id, label, icon, href]) => `<button class="${cur === id ? "on" : ""}" onclick="go('${href}')" aria-label="${label}">${id === "report" && openT ? `<span class="bdg">${openT}</span>` : ""}${ic(ICON[icon])}${label}</button>`).join("");
   return `
-  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Pizza 99 OS</div>${tabs.map(([id, label, icon, href]) => `<button class="${cur === id ? "on" : ""}" onclick="go('${href}')">${ic(ICON[icon], "sm")}${label}</button>`).join("")}</nav>
+  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Pizza 99 OS</div>${(role() === "master" ? tabs.flatMap(t => t[0] === "more" ? [["finance", "Finance", "finance", "#/finance"], t] : [t]) : tabs).map(([id, label, icon, href]) => `<button class="${cur === id ? "on" : ""}" onclick="go('${href}')">${ic(ICON[icon], "sm")}${label}</button>`).join("")}</nav>
   <div class="page">
     <header class="top">${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
@@ -106,7 +108,7 @@ function viewToday_v1() {
   const p = me(); const d = today(); const yd = addDays(d, -1); const y = SD[yd]; const cy = cmpWeek(yd);
   const nightly = ITEMS.filter(i => i.nightly); const openT = S.tickets.filter(t => t.status !== "done"); const high = openT.filter(t => t.priority === "high").length;
   const dueTasks = S.tasks.filter(t => t.status !== "done"); const recToday = S.receipts.filter(r => r.day === d); const draft = S.draft; const counted = draft ? Object.keys(draft.lines).length : 0;
-  const hour = new Date().getHours(); const dueNow = hour < 15 ? CHECKLISTS[0] : CHECKLISTS[1];
+  const hour = new Date().getHours(); const dueNow = (hour >= 4 && hour < 15) ? CHECKLISTS[0] : CHECKLISTS[1];
   const cls = CHECKLISTS.map(cl => { const pr = clProgress(cl); return `<button class="row tap" onclick="go('#/clean/${cl.id}')">${ring(pr.pct, pr.pct >= 100)}<div class="main"><div class="name">${cl.name}${cl === dueNow && pr.pct < 100 ? ` ${chip("info", "now")}` : ""}</div><div class="meta">${cl.from}–${cl.to} · ${pr.done} of ${pr.total} · ${esc(ROTA[wd(d)][cl.id === "open" ? 0 : 1])}</div></div><span class="chev">${ic("chevron-right")}</span></button>`; }).join("");
   const salesCard = card(kpi(`Yesterday, ${dayName(yd)}`, y ? peso(y.total) : "<span class='mut small'>not synced</span>", y ? `${y.tickets} tickets · ${cy && cy.pct != null ? pctTxt(cy.pct) : ""}` : `latest in the feed: ${dayName(LAST_DAY)}`, y && cy && cy.pct != null ? (cy.pct >= 0 ? "band-ok" : "band-bad") : ""), canManage() ? `salesDay='${y ? yd : LAST_DAY}';salesView='day';go('#/sales')` : null);
   const grid = role() === "crew" ? `<div class="grid2">${card(kpi("Count tonight", counted ? `${counted} / ${nightly.length}` : nightly.length, counted ? "in progress — continue" : "short list at closing"), "go('#/count')")}${card(kpi("Tickets open", openT.length, high ? chip("bad", high + " high") : "none urgent", high ? "band-bad" : ""), "go('#/report')")}</div>`
@@ -342,13 +344,13 @@ function viewCash_v1() {
 
 /* ---------- WALK (Cherry's morning run, as in Rocket OS v1: Store Cash Fund sheet + hygienics) ---------- */
 let walk = null;
-function viewWalk() {
+function viewWalk_v1() {
   const d = today(); const done = S.walks.find(w => w.day === d);
   const others = ["MCC", "Dragoncrepe", "MCBC", "Burger Kong"].map(n => `<div class="row" style="opacity:.55"><div class="main"><div class="name">${n}</div><div class="meta">still in Rocket OS v1 (Store walk app)</div></div></div>`).join("");
   return shell("Store walk", dayLong(d), `<div class="list"><button class="row tap" onclick="walk=null;go('#/walk/p99')"><div class="main"><div class="name">Pizza 99</div><div class="meta">${done ? `done ${timeOf(done.at)} · fund ${peso(done.fund)} · sales ${peso(done.sales)}${done.hyg ? " · hygienics " + done.hyg.total + "/45 " + done.hyg.band : ""}` : "not yet"}</div></div>${done ? chip("ok", "done") : chip("", "not yet")}<span class="chev">${ic("chevron-right")}</span></button>${others}</div>
     ${S.walks.length ? `<section class="card"><h3>Earlier runs</h3><table class="t"><thead><tr><th>Day</th><th class="n">Drawer</th><th class="n">Sales</th><th class="n">Hygienics</th></tr></thead><tbody>${S.walks.slice().reverse().map(w => `<tr><td>${dayName(w.day)}</td><td class="n num">${peso(w.total)}</td><td class="n num">${peso(w.sales)}</td><td class="n">${w.hyg ? `${w.hyg.total}/45 ${chip(w.hyg.cls, w.hyg.band)}` : "—"}</td></tr>`).join("")}</tbody></table></section>` : ""}`);
 }
-function viewWalkForm() {
+function viewWalkForm_v1() {
   if (!walk) { const prev = S.walks.find(w => w.day === today()); walk = prev ? JSON.parse(JSON.stringify(prev)) : { d: {}, fund: FUND, endorsed: "", received: S.me, qc: {}, booklet: "", first5: "", first5At: "", columnar: "", columnarDate: "", scores: [], photo: null, note: "" }; }
   const total = sumDenoms(walk); const sales = total - walk.fund; const low = total < walk.fund;
   window.openCashPad2 = d => openCashPad(walk, d);
@@ -395,6 +397,10 @@ function render() {
   const h = (location.hash || "#/today").slice(1); const seg = h.split("/").filter(Boolean);
   const qs = new URLSearchParams(location.search); if (qs.get("who") && !S.me) { const p = PEOPLE.find(x => x.id === qs.get("who") || x.role === qs.get("who")); if (p) { S.me = p.id; save(); } }
   let html;
+  { /* route guard: the screens mirror the database rules (the database refuses the data anyway) */
+    const r = role(), s0 = seg[0] || "", ownerOnly = ["sales", "finance"], walkOk = ["walk", "tasks", "task", "report", "more", "who", ""];
+    if ((r !== "master" && ownerOnly.includes(s0)) || (r === "walk" && !walkOk.includes(s0))) { location.hash = r === "walk" ? "#/walk" : "#/today"; return; }
+  }
   if (!S.me) { S.me = "store"; save(); } // no sign-in (Stefan, 2026-10-18): the app opens straight in; a name is optional, under More
   if (seg[0] === "who") html = viewWho();
   else switch (seg[0]) {

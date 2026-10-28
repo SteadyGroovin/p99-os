@@ -4,7 +4,7 @@
    actions, MeazureUp/Yoobic); tickets with priority, ageing and a status board (UpKeep work orders); a cash-up that counts by denomination, checks
    the float first, then compares to POS and asks for the reason of any over/short, with a variance log reviewed for patterns (Shopify, PlumPOS).
    Data shapes are only added to: tickets gain area/source/log/fixPhoto, tasks gain created/log, cash records keep their fields.
-   The business day runs 04:00–04:00 (P99.pos_cutoff), so a closing ticked at 00:40 belongs to the day it closed. */
+   The business day runs 09:00 to 04:00 the next morning (P99.pos_cutoff 04:00), so a closing ticked at 00:40 belongs to the day it closed. */
 
 const C2 = { hygDb: null, hygState: "idle", vals: {}, tkPri: "all", tkView: "board", tsOwner: "all", tsShow: "open", qa: { title: "", owner: "", due: "" }, cc: null };
 const bday = () => typeof bizToday === "function" ? bizToday() : today();
@@ -166,7 +166,7 @@ function viewClean() {
     ${c2Table(["Day"].concat(CHECKLISTS.map(c => c.name)), days.slice().reverse().filter(d => d >= first).map(d => [esc(dayName(d))].concat(CHECKLISTS.map(cl => { const st = c2State(cl, d); return `${st.s.n}/${st.s.tot} ${C2STATE[st.k][1]}${st.s.lastAt ? " " + timeOf(st.s.lastAt) : ""}`; }))))}` : ""}</section>`;
   const readings = `<section class="card"><h2>Readings <span class="tiny mut">typed in the lists · last 14 days</span></h2><div class="c2rds">${c2Readings(days)}</div></section>`;
   const rota = [1, 2, 3, 4, 5, 6, 0].map(k => `<tr class="${k === wd(day) ? "hi" : ""}"><td>${["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][k]}</td><td>${esc(ROTA[k][0])}</td><td>${esc(ROTA[k][1])}</td></tr>`).join("");
-  return shell("Clean", `${dayLong(day)}${day !== today() ? " · business day until 04:00" : ""}`, `${tiles}${shifts}${hist}<div class="c2two">${readings}${c2HygCard(hyg)}</div>
+  return shell("Clean", `${dayLong(day)}${day !== today() ? " · business day, 9:00 to 4:00" : ""}`, `${tiles}${shifts}${hist}<div class="c2two">${readings}${c2HygCard(hyg)}</div>
     <section class="card"><h2>Weekly cleaning rota <span class="tiny mut">from the crew's own reports, Aug–Sep · today highlighted</span></h2><table class="t"><thead><tr><th>Day</th><th>Morning shift</th><th>Closing shift</th></tr></thead><tbody>${rota}</tbody></table></section>`);
 }
 

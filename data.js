@@ -1,5 +1,5 @@
 /* Pizza 99 OS — data layer (public build: sample data only). */
-const P99 = { code: "P99", name: "Pizza 99", pos_cutoff: "04:00" };
+const P99 = { code: "P99", name: "Pizza 99", pos_cutoff: "04:00", opens: "09:00" }; /* working day: 09:00 to 04:00 next morning */
 
 const PEOPLE = [
   { id: "store", name: "P99", short: "P99", role: "master", pin: "", position: "store" },
@@ -215,12 +215,15 @@ const Store = {
   reset() { localStorage.removeItem(this.key); this._s = null; },
   item(id) { return ITEMS.find(i => i.id === id); },
   person(id) { return PEOPLE.find(p => p.id === id); },
-  lastCount(itemId) { const cs = this.load().counts.filter(c => c.submitted && c.lines[itemId] != null).sort((a, b) => a.day < b.day ? 1 : -1); return cs[0] ? { day: cs[0].day, qty: cs[0].lines[itemId], seed: !!cs[0].seed } : null; },
+  localLast(itemId) { const cs = this.load().counts.filter(c => c.submitted && c.lines[itemId] != null).sort((a, b) => a.day < b.day ? 1 : -1); return cs[0] ? { day: cs[0].day, qty: cs[0].lines[itemId], seed: !!cs[0].seed } : null; },
+  walkLast(itemId) { const rows = (window.WALK_ROWS || []).filter(r => r.item_key === itemId); return rows.length ? rows.reduce((a, b) => b.day > a.day ? b : a) : null; }, /* Cherry's morning quick counts, mirrored from the old OS (walk_quick_count) */
+  /* newest of a count typed in this app and Cherry's morning count. Her count is taken ~10:00 after the business day closed at 04:00, so sales are counted from the day AFTER the previous business day (calcDay = day - 1). */
+  lastCount(itemId) { const loc = this.localLast(itemId), w = this.walkLast(itemId); if (w && (!loc || w.day >= loc.day)) return { day: w.day, calcDay: addDays(w.day, -1), qty: +w.qty, seed: false, src: "walk" }; return loc; },
   receivedSince(itemId, day) { return this.load().receipts.filter(r => r.day > day).reduce((s, r) => s + r.lines.filter(l => l.item === itemId).reduce((t, l) => t + l.qty, 0), 0); },
   soldOn(itemId, day) { const it = this.item(itemId); const d = SALES_HISTORY.days[day]; if (!it || !it.pos || !d) return null; const r = d.items.find(x => x[1] === it.pos); return r ? r[2] : 0; },
   soldSince(itemId, day) { const it = this.item(itemId); if (!it || !it.pos) return null; let s = 0; Object.keys(SALES_HISTORY.days).forEach(d => { if (d > day) { const r = SALES_HISTORY.days[d].items.find(x => x[1] === it.pos); if (r) s += r[2]; } }); return s; },
   salesThrough() { return Object.keys(SALES_HISTORY.days).sort().pop(); },
-  expected(itemId) { const lc = this.lastCount(itemId); if (!lc) return null; const rec = this.receivedSince(itemId, lc.day); const sold = this.soldSince(itemId, lc.day); return { base: lc, received: rec, sold, value: sold === null ? null : lc.qty + rec - sold }; },
+  expected(itemId) { const lc = this.lastCount(itemId); if (!lc) return null; const rec = this.receivedSince(itemId, lc.calcDay || lc.day); const sold = this.soldSince(itemId, lc.calcDay || lc.day); return { base: lc, received: rec, sold, value: sold === null ? null : lc.qty + rec - sold }; },
   usageWeeks(itemId, n = 8) { const it = this.item(itemId); if (!it || !it.pos) return null; const days = Object.keys(SALES_HISTORY.days).sort(); const out = []; const last = new Date(days[days.length - 1] + "T00:00:00"); for (let w = n - 1; w >= 0; w--) { let s = 0; for (let i = 0; i < 7; i++) { const d = new Date(last); d.setDate(last.getDate() - w * 7 - i); const k = ymd(d); const dd = SALES_HISTORY.days[k]; if (dd) { const r = dd.items.find(x => x[1] === it.pos); if (r) s += r[2]; } } out.push(s); } return out; },
   prices(itemId) { return this.load().receipts.flatMap(r => r.lines.filter(l => l.item === itemId && l.price != null).map(l => ({ day: r.day, price: l.price, supplier: r.supplier }))).sort((a, b) => a.day < b.day ? -1 : 1); },
   lastPrice(itemId) { const p = this.prices(itemId); return p.length ? p[p.length - 1] : null; },

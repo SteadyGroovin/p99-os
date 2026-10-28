@@ -31,7 +31,13 @@ function skToPar(L) {
 }
 const skCoverChip = L => L.cover == null ? "" : L.cover < 2 ? chip("bad", `${L.cover.toFixed(1)} d left`) : L.cover < 4 ? chip("warn", `${L.cover.toFixed(1)} d left`) : `<span class="chip">${L.cover >= 30 ? "30+" : L.cover.toFixed(0)} d left</span>`;
 const skPlace = id => (PLACES.find(p => p.id === id) || { name: id }).name;
-function skLastSent() { return S.counts.filter(c => c.submitted).sort((a, b) => a.submitted < b.submitted ? 1 : -1)[0] || null; }
+function skLastSent() {
+  const loc = S.counts.filter(c => c.submitted).sort((a, b) => a.submitted < b.submitted ? 1 : -1)[0] || null;
+  const rows = window.WALK_ROWS || []; if (!rows.length) return loc;
+  const wd = rows.reduce((m, r) => r.day > m ? r.day : m, ""); /* Cherry's newest morning count, taken about 10:00 that day */
+  if (loc && loc.day >= wd) return loc;
+  return { day: wd, submitted: wd + "T10:00", src: "walk", seed: false };
+}
 function skAge(c) { if (!c) return chip("bad", "never"); const d = ageDays(c.submitted); const t = d === 0 ? "today" : d === 1 ? "1 day ago" : d + " days ago"; return chip(d <= 1 ? "ok" : d <= 7 ? "warn" : "bad", t); }
 const skSeed = on => on ? ` <span class="sample" data-tt="Seed count|14 Oct seed, not a real count — replace with the first real closing count">seed</span>` : "";
 const skVerify = it => it.verify ? ` <span class="sample" data-tt="Pack size|${esc(it.pack + " " + it.unit + " per " + it.packUnit)} not confirmed by the store yet">verify</span>` : "";
@@ -106,7 +112,7 @@ function viewStock() {
     <button class="btn" onclick="go('#/receive')">${ic("package", "sm")}Receive</button></div>`;
   const tiles = `<div class="grid2">
     ${tile("Below par", `${below.length}<span class="small mut"> / ${counted.length}</span>`, below.length ? (below.some(L => L.st.k === "out") ? chip("bad", `${below.filter(L => L.st.k === "out").length} out`) : chip("warn", "reorder")) + ` <span class="mut">of counted</span>` : counted.length ? chip("ok", "all at par") : `<span class="mut">nothing counted yet</span>`, "")}
-    ${tile("Last count", last ? esc(dayName(last.day)) : "—", `${skAge(last)}${last && last.seed ? skSeed(true) : ""}`, "")}
+    ${tile("Last count", last ? esc(dayName(last.day)) : "—", `${skAge(last)}${last && last.seed ? skSeed(true) : ""}${last && last.src === "walk" ? ' <span class="chip info">Cherry\'s morning count</span>' : ""}`, "")}
     ${tile("Deliveries, 7 days", recWk.length, recWk.length ? `${skSum(recWk.map(r => r.lines.length))} lines` : `<span class="mut">last ${lastRec ? esc(dayName(lastRec.day)) : "never"}</span>`, spark(wkRec))}
     ${tile("Last variance", lv ? `${vb.filter(c => c === "ok").length}<span class="small mut"> / ${vb.length} ok</span>` : "—", lv ? (vb.some(c => c === "bad") ? chip("bad", vb.filter(c => c === "bad").length + " off") : vb.some(c => c === "warn") ? chip("warn", vb.filter(c => c === "warn").length + " a little off") : chip("ok", "on target")) : `<span class="mut">no count sent from the app</span>`, "")}
   </div>`;

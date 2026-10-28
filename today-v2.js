@@ -35,7 +35,7 @@ function viewToday() {
   const bu = y ? boxUsual(yd) : null;
   const boxTile = y ? tile("Cash box, no sale", `${y.cashbox_opens || 0}×`, bu != null ? delta(y.cashbox_opens || 0, bu, `usual ${bu.toFixed(1)}×`) : "yesterday", "") : tile("Cash box, no sale", "—", "no data", "");
   const nightly = ITEMS.filter(i => i.nightly), lc = Store.lastCount("coke-zero"), draft = S.draft, counted = draft ? Object.keys(draft.lines).length : 0;
-  const countTile = tile("Count", counted ? `${counted}/${nightly.length}` : lc ? esc(dayName(lc.day).replace(/^\w+, /, "")) : "none", counted ? "in progress, continue" : lc ? "last closing count" : "nothing counted yet", "");
+  const countTile = tile("Count", counted ? `${counted}/${nightly.length}` : lc ? esc(dayName(lc.day).replace(/^\w+, /, "")) : "none", counted ? "in progress, continue" : lc ? (lc.src === "walk" ? "Cherry's morning count" : "last closing count") : "nothing counted yet", "");
   const tiles = `<div class="grid2">${runTile}${gapTile}${boxTile}${countTile}</div>`;
   /* needs attention */
   const openT = S.tickets.filter(t => t.status !== "done"), high = openT.filter(t => t.priority === "high");
@@ -46,7 +46,7 @@ function viewToday() {
   if (high.length) A.push(attnItem("!", "bad", `${high.length} high-priority ticket${high.length > 1 ? "s" : ""} open`, esc(high.slice(0, 2).map(t => t.title).join(" · ")), "go('#/report')"));
   if (over.length) A.push(attnItem("◔", "warn", `${over.length} to-do${over.length > 1 ? "s" : ""} overdue`, esc(over.slice(0, 2).map(t => t.title).join(" · ")), "go('#/tasks')"));
   if (blocked.length) A.push(attnItem("▣", "warn", `${blocked.length} to-do${blocked.length > 1 ? "s" : ""} blocked`, esc(blocked.slice(0, 2).map(t => t.title).join(" · ")), "go('#/tasks')"));
-  const dueNow = hour < 15 ? CHECKLISTS[0] : CHECKLISTS[1], dn = clProgress(dueNow);
+  const dueNow = (hour >= 4 && hour < 15) ? CHECKLISTS[0] : CHECKLISTS[1], dn = clProgress(dueNow); /* opening 09:00-11:00; closing 23:00-01:30, still the same business day after midnight */
   if (dn.pct < 100) A.push(attnItem("✓", "info", `${dueNow.name} checklist ${dn.done} of ${dn.total}`, `${dueNow.from}–${dueNow.to} · ${esc(ROTA[wd(d)][dueNow.id === "open" ? 0 : 1])}`, `go('#/clean/${dueNow.id}')`));
   const attn = `<section class="card"><h2>Needs attention ${A.length ? `<span class="tiny mut">${A.length}</span>` : ""}</h2>${A.length ? `<div class="attnlist">${A.join("")}</div>` : `<div class="okline"><span class="dl up"><i>●</i>All clear</span> <span class="mut small">data current, checklists on track, nothing overdue.</span></div>`}</section>`;
   /* what sold yesterday */
@@ -79,5 +79,6 @@ function viewMore() {
     row("Put a name on my entries", `optional · ${esc(me().name)} now`, "go('#/who')"),
     ...(window.DB_USER ? [`<button class="row tap" onclick="signOut()"><div class="main"><div class="name">Sign out</div><div class="meta">signed in as ${esc(window.DB_USER)}</div></div></button>`] : []),
     `<button class="row tap" onclick="if(confirm('Reset everything typed on this device?')){Store.reset();location.hash='#/who';location.reload()}"><div class="main"><div class="name band-bad">Reset this device</div><div class="meta">clears counts, receipts, tickets and photos typed here</div></div></button>`]);
-  return shell("More", `${esc(p.name)} · ${esc(p.position)}`, health + daily + review + me2 + `<div class="tiny mut">Pizza 99 OS v0.6 · one-person mode: every name sees everything; roles come before anyone else logs in.</div>`);
+  const owner = role() === "master";
+  return shell("More", `${esc(p.name)} · ${esc(p.position)}`, (owner ? health : "") + (owner ? daily : group("Every day", [row("Store walk", "the morning run", "go('#/walk')")])) + (owner ? review : "") + me2 + `<div class="tiny mut">Pizza 99 OS v0.6 · one-person mode: every name sees everything; roles come before anyone else logs in.</div>`);
 }

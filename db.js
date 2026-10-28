@@ -47,11 +47,17 @@ async function start() {
   if (mErr || !member) return bootScreen(`<div><b>Signed in as ${bootEsc(session.user.email)}</b></div>
     <div class="small mut" style="margin:8px 0 16px">This account is not on the Pizza 99 OS member list yet. Ask Stefan to add it.</div>
     <button class="btn full" onclick="signOut()">Sign out</button>`);
-  const { data, error } = await sb.rpc("sales_history", { p_store: "P99" });
-  if (error) return bootScreen(`<span class="band-bad">Could not load sales: ${bootEsc(error.message)}</span>`);
+  window.DB_ROLE = member.role; /* master | lead | walk | crew — the database enforces it too (migration 011); this only shapes the screens */
+  let data = { source: "", days: {} };
+  if (member.role === "master") { /* sales are for the owners only */
+    const { data: sh, error } = await sb.rpc("sales_history", { p_store: "P99" });
+    if (error) return bootScreen(`<span class="band-bad">Could not load sales: ${bootEsc(error.message)}</span>`);
+    data = sh;
+  }
   window.SALES_HISTORY = data;
+  if (member.role === "master") try { const { data: wq } = await sb.from("walk_quick_count").select("day,item_key,qty").eq("store", "P99").order("day", { ascending: false }).limit(2000); window.WALK_ROWS = wq || []; } catch (e) { window.WALK_ROWS = []; } /* Cherry's morning counts feed Stock */
   window.DB_USER = session.user.email;
   bootEl.innerHTML = "";
-  for (const s of ["data.js", "icons.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "finance-v2.js", "app.js"]) await loadScript(s);
+  for (const s of ["data.js", "icons.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "finance-v2.js", "walk-v2.js", "app.js"]) await loadScript(s);
 }
 start().catch(e => bootScreen(`<span class="band-bad">${bootEsc(e.message)}</span>`));
