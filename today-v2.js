@@ -11,7 +11,28 @@ function attnItem(icon, tone, title, detail, onclick) {
   return `<button class="attn ${tone}" ${onclick ? `onclick="${onclick}"` : ""}><span class="ai">${icon}</span><span class="at"><b>${title}</b>${detail ? `<span class="tiny mut">${detail}</span>` : ""}</span>${onclick ? `<span class="chev">${ic("chevron-right")}</span>` : ""}</button>`;
 }
 
+/* ---------- Store team (lead, crew): two sales numbers and their own work. No tickets, items, payment split, history, cash or expenses. ---------- */
+async function loadGlance() { try { const { data } = await sb.rpc("store_sales_glance", { p_store: "P99" }); window.GLANCE = data || null; } catch (e) { /* keep the last numbers */ } }
+function viewTodayStore() {
+  const d = today(), p = me(), g = window.GLANCE, hour = new Date().getHours();
+  const at = g && g.last_ticket_at ? new Date(g.last_ticket_at).toLocaleString("en-PH", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" }) : null;
+  const num = (x, label) => x && x.total != null ? `<div class="big num">${peso(x.total)}</div>` : `<div class="big num mut">—</div><div class="tiny mut">${label}</div>`;
+  const sales = `<section class="card"><h2>Sales</h2><div class="grid2">
+      <div><div class="lab">Today so far</div>${num(g && g.today, "nothing synced for today yet")}</div>
+      <div><div class="lab">Yesterday</div>${num(g && g.yesterday, "not synced yet")}</div></div>
+    <div class="tiny mut" style="margin-top:8px">${at ? `Newest sale in the system: ${esc(at)}` : "No sales synced yet"}</div>
+    ${typeof sb !== "undefined" ? `<div style="margin-top:10px"><button class="btn" ${SYNC.busy ? "disabled" : ""} onclick="syncNow()">${SYNC.busy ? "Updating…" : "Update"}</button>${SYNC.msg ? ` <span class="tiny mut">${esc(SYNC.msg)}</span>` : ""}</div>` : ""}</section>`;
+  const openT = S.tickets.filter(t => t.status !== "done"), high = openT.filter(t => t.priority === "high");
+  const tasks = S.tasks.filter(t => t.status !== "done"), over = tasks.filter(t => t.due && t.due < d);
+  const nightly = ITEMS.filter(i => i.nightly), draft = S.draft, counted = draft ? Object.keys(draft.lines).length : 0;
+  const tiles = `<div class="grid2">${tile("Count tonight", counted ? `${counted}/${nightly.length}` : `${nightly.length}`, counted ? "in progress, continue" : "short list at closing", "")}${tile("Tickets open", `${openT.length}`, high.length ? `${high.length} high` : "none urgent", "")}${tile("To-dos open", `${tasks.length}`, over.length ? `${over.length} overdue` : "none overdue", "")}</div>`;
+  const dueNow = (hour >= 4 && hour < 15) ? CHECKLISTS[0] : CHECKLISTS[1];
+  const cls = CHECKLISTS.map(cl => { const pr = clProgress(cl); return `<button class="row tap" onclick="go('#/clean/${cl.id}')">${ring(pr.pct, pr.pct >= 100)}<div class="main"><div class="name">${esc(cl.name)}${cl === dueNow && pr.pct < 100 ? ` ${chip("info", "now")}` : ""}</div><div class="meta">${cl.from}–${cl.to} · ${pr.done} of ${pr.total} · ${esc(ROTA[wd(d)][cl.id === "open" ? 0 : 1])}</div></div><span class="chev">${ic("chevron-right")}</span></button>`; }).join("");
+  return shell(`${greet()}${p && p.short && p.id !== "store" ? ", " + esc(p.short) : ""}`, dayLong(d), sales + tiles + `<section class="card"><h2>Checklists</h2><div class="list">${cls}</div></section>`);
+}
+
 function viewToday() {
+  if (role() !== "master" && typeof sb !== "undefined") return viewTodayStore();
   if (role() === "crew") return viewToday_v1();
   const d = today(), yd = bizYesterday(), y = SD[yd], p = me();
   if (typeof sb !== "undefined" && !RUN.rows && !RUN.loading && !RUN.err) setTimeout(loadRuns, 0); /* Cherry's runs, for the run + cash cards */
@@ -80,5 +101,5 @@ function viewMore() {
     ...(window.DB_USER ? [`<button class="row tap" onclick="signOut()"><div class="main"><div class="name">Sign out</div><div class="meta">signed in as ${esc(window.DB_USER)}</div></div></button>`] : []),
     `<button class="row tap" onclick="if(confirm('Reset everything typed on this device?')){Store.reset();location.hash='#/who';location.reload()}"><div class="main"><div class="name band-bad">Reset this device</div><div class="meta">clears counts, receipts, tickets and photos typed here</div></div></button>`]);
   const owner = role() === "master";
-  return shell("More", `${esc(p.name)} · ${esc(p.position)}`, (owner ? health : "") + (owner ? daily : group("Every day", [row("Store walk", "the morning run", "go('#/walk')")])) + (owner ? review : "") + me2 + `<div class="tiny mut">Pizza 99 OS v0.6 · one-person mode: every name sees everything; roles come before anyone else logs in.</div>`);
+  return shell("More", `${esc(p.name)} · ${esc(p.position)}`, (owner ? health : "") + (owner ? daily : role() === "walk" ? group("Every day", [row("Store walk", "the morning run", "go('#/walk')")]) : group("Every day", [row("Cash, closing count", "drawer by denomination", "go('#/cash')"), row("Tickets", "problems and repairs", "go('#/report')"), row("To-do list", "", "go('#/tasks')")])) + (owner ? review : "") + me2 + `<div class="tiny mut">Pizza 99 OS v0.7 · what you see depends on your login: owners, store team, morning run.</div>`);
 }

@@ -250,6 +250,7 @@ async function syncNow() {
       if (!r || !r.ok) throw new Error((r && (r.error || (r.errors || []).join("; "))) || "sync failed");
       tk += r.tickets; more = r.more; SYNC.msg = `${tk} tickets read…`; render();
     }
+    if (role() !== "master") { await loadGlance(); SYNC.msg = `done, ${tk} tickets checked`; SYNC.busy = false; render(); return; } /* the store team gets two numbers, never the history */
     const { data: sh, error: e2 } = await sb.rpc("sales_history", { p_store: "P99" }); if (e2) throw e2;
     const nd = Object.assign({}, sh.days); window.SALES_HISTORY = sh; Object.keys(SD).forEach(k => delete SD[k]); Object.assign(SD, nd); SDAYS.length = 0; SDAYS.push(...Object.keys(SD).sort()); LAST_DAY = SDAYS[SDAYS.length - 1];
     TX.cache = {}; SYNC.msg = `done, ${tk} tickets checked`;

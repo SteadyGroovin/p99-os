@@ -382,7 +382,7 @@ function viewMore_v1() {
   const p = me(); const links = [];
   if (role() === "lead") links.push(["Cash — closing count", "#/cash"], ["Tickets", "#/report"], ["Tasks", "#/tasks"], ["Variance", "#/variance"]);
   if (isOffice()) links.push(["Store walk (morning run)", "#/walk"], ["Tasks (to-do list)", "#/tasks"], ["Tickets", "#/report"], ["Cash — closing count", "#/cash"], ["Variance", "#/variance"], ["Receive", "#/receive"]);
-  if (role() === "crew") links.push(["Cash — closing count", "#/cash"], ["Sales (read only)", "#/sales"]);
+  if (role() === "crew") links.push(["Cash — closing count", "#/cash"]);
   return shell("More", `${esc(p.name)} · ${esc(p.position)}`, `<div class="list">${links.map(([l, h]) => `<button class="row tap" onclick="go('${h}')"><div class="main"><div class="name">${l}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("")}
     <button class="row tap" onclick="S.theme=S.theme==='dark'?'light':'dark';save();applyTheme();render()"><div class="main"><div class="name">Theme: ${S.theme === "dark" ? "dark" : "light"}</div></div></button>
     <button class="row tap" onclick="signOut()"><div class="main"><div class="name">Sign out</div><div class="meta">signed in as ${esc(window.DB_USER || "")}</div></div></button>

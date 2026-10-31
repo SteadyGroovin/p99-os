@@ -55,6 +55,7 @@ async function start() {
     data = sh;
   }
   window.SALES_HISTORY = data;
+  if (member.role === "lead" || member.role === "crew") { const { data: g } = await sb.rpc("store_sales_glance", { p_store: "P99" }); window.GLANCE = g || null; } /* today so far + yesterday, nothing else (migration 014) */
   if (member.role === "master") try { const { data: wq } = await sb.from("walk_quick_count").select("day,item_key,qty").eq("store", "P99").order("day", { ascending: false }).limit(2000); window.WALK_ROWS = wq || []; } catch (e) { window.WALK_ROWS = []; } /* Cherry's morning counts feed Stock */
   window.DB_USER = session.user.email;
   bootEl.innerHTML = "";
