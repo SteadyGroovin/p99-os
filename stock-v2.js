@@ -107,9 +107,12 @@ function viewStock() {
   const draft = S.draft; const scoped = ITEMS.filter(i => i.nightly); const dn = draft ? scoped.filter(i => draft.lines[i.id] != null).length : 0;
   const wkRec = []; for (let w = 7; w >= 0; w--) { const a = addDays(today(), -(w * 7 + 6)), b = addDays(today(), -w * 7); wkRec.push(S.receipts.filter(r => r.day >= a && r.day <= b).length); }
 
+  const trWait = typeof trAwaitingMe === "function" ? trAwaitingMe() : [];
   const actions = `<div class="skact">
     <button class="btn primary" onclick="go('#/count')">${ic("grid-01", "sm")}${draft && dn ? `Continue count · ${dn}/${scoped.length}` : "Count tonight"}</button>
-    <button class="btn" onclick="go('#/receive')">${ic("package", "sm")}Receive</button></div>`;
+    <button class="btn" onclick="go('#/receive')">${ic("package", "sm")}Receive</button>
+    <button class="btn" onclick="go('#/transfers')">${ic("package", "sm")}Stock in / out${trWait.length ? ` <span class="bdg" style="position:static;margin-left:6px">${trWait.length}</span>` : ""}</button></div>`
+    + (trWait.length ? `<div class="alert warn" style="margin-top:8px">⇄ ${trWait.length} transfer${trWait.length > 1 ? "s" : ""} waiting for your confirmation — <a href="#/transfers">open</a></div>` : "");
   const tiles = `<div class="grid2">
     ${tile("Below par", `${below.length}<span class="small mut"> / ${counted.length}</span>`, below.length ? (below.some(L => L.st.k === "out") ? chip("bad", `${below.filter(L => L.st.k === "out").length} out`) : chip("warn", "reorder")) + ` <span class="mut">of counted</span>` : counted.length ? chip("ok", "all at par") : `<span class="mut">nothing counted yet</span>`, "")}
     ${tile("Last count", last ? esc(dayName(last.day)) : "—", `${skAge(last)}${last && last.seed ? skSeed(true) : ""}${last && last.src === "walk" ? ' <span class="chip info">Cherry\'s morning count</span>' : ""}`, "")}
@@ -227,8 +230,11 @@ function skPriceFlag(id, price, base) {
 }
 function skRcPad(id) { openPad(id, "receive", (qty, text) => { if (!qty) return; const lp = Store.lastPrice(id); rc.lines.push({ item: id, qty, text, price: null, _last: lp ? lp.price : null }); }); }
 function viewReceive() {
-  if (!rc) rc = { kind: "delivery", supplier: "", lines: [], photo: null, amount: "" };
-  const srcs = rc.kind === "pullout" ? ["Office", "MCC", "Dragon store", "MCBC", "Burger Kong"] : SUPPLIERS;
+  if (!rc) rc = { kind: "delivery", supplier: "", lines: [], photo: null, amount: "", location: role() === "walk" ? "HO" : "P99" };
+  if (rc.kind === "pullout") { rc.kind = "delivery"; trStart("receive", "HO", "P99"); return ""; } /* a pull-out is a transfer now: both sides record it (transfer-v2.js) */
+  const srcs = SUPPLIERS;
+  const locRow = role() === "walk" ? `<div class="alert info">Delivered to <b>Head Office</b>. The store records its pull-out under Stock in / out; the office confirms the release.</div>`
+    : `<section class="card"><div class="field"><label>Delivered to</label><div class="chips">${[["P99", "Pizza 99"], ["HO", "Head Office"], ["DC", "Dragon store (keeps P99 meat)"]].map(([c, l]) => `<button class="chip ${rc.location === c ? "info" : ""}" onclick="rc.location='${c}';render()">${l}</button>`).join("")}</div>${rc.location !== "P99" ? `<div class="tiny mut" style="margin-top:6px">Goods held at ${esc(locName(rc.location))} for Pizza 99; they reach the store's stock through a transfer.</div>` : ""}</div></section>`;
   const recent = [...new Set(S.receipts.filter(r => r.kind === rc.kind).sort((a, b) => a.day < b.day ? 1 : -1).map(r => r.supplier))].filter(s => srcs.includes(s)).slice(0, 6);
   const freq = {}; S.receipts.filter(r => r.supplier === rc.supplier).forEach(r => r.lines.forEach(l => freq[l.item] = (freq[l.item] || 0) + 1));
   const usual = Object.keys(freq).sort((a, b) => freq[b] - freq[a]).filter(id => Store.item(id) && !rc.lines.some(l => l.item === id)).slice(0, 8);
@@ -242,7 +248,8 @@ function viewReceive() {
   const steps = [[!!rc.supplier, rc.kind === "pullout" ? "From" : "Supplier"], [rc.lines.length > 0, "Items"], [rc.kind === "pullout" || !!rc.photo, "Photo"]];
   return shell("Receive", dayLong(today()), `
     <ol class="rsteps">${steps.map(([ok, l], i) => `<li class="${ok ? "ok" : ""}"><span>${ok ? "✓" : i + 1}</span>${l}</li>`).join("")}</ol>
-    <div class="seg">${RECEIPT_KINDS.map(([k, l]) => `<button class="btn ${rc.kind === k ? "on" : ""}" onclick="rc.kind='${k}';rc.supplier='';render()">${esc(l.split(" (")[0])}</button>`).join("")}</div>
+    <div class="seg">${RECEIPT_KINDS.map(([k, l]) => `<button class="btn ${rc.kind === k ? "on" : ""}" onclick="${k === "pullout" ? "trStart('receive','HO','P99')" : `rc.kind='${k}';rc.supplier='';render()`}">${esc(l.split(" (")[0])}</button>`).join("")}</div>
+    ${locRow}
     <section class="card"><div class="field"><label>${rc.kind === "pullout" ? "From" : "Supplier / store"}</label><select class="in" onchange="rc.supplier=this.value;render()"><option value="">— choose —</option>${srcs.map(s => `<option ${rc.supplier === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
       ${recent.length ? `<div class="chips" style="margin-top:8px">${recent.map(s => `<button class="chip ${rc.supplier === s ? "info" : ""}" onclick="rc.supplier=${esc(JSON.stringify(s))};render()">${esc(s)}</button>`).join("")}</div>` : ""}</section>
     <section class="card"><h2>Items <span class="tiny mut">${rc.lines.length} line${rc.lines.length === 1 ? "" : "s"}${priced.length ? ` · ${peso(tot)}` : ""}</span></h2>
@@ -270,7 +277,7 @@ function viewReceipts() {
     return `<div class="txday">${esc(dayName(d))} <span class="mut">· ${dr.length} receipt${dr.length > 1 ? "s" : ""}${dv.length ? " · " + peso(skSum(dv)) : ""}</span></div>${dr.map(r => { const k = RECEIPT_KINDS.find(x => x[0] === r.kind); const v = rVal(r); const who = Store.person(r.by);
       return `<div class="rrow">${r.photo ? thumb(r.photo) : `<span class="nophoto" data-tt="No photo|seed rows come from the crew chat">—</span>`}<div class="main"><div class="name">${esc(r.supplier)} ${r.kind !== "delivery" ? chip("", k ? k[1].split(" (")[0] : r.kind) : ""}</div><div class="meta">${r.lines.map(l => { const it = Store.item(l.item); return `<a href="#/item/${l.item}">${esc(it ? it.name : l.item)}</a> ${fmt(l.qty)} ${esc(it ? it.unit : "")}${l.text ? " (" + esc(l.text) + ")" : ""}`; }).join(" · ")}${who ? " · " + esc(who.short) : ""}</div></div><div class="right"><div class="v num">${v != null ? peso(v) : ""}</div><div class="l">${r.lines.length} line${r.lines.length > 1 ? "s" : ""}</div></div></div>`; }).join("")}`; }).join("");
   const supOpts = [...new Set(S.receipts.map(r => r.supplier))].sort();
-  return shell("Deliveries log", "crew chat 18 Aug–9 Sep, then this app", `
+  return shell("Deliveries log", typeof Sync !== "undefined" && Sync.on && !(window.OS_LOADED && window.OS_LOADED.dev) ? "every receipt typed in the app, at the store or at Head Office" : "crew chat 18 Aug–9 Sep, then this app", `
     <div class="rng">${[["7", "7 days"], ["30", "30 days"], ["90", "90 days"], ["all", "All"]].map(([k, l]) => `<button class="${skRx.range === k ? "on" : ""}" onclick="skRx.range='${k}';render()">${l}</button>`).join("")}</div>
     <div class="txctl"><select class="in" onchange="skRx.sup=this.value;render()"><option value="">All suppliers</option>${supOpts.map(s => `<option ${skRx.sup === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select><select class="in" onchange="skRx.kind=this.value;render()"><option value="">All kinds</option>${RECEIPT_KINDS.map(([k, l]) => `<option value="${k}" ${skRx.kind === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
     ${tiles}${chart}

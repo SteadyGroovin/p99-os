@@ -49,7 +49,7 @@ const TABS = {
 };
 const tabsFor = () => TABS[role() === "crew" ? "crew" : role() === "lead" ? "lead" : role() === "walk" ? "walk" : "office"];
 function tabOf(route) { const seg = route.split("/")[1] || "today"; const ids = tabsFor().map(t => t[0]);
-  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
+  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", transfers: "stock", transfer: "stock", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
   if (seg === "finance") return role() === "master" ? "finance" : "more";
   if (ids.includes(seg)) return seg; const m = map[seg]; if (m && ids.includes(m)) return m; return "more"; }
 
@@ -210,7 +210,7 @@ function viewReceive_v1() {
     <div class="bottom-act"><button class="btn primary full" ${ok ? "" : "disabled"} onclick="rcSave()">Save · ${rc.lines.length} line${rc.lines.length === 1 ? "" : "s"}</button></div>${padHTML()}`, { back: role() === "crew" ? "#/today" : "#/stock" });
 }
 function rcAdd() { const id = $("#rcitem").value; openPad(id, "receive", (qty, text) => { if (!qty) return; let price = null; if (rc.kind !== "pullout") { const p = prompt("Price per " + Store.item(id).unit + " (₱) — leave empty if not on the invoice", Store.lastPrice(id) ? Store.lastPrice(id).price : ""); price = p ? parseFloat(p) : null; } rc.lines.push({ item: id, qty, text, price }); }); }
-function rcSave() { S.receipts.push({ id: "r-" + Date.now(), day: today(), kind: rc.kind, supplier: rc.supplier, by: S.me, photo: rc.photo, amount: rc.amount ? parseFloat(rc.amount) : null, lines: rc.lines.map(l => ({ item: l.item, qty: l.qty, text: l.text, price: l.price })) }); rc = null; save(); toast("Saved — stock updated."); go(role() === "crew" ? "#/today" : "#/stock"); }
+function rcSave() { S.receipts.push({ id: "r-" + Date.now(), day: today(), kind: rc.kind, supplier: rc.supplier, by: S.me, photo: rc.photo, amount: rc.amount ? parseFloat(rc.amount) : null, location: rc.location && rc.location !== "P99" ? rc.location : null, synced: false, lines: rc.lines.map(l => ({ item: l.item, qty: l.qty, text: l.text, price: l.price })) }); rc = null; save(); toast(role() === "walk" ? "Saved at Head Office." : "Saved — stock updated."); go(role() === "crew" ? "#/today" : role() === "walk" ? "#/transfers" : "#/stock"); }
 
 /* ---------- ITEMS ---------- */
 let itemQ = "";
@@ -398,7 +398,7 @@ function render() {
   const qs = new URLSearchParams(location.search); if (qs.get("who") && !S.me) { const p = PEOPLE.find(x => x.id === qs.get("who") || x.role === qs.get("who")); if (p) { S.me = p.id; save(); } }
   let html;
   { /* route guard: the screens mirror the database rules (the database refuses the data anyway) */
-    const r = role(), s0 = seg[0] || "", ownerOnly = ["sales", "finance"], walkOk = ["walk", "tasks", "task", "report", "more", "who", ""];
+    const r = role(), s0 = seg[0] || "", ownerOnly = ["sales", "finance"], walkOk = ["walk", "tasks", "task", "report", "more", "who", "receive", "transfers", "transfer", ""]; /* the office also records deliveries at Head Office and releases stock to the stores */
     if ((r !== "master" && ownerOnly.includes(s0)) || (r === "walk" && !walkOk.includes(s0))) { location.hash = r === "walk" ? "#/walk" : "#/today"; return; }
   }
   if (!S.me) { S.me = "store"; save(); } // no sign-in (Stefan, 2026-10-18): the app opens straight in; a name is optional, under More
@@ -418,6 +418,8 @@ function render() {
     case "task": html = viewTask(seg[1]); break;
     case "cash": html = viewCash(); break;
     case "walk": html = seg[1] ? viewWalkForm() : viewWalk(); break;
+    case "transfers": html = viewTransfers(); break;
+    case "transfer": html = seg[1] === "new" ? viewTransferNew() : viewTransfer(seg[1]); break;
     case "finance": html = viewFinance(seg[1], seg[2]); break;
     case "more": html = viewMore(); break;
     default: html = role() === "walk" ? viewWalk() : viewToday();

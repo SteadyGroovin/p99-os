@@ -385,7 +385,7 @@ function c2VarOf(r) { if (r.variance != null) return { v: r.variance, late: fals
 function c2VarChip(v) { if (v == null) return chip("", "no POS figure"); if (Math.abs(v) <= 5) return chip("ok", "✓ balanced"); if (v < 0) return chip(v < -100 ? "bad" : "warn", "▼ short " + peso(-v)); return chip("warn", "▲ over " + peso(v)); }
 function c2Reason(i) { const c = C2.cc; c.reason = (c.reason ? c.reason.replace(/\s*$/, "") + "; " : "") + C2REASONS[i]; render(); }
 function c2CashSend(total, pos, varc) {
-  const c = C2.cc; const rec = { day: bday(), kind: "closing", d: Object.assign({}, c.d), total, fund: c.fund, pos, gcash: c.gcash, ref: c.ref, photo: c.photo, variance: varc, reason: c.reason, by: S.me, at: nowISO() };
+  const c = C2.cc; const rec = { id: "cash-" + Date.now(), day: bday(), kind: "closing", d: Object.assign({}, c.d), total, fund: c.fund, pos, gcash: c.gcash, ref: c.ref, photo: c.photo, variance: varc, reason: c.reason, by: S.me, at: nowISO() };
   S.cash.push(rec); C2.cc = null; save(); toast("Cash count sent."); render(); window.scrollTo(0, 0);
 }
 function viewCash() {

@@ -58,7 +58,12 @@ async function start() {
   if (member.role === "lead" || member.role === "crew") { const { data: g } = await sb.rpc("store_sales_glance", { p_store: "P99" }); window.GLANCE = g || null; } /* today so far + yesterday, nothing else (migration 014) */
   if (member.role === "master") try { const { data: wq } = await sb.from("walk_quick_count").select("day,item_key,qty").eq("store", "P99").order("day", { ascending: false }).limit(2000); window.WALK_ROWS = wq || []; } catch (e) { window.WALK_ROWS = []; } /* Cherry's morning counts feed Stock */
   window.DB_USER = session.user.email;
+  { /* the store's own records: receipts, counts, checklist ticks, tickets, tasks, cash counts, transfers (migration 016; sync.js keeps them in step) */
+    const { data: L, error: lErr } = await sb.rpc("os_load", { p_store: "P99", p_days: 120 });
+    if (lErr) return bootScreen(`<span class="band-bad">Could not load the store's records: ${bootEsc(lErr.message)}</span><div class="small mut" style="margin-top:8px">Nothing was changed. Check the connection and open the app again.</div>`);
+    window.OS_LOADED = L;
+  }
   bootEl.innerHTML = "";
-  for (const s of ["data.js", "icons.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "finance-v2.js", "walk-v2.js", "app.js"]) await loadScript(s);
+  for (const s of ["data.js", "icons.js", "sync.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "finance-v2.js", "walk-v2.js", "transfer-v2.js", "app.js"]) await loadScript(s);
 }
 start().catch(e => bootScreen(`<span class="band-bad">${bootEsc(e.message)}</span>`));

@@ -207,7 +207,8 @@ const Store = {
   load() {
     if (this._s) return this._s;
     try { this._s = JSON.parse(localStorage.getItem(this.key) || "null"); } catch (e) { this._s = null; }
-    if (!this._s) this._s = { counts: SEED_COUNTS.slice(), receipts: SEED_RECEIPTS.slice(), tickets: [], tasks: SEED_TASKS.slice(), runs: {}, cash: [], walks: [], photos: {}, draft: null, me: null, theme: "light" };
+    if (!this._s) this._s = { counts: SEED_COUNTS.slice(), receipts: SEED_RECEIPTS.slice(), tickets: [], tasks: SEED_TASKS.slice(), runs: {}, cash: [], walks: [], photos: {}, draft: null, me: null, theme: "light", transfers: [], locations: [], held: [] };
+    this._s.transfers = this._s.transfers || []; this._s.locations = this._s.locations || []; this._s.held = this._s.held || []; /* stock moves between locations (2026-11-03) */
     return this._s;
   },
   save() { try { localStorage.setItem(this.key, JSON.stringify(this._s)); } catch (e) { toast("Storage full on this device — oldest photos dropped"); this.prunePhotos(8); try { localStorage.setItem(this.key, JSON.stringify(this._s)); } catch (e2) {} } },
