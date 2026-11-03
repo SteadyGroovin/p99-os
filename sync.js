@@ -32,7 +32,8 @@ const Sync = {
       st.locations = L.locations || []; st.held = (L.held || []).map(h => ({ location: h.location, item: h.item, on_hand: +h.on_hand, count_units: h.count_units == null ? null : +h.count_units }));
       /* the HR to-do list seeded in data.js becomes real to-dos once, the first time an owner or lead opens the app with an empty task table */
       if (!st.tasks.length && typeof SEED_TASKS !== "undefined" && ["master", "lead"].includes(window.DB_ROLE)) st.tasks = SEED_TASKS.map(t => Object.assign({}, t, { created: t.created || Sync.local(new Date().toISOString()) }));
-      this.snapAll(); this.lastLoad = new Date(); Store.save();
+      const seeded = st.tasks.filter(t => !t.synced && /^k-\d{1,2}$/.test(t.id)).map(t => "task:" + t.id);
+      this.snapAll(); seeded.forEach(k => delete this.snap[k]); this.lastLoad = new Date(); Store.save();
       this.fetchPhotos();
     } else { const st = Store.load(); st.transfers = st.transfers || []; st.locations = st.locations || [{ code: "P99", name: "Pizza 99", kind: "store" }, { code: "HO", name: "Head Office", kind: "office" }, { code: "DC", name: "Dragon Crepe", kind: "store" }, { code: "MCC", name: "My Crepes Cafe", kind: "store" }, { code: "MCBC", name: "My Crepes Beach Club", kind: "store" }, { code: "BK", name: "Burger Kong", kind: "store" }]; st.held = st.held || []; }
     const orig = Store.save.bind(Store); Store.save = () => { orig(); if (Sync.on) Sync.collect(); };
@@ -43,15 +44,17 @@ const Sync = {
   local(iso) { if (!iso) return iso; const d = new Date(iso); if (isNaN(d)) return iso; const p = n => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; },
 
   /* ---------- what gets sent: the record in the server's shape ---------- */
+  /* app clocks are local "YYYY-MM-DDTHH:MM" (nowISO); the database keeps instants, so the zone goes with them */
+  ts(s) { if (!s || typeof s !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(s) || /(Z|[+-]\d\d:?\d\d)$/.test(s)) return s || null; const d = new Date(s); return isNaN(d) ? s : d.toISOString(); },
   payload(kind, r) {
-    const ph = id => id ? (this.photos[id] || null) : null; const unit = id => { const it = typeof Store !== "undefined" && Store.item(id); return it ? it.unit : null; };
+    const ph = id => id ? (this.photos[id] || null) : null; const ts = s => this.ts(s); const log = l => (l || []).map(e => Object.assign({}, e, { at: ts(e.at) })); const unit = id => { const it = typeof Store !== "undefined" && Store.item(id); return it ? it.unit : null; };
     if (kind === "receipt") return { id: r.id, day: r.day, kind: r.kind, supplier: r.supplier, by: r.by, photo_path: ph(r.photo), amount: r.amount, location: r.location || null, invoice: r.invoice || null, lines: r.lines.map(l => ({ item: l.item, qty: l.qty, unit: unit(l.item), text: l.text || null, price: l.price == null ? null : l.price })) };
-    if (kind === "count") { const units = {}; Object.keys(r.lines).forEach(k => units[k] = unit(k)); return { id: r.id, day: r.day, kind: r.kind, by: r.by, started: r.started, submitted: r.submitted, note: r.note || null, lines: r.lines, text: r.text || {}, units, var: r.var || null }; }
-    if (kind === "ticket") return { id: r.id, title: r.title, note: r.note || null, priority: r.priority, status: r.status, by: r.by, created: r.created, photo_path: ph(r.photo), fix_photo_path: ph(r.fixPhoto), assigned: r.assigned || null, scheduled: r.scheduled || null, closed: r.closed || null, closed_note: r.closed_note || null, log: r.log || [] };
-    if (kind === "task") return { id: r.id, title: r.title, detail: r.detail || null, owner: r.owner || null, due: r.due || null, status: r.status, source: r.source || null, created: r.created, done_at: r.done_at || null, log: r.log || [] };
-    if (kind === "cash") return { id: r.id, day: r.day, kind: r.kind, d: r.d, total: r.total, fund: r.fund, pos: r.pos, pos_gcash: r.pos_gcash, gcash: r.gcash, ref: r.ref || null, photo_path: ph(r.photo), variance: r.variance, reason: r.reason || null, by: r.by, at: r.at };
-    if (kind === "checklist_run") { const phs = {}; Object.keys(r.ph || {}).forEach(k => { const p = ph(r.ph[k]); if (p) phs[k] = p; }); return { id: r.id, done: r.done || {}, ph: phs }; }
-    if (kind === "transfer") { const side = r._side || (r.received_at ? "receive" : "release"); return { id: r.id, from: r.from, to: r.to, day: r.day, side, by: side === "release" ? r.released_by : r.received_by, at: side === "release" ? r.released_at : r.received_at, note: side === "release" ? r.released_note : r.received_note, photo_path: ph(r.photo), lines: r.lines.map(l => ({ item: l.item, qty: side === "release" ? l.released : l.received, unit: unit(l.item), text: l.text || null })).filter(l => l.qty != null) }; }
+    if (kind === "count") { const units = {}; Object.keys(r.lines).forEach(k => units[k] = unit(k)); return { id: r.id, day: r.day, kind: r.kind, by: r.by, started: ts(r.started), submitted: ts(r.submitted), note: r.note || null, lines: r.lines, text: r.text || {}, units, var: r.var || null }; }
+    if (kind === "ticket") return { id: r.id, title: r.title, note: r.note || null, priority: r.priority, status: r.status, by: r.by, created: ts(r.created), photo_path: ph(r.photo), fix_photo_path: ph(r.fixPhoto), assigned: r.assigned || null, scheduled: r.scheduled || null, closed: ts(r.closed), closed_note: r.closed_note || null, log: log(r.log) };
+    if (kind === "task") return { id: r.id, title: r.title, detail: r.detail || null, owner: r.owner || null, due: r.due || null, status: r.status, source: r.source || null, created: ts(r.created), done_at: ts(r.done_at), log: log(r.log) };
+    if (kind === "cash") return { id: r.id, day: r.day, kind: r.kind, d: r.d, total: r.total, fund: r.fund, pos: r.pos, pos_gcash: r.pos_gcash, gcash: r.gcash, ref: r.ref || null, photo_path: ph(r.photo), variance: r.variance, reason: r.reason || null, by: r.by, at: ts(r.at) };
+    if (kind === "checklist_run") { const phs = {}; Object.keys(r.ph || {}).forEach(k => { const p = ph(r.ph[k]); if (p) phs[k] = p; }); const done = {}; Object.keys(r.done || {}).forEach(k => done[k] = Object.assign({}, r.done[k], { at: ts(r.done[k].at) })); return { id: r.id, done, ph: phs }; }
+    if (kind === "transfer") { const side = r._side || (r.received_at ? "receive" : "release"); return { id: r.id, from: r.from, to: r.to, day: r.day, side, by: side === "release" ? r.released_by : r.received_by, at: ts(side === "release" ? r.released_at : r.received_at), note: side === "release" ? r.released_note : r.received_note, photo_path: ph(r.photo), lines: r.lines.map(l => ({ item: l.item, qty: side === "release" ? l.released : l.received, unit: unit(l.item), text: l.text || null })).filter(l => l.qty != null) }; }
     return null;
   },
   each(fn) {
