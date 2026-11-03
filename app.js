@@ -40,7 +40,7 @@ function openPhoto(id) { const d = document.createElement("div"); d.className = 
 const photoBtn = (label, onId, has) => `<button class="photo ${has ? "has" : ""}" onclick="takePhoto(id=>{${onId}})">${ic("camera-01")} ${has ? "Retake" : label}</button>`;
 
 /* ---------- roles & tabs ---------- */
-const ICON = { home: "home-02", check: "clipboard-check", grid: "grid-01", box: "package", alert: "alert-triangle", cash: "bank-note-01", dots: "dots-horizontal", list: "list", finance: "wallet-02" };
+const ICON = { home: "home-02", check: "clipboard-check", grid: "grid-01", box: "package", alert: "alert-triangle", cash: "bank-note-01", dots: "dots-horizontal", list: "list", finance: "wallet-02", sun: "sun", coins: "coins-01" };
 const TABS = {
   crew: [["today", "Today", "home", "#/today"], ["clean", "Clean", "check", "#/clean"], ["count", "Count", "grid", "#/count"], ["receive", "Receive", "box", "#/receive"], ["report", "Report", "alert", "#/report"]],
   lead: [["today", "Today", "home", "#/today"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["more", "More", "dots", "#/more"]],
@@ -48,18 +48,22 @@ const TABS = {
   office: [["today", "Today", "home", "#/today"], ["sales", "Sales", "cash", "#/sales"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["more", "More", "dots", "#/more"]],
 };
 const tabsFor = () => TABS[role() === "crew" ? "crew" : role() === "lead" ? "lead" : role() === "walk" ? "walk" : "office"];
-function tabOf(route) { const seg = route.split("/")[1] || "today"; const ids = tabsFor().map(t => t[0]);
+/* The sidebar (tablet and laptop width) has room for every section; the phone bottom bar keeps five. Order = the day of the store, and the order of the walkthrough deck (Stefan, 2026-11-03). */
+const SIDEBAR = [["today", "Today", "home", "#/today"], ["walk", "Morning run", "sun", "#/walk"], ["sales", "Sales", "cash", "#/sales"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["cash", "Cash", "coins", "#/cash"], ["report", "Report", "alert", "#/report"], ["tasks", "Tasks", "list", "#/tasks"], ["finance", "Finance", "finance", "#/finance"], ["more", "More", "dots", "#/more"]];
+const sidebarFor = () => role() === "master" ? SIDEBAR : role() === "admin" ? SIDEBAR.filter(t => t[0] !== "finance") : tabsFor();   /* walk, lead and crew keep their short bars */
+function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split("/")[1] || "today";
   const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", transfers: "stock", transfer: "stock", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
   if (seg === "finance") return role() === "master" ? "finance" : "more";
+  if (seg === "tickets" && ids.includes("report")) return "report";
   if (ids.includes(seg)) return seg; const m = map[seg]; if (m && ids.includes(m)) return m; return "more"; }
 
 /* ---------- shell ---------- */
 function shell(title, sub, body, { back } = {}) {
-  const p = me(); const tabs = tabsFor(); const cur = tabOf(location.hash.slice(1) || "/today");
+  const p = me(); const tabs = tabsFor(); const cur = tabOf(location.hash.slice(1) || "/today"); const side = sidebarFor(); const scur = tabOf(location.hash.slice(1) || "/today", side.map(t => t[0]));
   const openT = S.tickets.filter(t => t.status !== "done").length;
   const tabHTML = tabs.map(([id, label, icon, href]) => `<button class="${cur === id ? "on" : ""}" onclick="go('${href}')" aria-label="${label}">${id === "report" && openT ? `<span class="bdg">${openT}</span>` : ""}${ic(ICON[icon])}${label}</button>`).join("");
   return `
-  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Pizza 99 OS</div>${(role() === "master" ? tabs.flatMap(t => t[0] === "more" ? [["finance", "Finance", "finance", "#/finance"], t] : [t]) : tabs).map(([id, label, icon, href]) => `<button class="${cur === id ? "on" : ""}" onclick="go('${href}')">${ic(ICON[icon], "sm")}${label}</button>`).join("")}</nav>
+  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Pizza 99 OS</div>${side.map(([id, label, icon, href]) => `<button class="${scur === id ? "on" : ""}" onclick="go('${href}')">${ic(ICON[icon], "sm")}${label}</button>`).join("")}</nav>
   <div class="page">
     <header class="top">${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
