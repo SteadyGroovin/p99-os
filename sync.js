@@ -31,7 +31,7 @@ const Sync = {
       st.transfers = arr("transfer", L.transfers, r => { r.photo = regPhoto(r.photo_path); r.lines.forEach(l => { if (l.released != null) l.released = +l.released; if (l.received != null) l.received = +l.received; }); });
       st.locations = L.locations || []; st.held = (L.held || []).map(h => ({ location: h.location, item: h.item, on_hand: +h.on_hand, count_units: h.count_units == null ? null : +h.count_units }));
       /* the HR to-do list seeded in data.js becomes real to-dos once, the first time an owner or lead opens the app with an empty task table */
-      if (!st.tasks.length && typeof SEED_TASKS !== "undefined" && ["master", "lead"].includes(window.DB_ROLE)) st.tasks = SEED_TASKS.map(t => Object.assign({}, t, { created: t.created || nowISO() }));
+      if (!st.tasks.length && typeof SEED_TASKS !== "undefined" && ["master", "lead"].includes(window.DB_ROLE)) st.tasks = SEED_TASKS.map(t => Object.assign({}, t, { created: t.created || Sync.local(new Date().toISOString()) }));
       this.snapAll(); this.lastLoad = new Date(); Store.save();
       this.fetchPhotos();
     } else { const st = Store.load(); st.transfers = st.transfers || []; st.locations = st.locations || [{ code: "P99", name: "Pizza 99", kind: "store" }, { code: "HO", name: "Head Office", kind: "office" }, { code: "DC", name: "Dragon Crepe", kind: "store" }, { code: "MCC", name: "My Crepes Cafe", kind: "store" }, { code: "MCBC", name: "My Crepes Beach Club", kind: "store" }, { code: "BK", name: "Burger Kong", kind: "store" }]; st.held = st.held || []; }
@@ -112,6 +112,7 @@ const Sync = {
   /* a fresh read of the database (More → Refresh); local unsent records are kept */
   async reload() { if (typeof sb === "undefined" || !sb.rpc) return; const { data, error } = await sb.rpc("os_load", { p_store: "P99", p_days: 120 }); if (error) { this.err = error.message; return; } const ob = this.outbox; this.init(data); this.outbox = ob; this.put(this.K.outbox, ob); if (typeof render === "function") render(); },
 };
-/* the camera capture goes to the bucket as soon as it is taken */
-if (typeof takePhoto === "function") { const _takePhoto = takePhoto; takePhoto = function (cb) { _takePhoto(id => { Sync.upload(id); cb(id); }); }; }
+/* the camera capture goes to the bucket as soon as it is taken; app.js (loaded after this file) calls hookPhoto() once takePhoto exists */
+Sync.hookPhoto = function () { if (typeof takePhoto !== "function" || takePhoto._synced) return; const _takePhoto = takePhoto; takePhoto = function (cb) { _takePhoto(id => { Sync.upload(id); cb(id); }); }; takePhoto._synced = true; };
+Sync.hookPhoto();
 if (window.OS_LOADED) Sync.init(window.OS_LOADED);

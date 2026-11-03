@@ -431,3 +431,4 @@ function render() {
 window.addEventListener("hashchange", render);
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
 render();
+if (typeof Sync !== "undefined" && Sync.hookPhoto) Sync.hookPhoto();
