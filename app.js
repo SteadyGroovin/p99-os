@@ -13,7 +13,7 @@ const dayName = d => new Date(d + "T00:00:00").toLocaleDateString("en-PH", { wee
 const dayLong = d => new Date(d + "T00:00:00").toLocaleDateString("en-PH", { weekday: "long", day: "numeric", month: "long" });
 const timeOf = iso => iso ? iso.slice(11, 16) : "";
 const ageDays = iso => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 86400000));
-const go = h => { location.hash = h; };
+const go = h => { if (location.hash === h) { if (typeof render === "function") render(); } else location.hash = h; };   /* same hash fires no hashchange, so draw it here */
 const save = () => Store.save();
 let toastT = null;
 function toast(msg) { let t = $(".toast"); if (!t) { t = document.createElement("div"); t.className = "toast"; document.body.appendChild(t); } t.textContent = msg; clearTimeout(toastT); toastT = setTimeout(() => t.remove(), 2400); }

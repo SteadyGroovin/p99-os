@@ -199,7 +199,7 @@ const HYG_GUIDE = [
 ];
 function hygBand(total) { return total >= 41 ? ["excellent", "ok", ""] : total >= 32 ? ["good", "ok", ""] : total >= 23 ? ["acceptable", "warn", "supervisor reports it in the management chat"] : total >= 14 ? ["unacceptable", "bad", "free staff meal cancelled both days"] : ["critical", "bad", "Notice to Explain to the person in charge"]; }
 const FIRST5 = ["No sale", "1 sale", "2 sales", "3 sales", "4 sales", "5 sales", "Not checked"];
-const FUND = 3000;
+const FUND = 10000;   /* the fund that stays in the drawer: ₱10,000 since 28 Oct 2026 (walk_fund_standard), all stores */
 
 /* ---------- Store ---------- */
 const Store = {
