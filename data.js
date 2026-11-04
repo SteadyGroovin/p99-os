@@ -173,7 +173,6 @@ const CHECKLISTS = [
     { id: "c-chiller", t: "Chiller temperature", values: ["Chiller °C"] },
     { id: "c-trash", t: "Trash out, bins washed" },
     { id: "c-count", t: "Stock count sent", link: "#/count" },
-    { id: "c-cash", t: "Cash count sent", link: "#/cash" },
     { id: "c-off", t: "Gas off, oven off, lights off, door locked" } ] },
 ];
 

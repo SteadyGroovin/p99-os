@@ -67,6 +67,33 @@ const mrDay = () => MR.cached ? today() : MR.setup.day; /* an offline copy from 
 const mrStores = () => (MR.setup && MR.setup.stores) || [];
 const mrStore = code => mrStores().find(s => s.code === code);
 const mrToday = st => (st && st.today && (!MR.cached || MR.setup.day === today())) ? st.today : null;
+
+/* cashier confirmation (migration 018, 2026-11-05): the drawer is counted together with the AM cashier, who confirms
+   the count on their own phone by scanning a one-time QR code (Mike: the tablet user must not count alone). */
+const MR_QR_LIB = "https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js";
+function mrConfirmUrl(tok) { return new URL("confirm.html?t=" + tok, location.href.split("#")[0]).href; }
+function mrConfChip(t) { if (!t || !t.confirm_token) return ""; return t.confirmed_at ? (t.confirm_ok ? chip("ok", "cashier confirmed") : chip("bad", "cashier: not correct")) : chip("warn", "waiting for the cashier"); }
+function mrQrCard(t) {
+  if (!t || !t.confirm_token) return "";
+  const who = esc(mrName(t.received_person, t.received_by) || "the cashier");
+  if (t.confirmed_at && t.confirm_ok) return `<section class="card small">${chip("ok", "Cashier confirmed")} ${who} confirmed ${peso(t.cash_total)} at ${esc(mrTime(t.confirmed_at))}.</section>`;
+  if (t.confirmed_at) return `<section class="card warnbox small">${chip("bad", "Cashier: not correct")} ${who} at ${esc(mrTime(t.confirmed_at))}: “${esc(t.confirm_note || "")}”. Count again together and send a correction; a new code appears.</section>`;
+  setTimeout(mrDrawQr, 0);
+  /* on the result screen, look again every 8 s until the cashier has answered */
+  if (/\/sent$/.test(location.hash) && !MR.qrPoll) MR.qrPoll = setTimeout(() => { MR.qrPoll = null; if (/\/sent$/.test(location.hash) && !MR.loading) { MR.setupAt = 0; mrLoad(); } }, 8000);
+  return `<section class="card mr-qrc"><div>${chip("warn", "Waiting for the cashier")}</div><h2 style="margin-top:10px">${who}: scan this with your phone camera</h2>
+    <div class="small mut">You counted ${peso(t.cash_total)} together. The cashier confirms it on their own phone.</div>
+    <div id="mr-qr" class="mr-qr" data-url="${esc(mrConfirmUrl(t.confirm_token))}"><span class="mut small">Loading the code…</span></div>
+    <button class="btn full" onclick="MR.setupAt=0;mrLoad().then(render)">${MR.loading ? "Checking…" : "Check again"}</button></section>`;
+}
+function mrDrawQr() {
+  const el = document.getElementById("mr-qr"); if (!el) return;
+  const draw = () => { try { const q = qrcode(0, "M"); q.addData(el.dataset.url); q.make(); el.innerHTML = q.createSvgTag(6, 2); } catch (e) { el.innerHTML = `<span class="small band-bad">Could not draw the code. Open this on the cashier's phone: ${esc(el.dataset.url)}</span>`; } };
+  if (window.qrcode) return draw();
+  if (MR.qrLoading) { MR.qrLoading.then(draw); return; }
+  MR.qrLoading = new Promise((ok, bad) => { const s = document.createElement("script"); s.src = MR_QR_LIB; s.onload = ok; s.onerror = bad; document.head.appendChild(s); });
+  MR.qrLoading.then(draw, () => { MR.qrLoading = null; el.innerHTML = `<span class="small band-bad">No internet for the code. Check again when online.</span>`; });
+}
 const mrAreas = () => (MR.setup && MR.setup.hygiene_areas && MR.setup.hygiene_areas.length === 9) ? MR.setup.hygiene_areas : HYG_AREAS;
 const mrFirst5 = () => (MR.setup && MR.setup.first5_options && MR.setup.first5_options.length) ? MR.setup.first5_options : FIRST5;
 const mrPerson = id => ((MR.setup && MR.setup.people) || []).find(p => p.id === id);
@@ -152,11 +179,11 @@ function viewWalk() {
     let meta, right;
     if (t) {
       const who = mrName(t.received_person, t.received_by);
-      meta = `Done ${esc(mrTime(t.created))}${who ? ` · received by ${esc(who)}` : ""} · drawer ${peso(t.cash_total)}`;
+      meta = `Done ${esc(mrTime(t.created))}${who ? ` · counted with ${esc(who)}` : ""} · drawer ${peso(t.cash_total)}`;
       right = chip("ok", "done");
     } else if (qd) { meta = `Saved on this device ${esc(mrTime(qd.queued_at))}${qd.error ? ` · <span class="band-bad">${esc(qd.error)}</span>` : ""}`; right = chip("warn", "waiting to send"); }
     else { meta = dr && dr.saved ? `Draft on this device, last change ${esc(mrTime(dr.saved))}` : "Not yet"; right = dr && dr.saved ? chip("info", "draft") : chip("", "not yet"); }
-    const chips = [t ? mrFundChip(t.fund, s.fund_standard) : "", t && t.hygiene ? mrBandChip(t.hygiene) : (t ? chip("", "no hygiene") : ""), t && dr && dr.saved ? chip("info", "edit draft") : ""].filter(Boolean).join("");
+    const chips = [mrConfChip(t), t ? mrFundChip(t.fund, s.fund_standard) : "", t && t.hygiene ? mrBandChip(t.hygiene) : (t ? chip("", "no hygiene") : ""), t && dr && dr.saved ? chip("info", "edit draft") : ""].filter(Boolean).join("");
     return `<button class="row tap mr-row" onclick="go('#/walk/${s.code}')"><div class="main"><div class="name">${esc(s.name)} <span class="mut tiny">${esc(s.code)}</span></div><div class="meta">${meta}</div>${chips ? `<div class="mr-chips">${chips}</div>` : ""}</div>${right}<span class="chev">${ic("chevron-right")}</span></button>`;
   }).join("");
   const prog = `<section class="card"><div class="split"><h2>${done} of ${stores.length} stores done</h2><span class="tiny mut">${MR.loading ? "refreshing…" : `checked ${mrHM(new Date(MR.setupAt || Date.now()))}`}</span></div><div class="bar ${done >= stores.length ? "ok" : ""}"><i style="width:${stores.length ? done / stores.length * 100 : 0}%"></i></div>${done >= stores.length ? `<div class="small band-ok" style="margin-top:8px">The round is done.</div>` : ""}</section>`;
@@ -270,14 +297,11 @@ function mrCheck(f, st) {
   if (c.fund == null) req.push(["fund", "Cash fund: type what stays in the drawer"]);
   if (!f.first5) req.push(["first5", "First 5 sales: choose the result"]);
   if (n > 0 && n < 9) req.push(["hyg", `Hygienics: ${n} of 9 areas scored — score all 9, or clear them`]);
-  if (f.endorsed === "__other" && !f.endorsedText.trim()) req.push(["who", "Endorsed by: type the name, or pick one from the list"]);
-  if (f.received === "__other" && !f.receivedText.trim()) req.push(["who", "Received by: type the name, or pick one from the list"]);
+  if (!f.received) req.push(["who", "Counted together with: choose the AM cashier"]);
+  if (f.received === "__other" && !f.receivedText.trim()) req.push(["who", "Counted together with: type the name, or pick one from the list"]);
   if (f.gapAsked != null && !f.gapReason.trim()) req.push(["gap", "Cash difference: write a short reason"]);
   if (c.total && c.sales != null && c.sales < 0) soft.push(["cash", "The drawer holds less than the fund — count again, then tell the office"]);
   if (c.fund != null && st.fund_standard != null && c.fund !== +st.fund_standard) soft.push(["fund", `Fund ${peso(c.fund)} differs from the standard ${peso(st.fund_standard)}`]);
-  if (!f.endorsed) soft.push(["who", "Endorsed by: nobody chosen"]);
-  if (!f.received) soft.push(["who", "Received by: nobody chosen"]);
-  if (f.endorsed === "__other" && f.endorsedText.trim()) soft.push(["who", `"${f.endorsedText.trim()}" is typed, not on the list`]);
   if (f.received === "__other" && f.receivedText.trim()) soft.push(["who", `"${f.receivedText.trim()}" is typed, not on the list`]);
   if (st.items.length && !st.items.some(it => mrPieces(it, f.quick[it.key]))) soft.push(["quick", "Quick counts: nothing counted"]);
   if (!f.booklet.trim()) soft.push(["or", "OR booklet no.: empty"]);
@@ -298,6 +322,7 @@ function mrFormHTML(st) {
   const f = MR.form, base = mrDay(), t = f.day === base ? mrToday(st) : null, chk = mrCheck(f, st), q = mrQueue().find(e => e.payload.store === st.code && e.payload.day === f.day);
   const notes = [];
   if (f.day !== base) notes.push(`<div class="card warnbox small">${chip("warn", "Earlier day")} This run is for <b>${esc(dayLong(f.day))}</b>, not today.</div>`);
+  if (t) notes.push(mrQrCard(t));
   if (t || f.editOf) notes.push(`<div class="card mr-edit small">${chip("info", "Edit")} Editing today's run (saved ${esc(mrTime(t ? t.created : f.editOf))}) — the first version is kept.</div>`);
   if (MR.restored) notes.push(`<div class="card small">${chip("info", "Draft restored")} Your typing from this device, last change ${esc(mrTime(f.saved))}. <button class="btn sm ghost danger" onclick="mrDiscard()">Discard draft</button></div>`);
   if (q) notes.push(`<div class="card warnbox small">${chip("warn", "Waiting to send")} A run for this store is saved on this device since ${esc(mrTime(q.queued_at))}${q.error ? ` — <span class="band-bad">${esc(q.error)}</span>` : ""}. Sending again replaces it.</div>`);
@@ -311,15 +336,15 @@ function mrFormHTML(st) {
     return `<div class="mr-area" id="mr-a-${i}"><div class="name">${i + 1}. ${esc(a)}</div>${g.length ? `<ul class="mr-guide">${g.map(x => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}<div class="mr-sc" role="group" aria-label="${esc(a)} score">${[1, 2, 3, 4, 5].map(n => `<button type="button" class="${s === n ? "on s" + n : ""}" aria-pressed="${s === n}" onclick="mrScore(${i},${n})">${n}</button>`).join("")}</div><div class="tiny mr-low" ${s && s <= 2 ? "" : "hidden"}>Score ${s || ""}: add a note below what is wrong.</div></div>`; }).join("");
   const first5 = mrFirst5().map(o => `<option ${f.first5 === o ? "selected" : ""}>${esc(o)}</option>`).join("");
   const body = notes.join("") + `
-  <section class="card mr-sec" id="mr-s-cash"><h2>1 · Cash count ${mrReqTag}</h2><div class="small mut">All the money in the drawer: yesterday's sales and the fund together. Pieces per note.</div>
+  <section class="card mr-sec" id="mr-s-who"><h2>1 · Counted together with ${mrReqTag}</h2><div class="small mut">Count the drawer together with the AM cashier, both at the drawer. After you send, the cashier confirms the count on their own phone.</div>
+    <div class="field"><label for="mr-received">AM cashier</label>${mrSel("received", f, st)}</div></section>
+  <section class="card mr-sec" id="mr-s-cash"><h2>2 · Cash count ${mrReqTag}</h2><div class="small mut">All the money in the drawer: yesterday's sales and the fund together. Pieces per note.</div>
     <div class="mr-sum"><div><span>Drawer total</span><b class="num" id="mr-tot">${peso(chk.c.total)}</b></div><div><span>Cash fund</span><b class="num" id="mr-fv">${chk.c.fund == null ? "—" : peso(chk.c.fund)}</b></div><div><span>Cash sales</span><b class="num" id="mr-sales">—</b></div></div>
     <div class="small" id="mr-salesl"></div>
     <div class="mr-dens">${den}</div>
     <div class="field" id="mr-s-fund" style="margin-top:14px"><label for="mr-fund">Cash fund kept in the drawer (₱) ${mrReqTag}</label>
       <div class="mr-fundrow"><input class="in num" id="mr-fund" inputmode="numeric" pattern="[0-9]*" placeholder="₱" value="${esc(f.fund)}" oninput="mrFund(this)">${st.fund_standard != null ? `<button type="button" class="btn" onclick="mrFundFill(${+st.fund_standard})">= ${peso(st.fund_standard)}</button>` : ""}</div>
       <div id="mr-fundchip" class="tiny"></div></div></section>
-  <section class="card mr-sec" id="mr-s-who"><h2>2 · Who</h2><div class="small mut">Like the two signatures on paper: who hands the cash over, who takes it.</div>
-    <div class="mr-two"><div class="field"><label for="mr-endorsed">Endorsed by</label>${mrSel("endorsed", f, st)}</div><div class="field"><label for="mr-received">Received by</label>${mrSel("received", f, st)}</div></div></section>
   <section class="card mr-sec" id="mr-s-quick"><h2>3 · Quick counts</h2><div class="small mut">Count what is there. Leave empty what you did not count.</div><div class="mr-qcs">${qc}</div></section>
   <section class="card mr-sec" id="mr-s-or"><h2>4 · OR booklet no.</h2><input class="in" id="mr-or" autocomplete="off" value="${esc(f.booklet)}" placeholder="${st.last_booklet ? "last sent: " + esc(st.last_booklet) : "booklet number"}" oninput="MR.form.booklet=this.value;mrTouch()">${st.last_booklet ? `<div class="tiny mut" style="margin-top:6px">Last sent for this store: <b>${esc(st.last_booklet)}</b></div>` : ""}</section>
   <section class="card mr-sec" id="mr-s-first5"><h2>5 · First 5 sales (BIR) ${mrReqTag}</h2><div class="mr-two"><div class="field"><label for="mr-f5">Result</label><select class="in" id="mr-f5" onchange="MR.form.first5=this.value;mrTouch()"><option value="" ${!f.first5 ? "selected" : ""}>— choose —</option>${first5}</select></div><div class="field"><label for="mr-time">Time checked</label><input class="in" id="mr-time" type="time" value="${esc(f.time)}" onchange="MR.form.time=this.value;mrTouch()"></div></div></section>
@@ -356,7 +381,7 @@ function mrLive() {
   const who = (sel, txt) => sel === "__other" ? (txt.trim() ? `${esc(txt.trim())} <span class="tiny band-warn">typed</span>` : "—") : sel ? esc(mrName(sel)) : `<span class="mut">—</span>`;
   const counted = st.items.filter(it => mrPieces(it, f.quick[it.key])).length;
   const kv = [["Drawer total", peso(c.total)], ["Cash fund", c.fund == null ? "—" : peso(c.fund) + " " + mrFundChip(c.fund, st.fund_standard)], ["Cash sales", c.sales == null || !c.total ? "—" : `<span class="${c.sales < 0 ? "band-bad" : ""}">${c.sales < 0 ? "−" : ""}${peso(Math.abs(c.sales))}</span>`],
-    ["Endorsed → received", `${who(f.endorsed, f.endorsedText)} → ${who(f.received, f.receivedText)}`], ["Quick counts", `${counted} of ${st.items.length}`], ["OR booklet", esc(f.booklet.trim()) || "—"],
+    ["Counted together with", who(f.received, f.receivedText)], ["Quick counts", `${counted} of ${st.items.length}`], ["OR booklet", esc(f.booklet.trim()) || "—"],
     ["First 5 sales", f.first5 ? `${esc(f.first5)}${f.time ? " · " + esc(f.time) : ""}` : `<span class="band-bad">—</span>`], ["Columnar", f.colSales ? `${peso(+f.colSales)}${f.colDate ? " · " + esc(dayName(f.colDate)) : ""}` : "—"],
     ["Hygienics", n === 9 ? `${tot}/45 ${chip(hb[1], hb[0])}` : n ? `<span class="band-bad">${n} of 9</span>` : "not done"], ["Note", esc(f.note.trim()) || "—"]];
   const li = (arr, cls) => arr.map(([sec, t]) => `<li><button type="button" class="${cls}" onclick="mrGoto('${sec}')">${esc(t)}</button></li>`).join("");
@@ -432,5 +457,6 @@ function mrViewResult(st) {
     <div class="mr-sum"><div><span>Drawer</span><b class="num">${peso(d.cash_total)}</b></div><div><span>Fund</span><b class="num">${peso(p.fund)}</b></div><div><span>Cash sales</span><b class="num ${d.cash_sales < 0 ? "band-bad" : ""}">${d.cash_sales < 0 ? "−" : ""}${peso(Math.abs(d.cash_sales))}</b></div></div>
     <div class="mr-chips">${fs}</div>
     ${owner && d.gap != null ? `<div class="small" style="margin-top:8px">Against UTAK cash: <b class="${Math.abs(d.gap) > ((MR.setup.settings || {}).cash_gap_threshold || 0) ? "band-warn" : ""}">${d.gap > 0 ? "+" : d.gap < 0 ? "−" : ""}${peso(Math.abs(d.gap))}</b>${p.gap_reason ? ` · reason: ${esc(p.gap_reason)}` : ""}</div>` : ""}
+    </section>${d.duplicate ? "" : mrQrCard(mrToday(st)) || `<section class="card small mut">The QR code for the cashier appears here in a moment. <button class="btn sm" onclick="MR.setupAt=0;mrLoad()">Check again</button></section>`}<section class="card">
     <div class="mr-hres">${h ? `<div><b class="num mr-hbig">${h.total}</b><span class="mut">/45</span> ${chip(hb[1], esc(h.band))}</div>${h.consequence ? `<div class="small band-${hb[1]}" style="margin-top:4px">What follows: ${esc(h.consequence)}</div>` : `<div class="small mut" style="margin-top:4px">Nothing follows.</div>`}` : `<div class="small mut">No hygienics in this run. Add them later: open the store and send a correction.</div>`}</div></section>${btns}`, { back: "#/walk" });
 }

@@ -49,7 +49,7 @@ const TABS = {
 };
 const tabsFor = () => TABS[role() === "crew" ? "crew" : role() === "lead" ? "lead" : role() === "walk" ? "walk" : "office"];
 /* The sidebar (tablet and laptop width) has room for every section; the phone bottom bar keeps five. Order = the day of the store, and the order of the walkthrough deck (Stefan, 2026-11-03). */
-const SIDEBAR = [["today", "Today", "home", "#/today"], ["walk", "Morning run", "sun", "#/walk"], ["sales", "Sales", "cash", "#/sales"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["cash", "Cash", "coins", "#/cash"], ["report", "Report", "alert", "#/report"], ["tasks", "Tasks", "list", "#/tasks"], ["finance", "Finance", "finance", "#/finance"], ["more", "More", "dots", "#/more"]];
+const SIDEBAR = [["today", "Today", "home", "#/today"], ["walk", "Morning run", "sun", "#/walk"], ["sales", "Sales", "cash", "#/sales"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["report", "Report", "alert", "#/report"], ["tasks", "Tasks", "list", "#/tasks"], ["finance", "Finance", "finance", "#/finance"], ["more", "More", "dots", "#/more"]];
 const sidebarFor = () => role() === "master" ? SIDEBAR : role() === "admin" ? SIDEBAR.filter(t => t[0] !== "finance") : tabsFor();   /* walk, lead and crew keep their short bars */
 function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split("/")[1] || "today";
   const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", transfers: "stock", transfer: "stock", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
@@ -384,9 +384,8 @@ function walkSubmit() { const total = sumDenoms(walk); const scored = walk.score
 /* ---------- MORE ---------- */
 function viewMore_v1() {
   const p = me(); const links = [];
-  if (role() === "lead") links.push(["Cash — closing count", "#/cash"], ["Tickets", "#/report"], ["Tasks", "#/tasks"], ["Variance", "#/variance"]);
-  if (isOffice()) links.push(["Store walk (morning run)", "#/walk"], ["Tasks (to-do list)", "#/tasks"], ["Tickets", "#/report"], ["Cash — closing count", "#/cash"], ["Variance", "#/variance"], ["Receive", "#/receive"]);
-  if (role() === "crew") links.push(["Cash — closing count", "#/cash"]);
+  if (role() === "lead") links.push(["Tickets", "#/report"], ["Tasks", "#/tasks"], ["Variance", "#/variance"]);
+  if (isOffice()) links.push(["Store walk (morning run)", "#/walk"], ["Tasks (to-do list)", "#/tasks"], ["Tickets", "#/report"], ["Variance", "#/variance"], ["Receive", "#/receive"]);
   return shell("More", `${esc(p.name)} · ${esc(p.position)}`, `<div class="list">${links.map(([l, h]) => `<button class="row tap" onclick="go('${h}')"><div class="main"><div class="name">${l}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("")}
     <button class="row tap" onclick="S.theme=S.theme==='dark'?'light':'dark';save();applyTheme();render()"><div class="main"><div class="name">Theme: ${S.theme === "dark" ? "dark" : "light"}</div></div></button>
     <button class="row tap" onclick="signOut()"><div class="main"><div class="name">Sign out</div><div class="meta">signed in as ${esc(window.DB_USER || "")}</div></div></button>

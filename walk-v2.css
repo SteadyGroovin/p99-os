@@ -75,3 +75,8 @@
 .mr-res h2{font-size:18px; line-height:26px}
 .mr-hres{margin-top:12px; padding-top:12px; border-top:1px solid var(--line)}
 .mr-btns{display:grid; gap:8px} .mr-btns .btn{min-height:52px; font-size:16px}
+
+/* cashier QR (018) */
+.mr-qr{display:flex; justify-content:center; padding:16px 0}
+.mr-qr svg{width:min(260px,70vw); height:auto; background:#fff; border-radius:8px}
+.mr-qrc h2{font-size:18px}
