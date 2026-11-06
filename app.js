@@ -401,7 +401,7 @@ function render() {
   const qs = new URLSearchParams(location.search); if (qs.get("who") && !S.me) { const p = PEOPLE.find(x => x.id === qs.get("who") || x.role === qs.get("who")); if (p) { S.me = p.id; save(); } }
   let html;
   { /* route guard: the screens mirror the database rules (the database refuses the data anyway) */
-    const r = role(), s0 = seg[0] || "", ownerOnly = ["sales", "finance"], walkOk = ["walk", "tasks", "task", "report", "more", "who", "receive", "transfers", "transfer", ""]; /* the office also records deliveries at Head Office and releases stock to the stores */
+    const r = role(), s0 = seg[0] || "", ownerOnly = ["sales", "finance"], walkOk = ["walk", "tasks", "task", "report", "more", "who", "password", "receive", "transfers", "transfer", ""]; /* the office also records deliveries at Head Office and releases stock to the stores */
     if ((r !== "master" && ownerOnly.includes(s0)) || (r === "walk" && !walkOk.includes(s0))) { location.hash = r === "walk" ? "#/walk" : "#/today"; return; }
   }
   if (!S.me) { S.me = "store"; save(); } // no sign-in (Stefan, 2026-10-18): the app opens straight in; a name is optional, under More
@@ -425,6 +425,7 @@ function render() {
     case "transfer": html = seg[1] === "new" ? viewTransferNew() : viewTransfer(seg[1]); break;
     case "finance": html = viewFinance(seg[1], seg[2]); break;
     case "more": html = viewMore(); break;
+    case "password": html = viewPassword(); break;
     default: html = role() === "walk" ? viewWalk() : viewToday();
   }
   $("#app").innerHTML = html;

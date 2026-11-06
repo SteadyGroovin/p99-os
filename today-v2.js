@@ -102,9 +102,42 @@ function viewMore() {
   const me2 = group("This device", [
     `<button class="row tap" onclick="S.theme=S.theme==='dark'?'light':'dark';save();applyTheme();render()"><div class="main"><div class="name">Dark theme</div><div class="meta">easier in a dim kitchen</div></div><span class="sw ${S.theme === "dark" ? "on" : ""}"><i></i></span></button>`,
     row("Put a name on my entries", `optional · ${esc(me().name)} now`, "go('#/who')"),
+    ...(window.DB_USER ? [row("Change password", "for signing in with e-mail and password", "go('#/password')")] : []),
     ...(window.DB_USER ? [`<button class="row tap" onclick="signOut()"><div class="main"><div class="name">Sign out</div><div class="meta">signed in as ${esc(window.DB_USER)}</div></div></button>`] : []),
     `<button class="row tap" onclick="if(confirm('Reset everything typed on this device?')){Store.reset();location.hash='#/who';location.reload()}"><div class="main"><div class="name band-bad">Reset this device</div><div class="meta">clears counts, receipts, tickets and photos typed here</div></div></button>`]);
   const owner = role() === "master";
   const saved = typeof Sync !== "undefined" && Sync.on ? `<div class="tiny mut" style="margin:0 0 8px">${esc(Sync.state().label === "all saved" ? "Everything typed here is saved to the database." : Sync.state().label)}</div>` : "";
   return shell("More", `${esc(p.name)} · ${esc(p.position)}`, (owner ? health : saved) + (owner ? daily : role() === "walk" ? group("Every day", [row("Store walk", "the morning run", "go('#/walk')"), row("Delivery at Head Office", "a supplier dropped goods at the office", "go('#/receive')"), row("Stock out to a store", "release, or confirm a store's pull-out", "go('#/transfers')")]) : group("Every day", [row("Stock in / out", "pull-outs from Head Office or another store", "go('#/transfers')"), row("Tickets", "problems and repairs", "go('#/report')"), row("To-do list", "", "go('#/tasks')")])) + (owner ? review : "") + me2 + `<div class="tiny mut">Pizza 99 OS v0.9 · what you see depends on your login: owners, store team, Head Office.</div>`);
+}
+
+
+/* ---------- Change password (Stefan, 2026-11-07) ----------
+   Anyone signed in sets a new password for their own login (Supabase auth.updateUser). Also how someone who only used the
+   e-mail link gets a password. Nothing is stored on the device; the password goes straight to Supabase over https. */
+let pwMsg = null, pwBusy = false;
+function viewPassword() {
+  if (!window.DB_USER) { setTimeout(() => go("#/more"), 0); return shell("Change password", "", ""); }
+  const m = pwMsg ? `<div class="alert ${pwMsg.ok ? "ok" : "bad"}" style="margin-top:12px">${esc(pwMsg.t)}</div>` : "";
+  return shell("Change password", esc(window.DB_USER), `<section class="card">
+    <div class="field"><label for="pw-a">New password</label><input class="in" id="pw-a" type="password" autocomplete="new-password" minlength="8"></div>
+    <div class="field" style="margin-top:12px"><label for="pw-b">New password again</label><input class="in" id="pw-b" type="password" autocomplete="new-password" minlength="8" onkeydown="if(event.key==='Enter')pwSave()"></div>
+    <div class="tiny mut" style="margin-top:8px">At least 8 characters. You stay signed in on this device.</div>
+    <button class="btn primary full" style="margin-top:14px" ${pwBusy ? "disabled" : ""} onclick="pwSave()">${pwBusy ? "Saving…" : "Save new password"}</button>${m}</section>`, { back: "#/more" });
+}
+async function pwSave() {
+  const a = (document.getElementById("pw-a") || {}).value || "", b = (document.getElementById("pw-b") || {}).value || "";
+  if (a.length < 8) { pwMsg = { ok: false, t: "The password needs at least 8 characters." }; return render(); }
+  if (a !== b) { pwMsg = { ok: false, t: "The two passwords are not the same." }; return render(); }
+  pwBusy = true; pwMsg = null; render();
+  let error = null;
+  try { ({ error } = await sb.auth.updateUser({ password: a })); } catch (e) { error = e; }
+  pwBusy = false;
+  const t = error ? String(error.message || error) : "";
+  pwMsg = !error ? { ok: true, t: "Password changed. Use it the next time you sign in." }
+    : /same|different from the old/i.test(t) ? { ok: false, t: "That is your current password. Choose a new one." }
+    : /reauth|recent|nonce/i.test(t) ? { ok: false, t: "For safety, sign out, sign in again with the e-mail link, then change the password right away." }
+    : /weak|short|length/i.test(t) ? { ok: false, t: "Supabase finds this password too weak. Use a longer one." }
+    : /fetch|network/i.test(t) ? { ok: false, t: "No internet. Try again when online." }
+    : { ok: false, t: "Could not change the password: " + t };
+  render();
 }
