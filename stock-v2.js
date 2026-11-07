@@ -246,7 +246,7 @@ function skShort() { if (!rc.po) return []; const o = (S.orders || []).find(x =>
   return o.lines.map(l => { const it = Store.item(l.item); if (!it) return null; const want = skOrdToCount(it, l.qty, l.unit); if (want == null) return null; const got = rc.lines.filter(x => x.item === l.item).reduce((a, x) => a + x.qty, 0); return got < want ? { it, want, got } : null; }).filter(Boolean); }
 function viewReceive() {
   if (!rc) rc = { kind: "delivery", supplier: "", lines: [], photo: null, amount: "", total: "", invoice: "", pay_mode: null, pay_source: "store_fund", po: null, location: role() === "walk" ? "HO" : "P99" };
-  if (rc.kind === "pullout") { rc.kind = "delivery"; trStart("receive", "HO", "P99"); return ""; } /* a pull-out is a transfer now: both sides record it (transfer-v2.js) */
+  if (rc.kind === "pullout") return skPullout();   /* v0.13.1: a pull-out is a transfer (both sides record it, transfer-v2.js); Receive shows what waits and opens the form only on a tap */
   const srcs = SUPPLIERS;
   const locRow = role() === "walk" ? `<div class="alert info">Delivered to <b>Head Office</b>. The store records its pull-out under Stock in / out; the office confirms the release.</div>`
     : `<section class="card"><div class="field"><label>Delivered to</label><div class="chips">${[["P99", "Pizza 99"], ["HO", "Head Office"], ["DC", "Dragon store (keeps P99 meat)"]].map(([c, l]) => `<button class="chip ${rc.location === c ? "info" : ""}" onclick="rc.location='${c}';render()">${l}</button>`).join("")}</div>${rc.location !== "P99" ? `<div class="tiny mut" style="margin-top:6px">Goods held at ${esc(locName(rc.location))} for Pizza 99; they reach the store's stock through a transfer.</div>` : ""}</div></section>`;
@@ -266,8 +266,8 @@ function viewReceive() {
   if (!totOk) need.push("total ₱"); if (!rc.pay_mode) need.push("paid now or bill"); if (rc.kind !== "pullout" && !rc.photo) need.push("photo");
   const steps = [[!!rc.supplier, rc.kind === "pullout" ? "From" : "Supplier"], [rc.lines.length > 0, "Items"], [totOk && !!rc.pay_mode, "Money"], [rc.kind === "pullout" || !!rc.photo, "Photo"]];
   return shell("Receive", dayLong(today()), `
-    <ol class="rsteps">${steps.map(([ok, l], i) => `<li class="${ok ? "ok" : ""}"><span>${ok ? "✓" : i + 1}</span>${l}</li>`).join("")}</ol>
-    <div class="seg">${RECEIPT_KINDS.map(([k, l]) => `<button class="btn ${rc.kind === k ? "on" : ""}" onclick="${k === "pullout" ? "trStart('receive','HO','P99')" : `rc.kind='${k}';rc.supplier='';rc.po=null;rc.pay_mode=${k === "purchase" ? "'paid_now'" : "null"};render()`}">${esc(l.split(" (")[0])}</button>`).join("")}</div>
+    <ol class="rsteps">${steps.map(([ok, l], i) => `<li class="${ok ? "ok" : ""}"><span>${ok ? "✓" : i + 1}</span><em class="rl">${l}</em></li>`).join("")}</ol>
+    <div class="seg">${RECEIPT_KINDS.map(([k, l]) => `<button class="btn ${rc.kind === k ? "on" : ""}" onclick="${k === "pullout" ? "rc.kind='pullout';render()" : `rc.kind='${k}';rc.supplier='';rc.po=null;rc.pay_mode=${k === "purchase" ? "'paid_now'" : "null"};render()`}">${esc(l.split(" (")[0])}</button>`).join("")}</div>
     ${locRow}
     <section class="card"><div class="field"><label>${rc.kind === "pullout" ? "From" : "Supplier / store"}</label><select class="in" onchange="skPickSupplier(this.value)"><option value="">— choose —</option>${srcs.map(s => `<option ${rc.supplier === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
       ${recent.length ? `<div class="chips" style="margin-top:8px">${recent.map(s => `<button class="chip ${rc.supplier === s ? "info" : ""}" onclick="skPickSupplier(${esc(JSON.stringify(s))})">${esc(s)}</button>`).join("")}</div>` : ""}
@@ -289,6 +289,17 @@ function viewReceive() {
     ${need.length ? `<div class="tiny mut" style="text-align:center">Needed: ${need.join(", ")}.</div>` : ""}${padHTML()}`, { back: role() === "crew" ? "#/today" : "#/stock" });
 }
 
+function skPullout() {   /* v0.13.1: stock from Head Office or another store, without leaving Receive */
+  const here = typeof myLoc === "function" ? myLoc() : "P99";
+  const waiting = (typeof trAwaitingMe === "function" ? trAwaitingMe() : []).filter(t => t.to === here);
+  const seg = `<div class="seg">${RECEIPT_KINDS.map(([k, l]) => `<button class="btn ${rc.kind === k ? "on" : ""}" onclick="${k === "pullout" ? "rc.kind='pullout';render()" : `rc.kind='${k}';rc.supplier='';rc.po=null;rc.pay_mode=${k === "purchase" ? "'paid_now'" : "null"};render()`}">${esc(l.split(" (")[0])}</button>`).join("")}</div>`;
+  const rows = waiting.map(t => `<button class="row tap" onclick="go('#/transfer/${t.id}')"><div class="main"><div class="name">From ${esc(locName(t.from))} · ${esc(dayName(t.day))}</div><div class="meta">${t.lines.map(l => `${fmt(l.released)} ${esc((Store.item(l.item) || {}).unit || "")} ${esc((Store.item(l.item) || { name: l.item }).name)}`).join(" · ")}</div></div><span class="chip warn"><i class="dot"></i>confirm</span></button>`).join("");
+  return shell("Receive", dayLong(today()), `${seg}
+    <div class="alert info">A pull-out is stock that comes from Head Office or another store. Both sides record it: the one who sends and the one who receives. Differences are flagged.</div>
+    <section class="card"><h2>Waiting for you to confirm <span class="tiny mut">${waiting.length}</span></h2>${rows ? `<div class="list">${rows}</div>` : `<div class="mut small">Nothing was released to ${esc(locName(here))} yet. If the stock is already here, record the pull-out below.</div>`}</section>
+    <button class="btn primary full" onclick="trStart('receive','HO','${here}')">Record a pull-out</button>
+    <div class="tiny mut" style="text-align:center">All transfers: Stock → Stock in / out</div>`, { back: role() === "crew" ? "#/today" : "#/stock" });
+}
 function skRunLabel(d) { const day = +String(d).slice(8, 10), m = new Date(d + "T00:00:00").toLocaleString("en-PH", { month: "short" }); return day <= 15 ? `1–15 ${m}` : `16–end ${m}`; }
 
 /* ---------- RECEIPTS (deliveries log) ---------- */

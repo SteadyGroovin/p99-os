@@ -66,6 +66,8 @@
 .rsteps li{flex:1; display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; color:var(--mut); padding:6px 8px; border-radius:var(--r-ctl); background:var(--surf2)}
 .rsteps li span{width:22px; height:22px; border-radius:50%; display:grid; place-items:center; background:var(--surf); border:1px solid var(--line2); font-size:12px; flex:none}
 .rsteps li.ok{color:var(--ok); background:var(--ok-bg)} .rsteps li.ok span{border-color:var(--ok-dot); color:var(--ok)}
+.rsteps li{min-width:0} .rsteps .rl{font-style:normal; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}   /* v0.13.1: the step bar fits a phone */
+@media (max-width:480px){ .rsteps{gap:4px} .rsteps li{flex-direction:column; gap:2px; padding:5px 2px; font-size:11px; text-align:center} .rsteps .rl{max-width:100%} }
 .rline{display:grid; grid-template-columns:1fr auto; gap:4px 8px; align-items:center; padding:10px 4px 10px 12px; border:1px solid var(--line); border-radius:var(--r-card); background:var(--surf)}
 .rline .main{min-width:0} .rline .name{font-weight:600} .rline .meta{font-size:13px; color:var(--mut)}
 .rline .rx{min-width:44px; padding:0}

@@ -92,6 +92,7 @@ h3{font-size:14px; line-height:20px; margin:0 0 8px; color:var(--mut); font-weig
 .btn.danger{color:var(--bad)}
 .bottom-act{position:sticky; bottom:calc(var(--tab) + 8px); padding:8px 0 0; margin-top:4px; background:linear-gradient(to top, var(--bg) 70%, transparent)}
 .list + .bottom-act{margin-top:12px}
+main.wrap > *{min-width:0}   /* v0.13.1: a child never widens the page past the phone */
 .seg{display:flex; gap:8px; flex-wrap:wrap}
 .seg .btn{flex:1}
 .seg .btn.on{background:var(--p99-soft); border-color:var(--p99); color:var(--p99-deep)}
