@@ -274,3 +274,43 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 /* stock in / out (transfer-v2.js, 2026-11-03) */
 .t tr.bad td{background:var(--bad-bg)}
 .alert.info{background:var(--p99-soft); color:var(--p99-deep); border-color:var(--p99)}
+
+/* ===================================================================================================================
+   v0.11.0 — one compact top for every section (Stefan, 2026-11-08: "the way we made Tasks compact, everywhere").
+   The rule, as in Tasks: title + one line under it; then ONE toolbar row (views and filters left, actions right, 36 px);
+   numbers in a slim strip, not tall tiles; the content starts as high as it can. Prefixed with .wrap so it wins over the
+   section stylesheets that load after this file.
+   =================================================================================================================== */
+@media (min-width:900px){ .wrap{padding-top:14px; gap:10px} }
+.wrap{gap:10px}
+/* the toolbar row: tabs, ranges, chips, actions on one line, wrapping on a phone */
+.pbar{display:flex; flex-wrap:wrap; gap:8px; align-items:center; min-width:0}
+.pbar .rng{flex:0 1 auto; padding:0; min-width:0}
+.pbar .grow{flex:1}
+/* number tiles become a slim strip: small value, one-line note, short sparkline */
+.wrap .grid2{gap:8px}
+.wrap .grid2 > .card{padding:9px 12px; box-shadow:none}
+.wrap .grid2 .kt .lab, .wrap .grid2 .card .lab{font-size:12px; line-height:16px}
+.wrap .grid2 .kt .val{font-size:19px; line-height:26px; margin-top:0}
+.wrap .grid2 .kt .trend{font-size:12px; line-height:16px; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.wrap .grid2 .kt .trend .chip{min-height:18px; font-size:11px; padding:0 6px}
+.wrap .grid2 .kt .sp{margin-top:4px; height:18px}
+/* big headline numbers (Sales, Finance, Today) a size down */
+.wrap .hero2{padding:12px 16px}
+.wrap .hero2 .big{font-size:34px; line-height:40px; margin-top:2px}
+.wrap .hero2 .spark{height:34px}
+.wrap .hero2 .sub{margin:4px 0 6px}
+@media (min-width:900px){ .wrap .hero2 .big{font-size:40px; line-height:46px} .wrap .hero2 .spark{height:40px} }
+/* the data-freshness bar: one slim line, the last-sync note inline */
+.wrap .syncbar{padding:6px 8px 6px 12px; box-shadow:none}
+.wrap .syncbar .sb-t{display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; font-size:14px}
+.wrap .syncbar .sb-t .tiny{display:inline}
+.wrap .syncbar .btn{min-height:32px; height:32px; min-width:0; padding:0 14px; font-size:14px}
+/* section tabs (Sales) as pills, not full-width blocks */
+.wrap .tabs2{display:flex; gap:6px; flex:none}
+.wrap .tabs2 .btn{flex:none; min-height:36px; height:36px; padding:0 14px; font-size:14px; border-radius:999px}
+/* full-width action buttons become toolbar buttons */
+.wrap .skact{display:flex; flex-wrap:wrap; gap:8px}
+.wrap .skact .btn{min-height:36px; height:36px; padding:0 14px; font-size:14px; flex:none}
+.wrap .c2big, .wrap .c2big.full{width:auto; min-height:36px; height:36px; padding:0 16px; font-size:14px; justify-self:start}
+@media (max-width:699px){ .wrap .skact .btn{flex:1 1 auto} .wrap .c2big{width:100%} }

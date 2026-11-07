@@ -200,7 +200,7 @@ function viewSalesRange(tabs) {
     const mx = Math.max(...rows.map(r => r.total), 1);
     months = `<section class="card"><h2>By month</h2><table class="t mt"><thead><tr><th>Month</th><th class="n">Sales</th><th class="n">vs month before</th><th class="n">Avg ticket</th></tr></thead><tbody>${rows.slice().reverse().map((r, i, arr) => { const prv = arr[i + 1]; return `<tr><td>${monthName(r.m)}<div class="mbar"><i style="width:${(100 * r.total / mx).toFixed(0)}%"></i></div></td><td class="n num">${peso(r.total)}</td><td class="n">${prv ? delta(r.perDay, prv.perDay) : ""}</td><td class="n num">${peso(r.avgTicket)}</td></tr>`; }).join("")}</tbody></table><div class="tiny mut">Month-on-month compares sales per open day, so a short month is not penalised.</div></section>`;
   }
-  return shell("Sales", `${esc(dn(from))} – ${esc(dn(to))}`, tabs + syncBar() + rangeBar() + hero + tiles + chart + `<section class="card"><h2>What the numbers say</h2>${insights(a, p, h, R.days)}</section>` + when + sells + months + `<div class="tiny mut">Source: ${esc(SALES_HISTORY.source)}. Tickets exclude cash-box openings.</div>`);
+  return shell("Sales", `${esc(dn(from))} – ${esc(dn(to))}`, `<div class="pbar">${tabs}${rangeBar()}</div>` + syncBar() + hero + tiles + chart + `<section class="card"><h2>What the numbers say</h2>${insights(a, p, h, R.days)}</section>` + when + sells + months + `<div class="tiny mut">Source: ${esc(SALES_HISTORY.source)}. Tickets exclude cash-box openings.</div>`);
 }
 function viewSalesDay(tabs) {
   const d = SD[salesDay], i = SDAYS.indexOf(salesDay), prev = SDAYS[i - 1], next = SDAYS[i + 1];
@@ -216,7 +216,7 @@ function viewSalesDay(tabs) {
   const cats = {}; d.items.forEach(([cat, item, q, g]) => { const c = cats[cat] = cats[cat] || { cat, qty: 0, gross: 0, rows: [] }; c.qty += q; c.gross += g; c.rows.push([item, q, g]); });
   const co = Object.values(cats).sort((a, b) => b.gross - a.gross); const slices = (cats["Pizza Slice"] || { qty: 0 }).qty, wholes = (cats["Pizza Whole"] || { qty: 0 }).qty;
   const tix = d.tickets;
-  return shell("Sales", dayLong(salesDay), tabs + syncBar() + yestBanner() + rangeBar() + nav + `
+  return shell("Sales", dayLong(salesDay), `<div class="pbar">${tabs}${rangeBar()}</div>` + syncBar() + yestBanner() + nav + `
     <section class="card hero2"><div class="lab">${esc(WD[w])} sales</div><div class="big num">${peso(d.total)}</div><div class="trend">${typ != null ? delta(d.total, typ, `vs a usual ${WD[w]} (${peso(typ)}, last ${same.length})`) : '<span class="mut">no earlier same weekday</span>'}</div></section>
     <div class="grid2">${tile("Tickets", tix, `avg ${peso(d.total / Math.max(1, tix))}`, "")}${tile("Pizzas", `${fmt(slices + wholes)}`, `${fmt(slices)} slices · ${fmt(wholes)} whole`, "")}${tile("Cash box", d.cashbox_opens + "×", "opened without a sale", "")}${tile("Cashiers", d.cashiers.length, d.cashiers.map(([n, k]) => `${esc(n || "—")} ${k}`).join(" · "), "")}</div>
     <section class="card"><h2>By hour <span class="tiny mut">dashed = a usual ${WD[w]}</span></h2><svg class="chart trend" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Sales by hour">${grid}${ty}${bars}${xl}</svg></section>
@@ -301,7 +301,7 @@ function viewTxns(tabs) {
   if (!rows && !TX.loading && TX.errKey !== key) setTimeout(loadTx, 0);
   const R = [["today", "Today"], ["yest", "Yesterday"], ["7", "7 days"], ["30", "30 days"], ["90", "90 days"], ["day", "Pick day"]];
   const rng = `<div class="rng">${R.map(([k, l]) => `<button class="${TX.range === k ? "on" : ""}" onclick="txSet('range','${k}')">${l}</button>`).join("")}</div>${TX.range === "day" ? `<input class="in" type="date" value="${TX.day || bizYesterday()}" max="${bizToday()}" onchange="TX.day=this.value;TX.limit=100;render()">` : ""}`;
-  const head = tabs + syncBar() + rng;
+  const head = `<div class="pbar">${tabs}${rng}</div>` + syncBar();
   if (!rows) return shell("Sales", "Transactions", head + (TX.err && TX.errKey === key ? `<div class="card"><span class="band-bad">Could not load: ${esc(TX.err)}</span><div style="margin-top:8px"><button class="btn" onclick="TX.errKey=null;render()">Try again</button></div></div>` : `<div class="card mut" style="text-align:center">Loading transactions…</div>`));
   const boxN = rows.filter(t => t.cash_box_open).length, saleN = rows.length - boxN;
   const cashiers = [...new Set(rows.map(t => t.cashier).filter(Boolean))].sort();
@@ -332,7 +332,7 @@ async function loadRuns() {
 }
 function viewRuns(tabs) {
   if (!RUN.rows && !RUN.loading && !RUN.err) setTimeout(loadRuns, 0);
-  const head = tabs + syncBar();
+  const head = `<div class="pbar">${tabs}</div>` + syncBar();
   if (!RUN.rows) return shell("Sales", "Morning run", head + (RUN.err ? `<div class="card"><span class="band-bad">Could not load: ${esc(RUN.err)}</span><div style="margin-top:8px"><button class="btn" onclick="RUN.err=null;render()">Try again</button></div></div>` : `<div class="card mut" style="text-align:center">Loading the morning runs…</div>`));
   const rows = RUN.rows.map(r => { const pos = SD[addDays(r.day, -1)]; const pc = pos ? pos.pay.cash || 0 : null; return { ...r, pos: pc, diff: (r.cash_sales != null && pc != null) ? Math.round((r.cash_sales - pc) * 100) / 100 : null }; });
   const last = rows[0], withD = rows.filter(r => r.diff != null), avgAbs = withD.length ? sum(withD.map(r => Math.abs(r.diff))) / withD.length : null, net = sum(withD.map(r => r.diff));
