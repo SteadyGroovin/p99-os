@@ -52,7 +52,7 @@ const tabsFor = () => TABS[role() === "crew" ? "crew" : role() === "lead" ? "lea
 const SIDEBAR = [["today", "Today", "home", "#/today"], ["walk", "Morning run", "sun", "#/walk"], ["sales", "Sales", "cash", "#/sales"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["report", "Report", "alert", "#/report"], ["tasks", "Tasks", "list", "#/tasks"], ["finance", "Finance", "finance", "#/finance"], ["more", "More", "dots", "#/more"]];
 const sidebarFor = () => role() === "master" ? SIDEBAR : role() === "admin" ? SIDEBAR.filter(t => t[0] !== "finance") : tabsFor();   /* walk, lead and crew keep their short bars */
 function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split("/")[1] || "today";
-  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", transfers: "stock", transfer: "stock", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
+  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", transfers: "stock", transfer: "stock", order: "stock", approve: "more", bills: "finance", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
   if (seg === "finance") return role() === "master" ? "finance" : "more";
   if (seg === "tickets" && ids.includes("report")) return "report";
   if (ids.includes(seg)) return seg; const m = map[seg]; if (m && ids.includes(m)) return m; return "more"; }
@@ -214,7 +214,11 @@ function viewReceive_v1() {
     <div class="bottom-act"><button class="btn primary full" ${ok ? "" : "disabled"} onclick="rcSave()">Save · ${rc.lines.length} line${rc.lines.length === 1 ? "" : "s"}</button></div>${padHTML()}`, { back: role() === "crew" ? "#/today" : "#/stock" });
 }
 function rcAdd() { const id = $("#rcitem").value; openPad(id, "receive", (qty, text) => { if (!qty) return; let price = null; if (rc.kind !== "pullout") { const p = prompt("Price per " + Store.item(id).unit + " (₱) — leave empty if not on the invoice", Store.lastPrice(id) ? Store.lastPrice(id).price : ""); price = p ? parseFloat(p) : null; } rc.lines.push({ item: id, qty, text, price }); }); }
-function rcSave() { S.receipts.push({ id: "r-" + Date.now(), day: today(), kind: rc.kind, supplier: rc.supplier, by: S.me, photo: rc.photo, amount: rc.amount ? parseFloat(rc.amount) : null, location: rc.location && rc.location !== "P99" ? rc.location : null, synced: false, lines: rc.lines.map(l => ({ item: l.item, qty: l.qty, text: l.text, price: l.price })) }); rc = null; save(); toast(role() === "walk" ? "Saved at Head Office." : "Saved — stock updated."); go(role() === "crew" ? "#/today" : role() === "walk" ? "#/transfers" : "#/stock"); }
+function rcSave() { const total = rc.total !== "" && rc.total != null ? parseFloat(rc.total) : null;   /* v0.12: total, paid now / bill and the order it fills */
+  S.receipts.push({ id: "r-" + Date.now(), day: today(), kind: rc.kind, supplier: rc.supplier, by: S.me, photo: rc.photo, amount: rc.pay_mode === "paid_now" ? total : null, total, pay_mode: rc.pay_mode || null, pay_source: rc.pay_mode === "paid_now" ? rc.pay_source || "store_fund" : null, invoice: (rc.invoice || "").trim() || null, po: rc.po || null,
+    location: rc.location && rc.location !== "P99" ? rc.location : null, synced: false, lines: rc.lines.map(l => ({ item: l.item, qty: l.qty, text: l.text, price: l.price })) });
+  if (rc.po) { const o = (S.orders || []).find(x => x.id === rc.po); if (o) o.status = "received"; }
+  rc = null; save(); toast(role() === "walk" ? "Saved at Head Office." : "Saved — stock updated."); go(role() === "crew" ? "#/today" : role() === "walk" ? "#/transfers" : "#/stock"); }
 
 /* ---------- ITEMS ---------- */
 let itemQ = "";
@@ -386,7 +390,8 @@ function render() {
   let html;
   { /* route guard: the screens mirror the database rules (the database refuses the data anyway) */
     const r = role(), s0 = seg[0] || "", ownerOnly = ["sales", "finance"], walkOk = ["walk", "tasks", "task", "report", "more", "who", "password", "receive", "transfers", "transfer", ""]; /* the office also records deliveries at Head Office and releases stock to the stores */
-    if ((r !== "master" && ownerOnly.includes(s0)) || (r === "walk" && !walkOk.includes(s0))) { location.hash = r === "walk" ? "#/walk" : "#/today"; return; }
+    const officeOnly = ["bills"], leadOk = ["order"]; /* v0.12 */
+    if ((r !== "master" && ownerOnly.includes(s0)) || (r === "walk" && !walkOk.includes(s0)) || (officeOnly.includes(s0) && !["master", "admin"].includes(r)) || (leadOk.includes(s0) && !["master", "lead"].includes(r)) || (s0 === "approve" && r !== "master")) { location.hash = r === "walk" ? "#/walk" : "#/today"; return; }
   }
   if (/^#\/tasks?(\/|$)/.test(location.hash) && typeof viewTasks !== "function") { $("#app").innerHTML = `<div class="wrap"><section class="card"><b>A new version of Rocket OS is ready.</b><div class="small mut" style="margin:6px 0 12px">Part of the old version is still in this phone's cache.</div><button class="btn primary full" onclick="location.reload()">Reload</button></section></div>`; return; }
   /* signed in: the app is that person (v0.11.6, Stefan: "she should be named Cherry in the app"); entries carry their name.
@@ -410,6 +415,9 @@ function render() {
     case "cash": html = viewCash(); break;
     case "walk": html = seg[1] ? viewWalkForm() : viewWalk(); break;
     case "transfers": html = viewTransfers(); break;
+    case "order": html = viewOrder(); break;                 /* v0.12: order today (lead), approval and bills (office) */
+    case "approve": html = viewApprove(); break;
+    case "bills": html = viewBills(); break;
     case "transfer": html = seg[1] === "new" ? viewTransferNew() : viewTransfer(seg[1]); break;
     case "finance": html = viewFinance(seg[1], seg[2]); break;
     case "more": html = viewMore(); break;

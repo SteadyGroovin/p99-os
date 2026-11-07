@@ -105,7 +105,7 @@ function finSrc(which) {
 /* ---------- shared pieces ---------- */
 function finNav(cur) {
   const T = [["", "Overview"], ["book", "Book"], ["expenses", "Expenses"], ["payables", "Payables"], ["pl", "P&L"]];
-  return `<div class="rng fnav" role="tablist">${T.map(([k, l]) => `<button class="${cur === k ? "on" : ""}" role="tab" aria-selected="${cur === k}" onclick="go('#/finance${k ? "/" + k : ""}')">${l}</button>`).join("")}</div>`;
+  return `<div class="rng fnav" role="tablist">${T.map(([k, l]) => `<button class="${cur === k ? "on" : ""}" role="tab" aria-selected="${cur === k}" onclick="go('#/finance${k ? "/" + k : ""}')">${l}</button>`).join("")}<button onclick="go('#/bills')" title="Deliveries recorded in the app: open bills, paid-now expenses, CSV for the sheets">From the app</button></div>`;   /* v0.12 */
 }
 function finMonthChips(sel, list, fn) {
   return `<div class="rng">${list.map(m => `<button class="${m === sel ? "on" : ""}" onclick="${fn}('${m}')">${esc(monthName(m))}${m < FIN_RELIABLE ? " *" : ""}</button>`).join("")}</div>`;

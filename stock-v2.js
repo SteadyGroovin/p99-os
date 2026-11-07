@@ -110,6 +110,7 @@ function viewStock() {
   const trWait = typeof trAwaitingMe === "function" ? trAwaitingMe() : [];
   const actions = `<div class="skact">
     <button class="btn primary" onclick="go('#/count')">${ic("grid-01", "sm")}${draft && dn ? `Continue count · ${dn}/${scoped.length}` : "Count tonight"}</button>
+    ${["lead", "master"].includes(role()) ? `<button class="btn ${REORDER.some(r => r.order_now) ? "primary" : ""}" onclick="go('#/order')">${ic("list", "sm")}Order today${REORDER.filter(r => r.order_now).length ? ` <span class="bdg" style="position:static;margin-left:6px">${REORDER.filter(r => r.order_now).length}</span>` : ""}</button>` : ""}
     <button class="btn" onclick="go('#/receive')">${ic("package", "sm")}Receive</button>
     <button class="btn" onclick="go('#/transfers')">${ic("package", "sm")}Stock in / out${trWait.length ? ` <span class="bdg" style="position:static;margin-left:6px">${trWait.length}</span>` : ""}</button></div>`
     + (trWait.length ? `<div class="alert warn" style="margin-top:8px">⇄ ${trWait.length} transfer${trWait.length > 1 ? "s" : ""} waiting for your confirmation — <a href="#/transfers">open</a></div>` : "");
@@ -229,8 +230,21 @@ function skPriceFlag(id, price, base) {
   return `<span class="pf ${p > 0 ? "up" : "down"} ${Math.abs(p) >= .1 ? "big" : ""}" data-tt="${esc(tt)}"><i>${p > 0 ? "▲" : "▼"}</i>${Math.round(Math.abs(p) * 100)}% vs ${esc(dayName(lp.day))} (${skP(lp.price)})</span>`;
 }
 function skRcPad(id) { openPad(id, "receive", (qty, text) => { if (!qty) return; const lp = Store.lastPrice(id); rc.lines.push({ item: id, qty, text, price: null, _last: lp ? lp.price : null }); }); }
+/* v0.12 money side of a delivery: paid now (expense, from which fund) or bill (supplier on terms → 1–15 / 16–end run) */
+function skDefaultPay(sup, kind) { if (kind === "purchase") return "paid_now"; const i = SUPPLIER_INFO[sup]; return i && i.pay_mode === "terms" ? "bill" : i && i.pay_mode === "paid_now" ? "paid_now" : null; }
+function skPickSupplier(s) { rc.supplier = s; rc.pay_mode = skDefaultPay(s, rc.kind) || rc.pay_mode; rc.po = null; render(); }
+function skOrdToCount(it, qty, unit) {   /* an order line (buy units) → the count units the pad and the stock use */
+  if (unit == null || unit === it.unit) return qty; if (unit === it.packUnit && it.pack) return qty * it.pack;
+  const b = (it.buys || []).find(x => x.unit === unit && x.qty); if (b && it.per) return qty * b.qty / it.per; return null; }   /* unknown size: the crew counts what came */
+function skRcFix(i) { const l = rc.lines[i]; openPad(l.item, "receive", (qty, text) => { if (!qty) return; l.qty = qty; l.text = (l.text || "").split(" · ")[0] + " · came " + text; }); }
+function skOpenOrders(sup) { return (S.orders || []).filter(o => o.supplier === sup && (o.status === "approved" || o.status === "requested")); }
+function skLoadOrder(id) { const o = (S.orders || []).find(x => x.id === id); if (!o) return; rc.po = id;
+  o.lines.forEach(l => { const it = Store.item(l.item); if (!it || rc.lines.some(x => x.item === l.item)) return; const q = skOrdToCount(it, l.qty, l.unit); rc.lines.push({ item: l.item, qty: q, text: `${fmt(l.qty)} ${l.unit || it.unit} ordered${q == null ? ` · count the ${it.unit}s that came` : ""}`, price: null, _ordered: q }); });
+  render(); }
+function skShort() { if (!rc.po) return []; const o = (S.orders || []).find(x => x.id === rc.po); if (!o) return [];
+  return o.lines.map(l => { const it = Store.item(l.item); if (!it) return null; const want = skOrdToCount(it, l.qty, l.unit); if (want == null) return null; const got = rc.lines.filter(x => x.item === l.item).reduce((a, x) => a + x.qty, 0); return got < want ? { it, want, got } : null; }).filter(Boolean); }
 function viewReceive() {
-  if (!rc) rc = { kind: "delivery", supplier: "", lines: [], photo: null, amount: "", location: role() === "walk" ? "HO" : "P99" };
+  if (!rc) rc = { kind: "delivery", supplier: "", lines: [], photo: null, amount: "", total: "", invoice: "", pay_mode: null, pay_source: "store_fund", po: null, location: role() === "walk" ? "HO" : "P99" };
   if (rc.kind === "pullout") { rc.kind = "delivery"; trStart("receive", "HO", "P99"); return ""; } /* a pull-out is a transfer now: both sides record it (transfer-v2.js) */
   const srcs = SUPPLIERS;
   const locRow = role() === "walk" ? `<div class="alert info">Delivered to <b>Head Office</b>. The store records its pull-out under Stock in / out; the office confirms the release.</div>`
@@ -240,28 +254,39 @@ function viewReceive() {
   const usual = Object.keys(freq).sort((a, b) => freq[b] - freq[a]).filter(id => Store.item(id) && !rc.lines.some(l => l.item === id)).slice(0, 8);
   const itemOpts = ITEMS.filter(i => !rc.supplier || !i.supplier || i.supplier === rc.supplier || rc.kind !== "delivery").map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join("");
   const lines = rc.lines.map((l, i) => { const it = Store.item(l.item); const lp = Store.lastPrice(l.item);
-    return `<div class="rline"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">${esc(l.text || fmt(l.qty) + " " + it.unit)} = ${fmt(l.qty)} ${esc(it.unit)}${l.price != null ? ` · <b class="ink2">${peso(l.price * l.qty)}</b>` : ""}</div></div>
+    return `<div class="rline"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">${esc(l.text || fmt(l.qty) + " " + it.unit)} = ${l.qty == null ? `<button class="btn primary" style="padding:2px 10px" onclick="skRcFix(${i})">Qty</button>` : fmt(l.qty) + " " + esc(it.unit)}${l.price != null ? ` · <b class="ink2">${peso(l.price * l.qty)}</b>` : ""}</div></div>
       <button class="btn ghost danger rx" onclick="rc.lines.splice(${i},1);render()" aria-label="Remove ${esc(it.name)}">${ic("x-close")}</button>
       ${rc.kind !== "pullout" ? `<div class="rprice"><label class="rpin"><span>₱</span><input class="in num" inputmode="decimal" aria-label="Price per ${esc(it.unit)}" placeholder="${lp ? fmt(lp.price) : "price"}" value="${l.price != null ? l.price : ""}" onchange="rc.lines[${i}].price=this.value===''?null:parseFloat(this.value);render()"><span class="tiny mut">per ${esc(it.unit)}</span></label><div class="pflag">${l.price != null ? skPriceFlag(l.item, l.price) : lp ? `<span class="tiny mut">last ${skP(lp.price)} on ${esc(dayName(lp.day))}</span>` : `<span class="tiny mut">no earlier price</span>`}</div></div>` : ""}</div>`; }).join("");
   const priced = rc.lines.filter(l => l.price != null); const tot = skSum(priced.map(l => l.price * l.qty)); const flags = priced.filter(l => { const lp = Store.lastPrice(l.item); return lp && Math.abs((l.price - lp.price) / lp.price) >= SK_PRICE_TOL; });
-  const need = []; if (!rc.supplier) need.push(rc.kind === "pullout" ? "where from" : "supplier"); if (!rc.lines.length) need.push("at least one item"); if (rc.kind !== "pullout" && !rc.photo) need.push("photo");
-  const steps = [[!!rc.supplier, rc.kind === "pullout" ? "From" : "Supplier"], [rc.lines.length > 0, "Items"], [rc.kind === "pullout" || !!rc.photo, "Photo"]];
+  const short = skShort(); const totOk = rc.total !== "" && !isNaN(parseFloat(rc.total)) && parseFloat(rc.total) >= 0;
+  const need = []; if (!rc.supplier) need.push(rc.kind === "pullout" ? "where from" : "supplier"); if (!rc.lines.length) need.push("at least one item"); if (rc.lines.some(l => !(l.qty > 0))) need.push("a quantity on every line");
+  if (!totOk) need.push("total ₱"); if (!rc.pay_mode) need.push("paid now or bill"); if (rc.kind !== "pullout" && !rc.photo) need.push("photo");
+  const steps = [[!!rc.supplier, rc.kind === "pullout" ? "From" : "Supplier"], [rc.lines.length > 0, "Items"], [totOk && !!rc.pay_mode, "Money"], [rc.kind === "pullout" || !!rc.photo, "Photo"]];
   return shell("Receive", dayLong(today()), `
     <ol class="rsteps">${steps.map(([ok, l], i) => `<li class="${ok ? "ok" : ""}"><span>${ok ? "✓" : i + 1}</span>${l}</li>`).join("")}</ol>
-    <div class="seg">${RECEIPT_KINDS.map(([k, l]) => `<button class="btn ${rc.kind === k ? "on" : ""}" onclick="${k === "pullout" ? "trStart('receive','HO','P99')" : `rc.kind='${k}';rc.supplier='';render()`}">${esc(l.split(" (")[0])}</button>`).join("")}</div>
+    <div class="seg">${RECEIPT_KINDS.map(([k, l]) => `<button class="btn ${rc.kind === k ? "on" : ""}" onclick="${k === "pullout" ? "trStart('receive','HO','P99')" : `rc.kind='${k}';rc.supplier='';rc.po=null;rc.pay_mode=${k === "purchase" ? "'paid_now'" : "null"};render()`}">${esc(l.split(" (")[0])}</button>`).join("")}</div>
     ${locRow}
-    <section class="card"><div class="field"><label>${rc.kind === "pullout" ? "From" : "Supplier / store"}</label><select class="in" onchange="rc.supplier=this.value;render()"><option value="">— choose —</option>${srcs.map(s => `<option ${rc.supplier === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
-      ${recent.length ? `<div class="chips" style="margin-top:8px">${recent.map(s => `<button class="chip ${rc.supplier === s ? "info" : ""}" onclick="rc.supplier=${esc(JSON.stringify(s))};render()">${esc(s)}</button>`).join("")}</div>` : ""}</section>
+    <section class="card"><div class="field"><label>${rc.kind === "pullout" ? "From" : "Supplier / store"}</label><select class="in" onchange="skPickSupplier(this.value)"><option value="">— choose —</option>${srcs.map(s => `<option ${rc.supplier === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
+      ${recent.length ? `<div class="chips" style="margin-top:8px">${recent.map(s => `<button class="chip ${rc.supplier === s ? "info" : ""}" onclick="skPickSupplier(${esc(JSON.stringify(s))})">${esc(s)}</button>`).join("")}</div>` : ""}
+      ${rc.supplier && skOpenOrders(rc.supplier).length ? `<div class="alert info" style="margin-top:10px">Ordered from ${esc(rc.supplier)}: ${skOpenOrders(rc.supplier).map(o => `<button class="chip ${rc.po === o.id ? "info" : ""}" onclick="skLoadOrder('${o.id}')">${rc.po === o.id ? "✓ " : ""}order of ${esc(dayName(o.day))} · ${o.lines.length} item${o.lines.length === 1 ? "" : "s"}${o.status === "requested" ? " · not approved yet" : ""}</button>`).join(" ")}<div class="tiny mut" style="margin-top:4px">Tap to fill in what was ordered, then correct what really came.</div></div>` : ""}</section>
     <section class="card"><h2>Items <span class="tiny mut">${rc.lines.length} line${rc.lines.length === 1 ? "" : "s"}${priced.length ? ` · ${peso(tot)}` : ""}</span></h2>
       ${usual.length ? `<div class="tiny mut" style="margin-bottom:6px">Usually from ${esc(rc.supplier)} — tap to add</div><div class="chips">${usual.map(id => `<button class="chip" onclick="skRcPad('${id}')">+ ${esc(Store.item(id).name)}</button>`).join("")}</div>` : ""}
       <div class="field" style="margin-top:10px"><label>Any item</label><div style="display:flex;gap:8px"><select class="in" id="rcitem">${itemOpts}</select><button class="btn primary" onclick="skRcPad(document.getElementById('rcitem').value)">Qty</button></div></div>
       ${lines ? `<div class="list" style="margin-top:10px">${lines}</div>` : `<div class="mut small" style="margin-top:8px">No lines yet.</div>`}
       ${flags.length ? `<div class="alert warn" style="margin-top:10px">▲ ${flags.length} price${flags.length > 1 ? "s" : ""} changed by ${Math.round(SK_PRICE_TOL * 100)} % or more since the last delivery — check the invoice.</div>` : ""}</section>
-    ${rc.kind === "purchase" ? `<div class="field"><label>Amount paid (₱)</label><input class="in num" inputmode="decimal" value="${esc(rc.amount)}" placeholder="${priced.length ? fmt(Math.round(tot)) : ""}" oninput="rc.amount=this.value"></div>` : ""}
+    ${short.length ? `<div class="alert warn">Short against the order: ${short.map(x => `${esc(x.it.name)} ${fmt(x.got)} of ${fmt(x.want)} ${esc(x.it.unit)}`).join(" · ")}. Save anyway if that is what came; the rest stays open.</div>` : ""}
+    <section class="card"><h2>Money</h2>
+      <div class="field"><label>Total on the receipt (₱, required)</label><input class="in num" inputmode="decimal" value="${esc(rc.total)}" placeholder="${priced.length ? fmt(Math.round(tot * 100) / 100) : "e.g. 1250"}" oninput="rc.total=this.value" onchange="render()"></div>
+      <div class="field"><label>Invoice / SI / DR number</label><input class="in" value="${esc(rc.invoice)}" placeholder="if the paper has one" oninput="rc.invoice=this.value"></div>
+      <div class="field"><label>Payment (required)</label><div class="seg"><button class="btn ${rc.pay_mode === "paid_now" ? "on" : ""}" onclick="rc.pay_mode='paid_now';render()">Paid now</button><button class="btn ${rc.pay_mode === "bill" ? "on" : ""}" ${rc.kind === "purchase" ? "disabled" : ""} onclick="rc.pay_mode='bill';render()">Bill (pay later)</button></div>
+        ${rc.pay_mode === "paid_now" ? `<div class="chips" style="margin-top:8px">${PAY_SOURCES.map(([k, l]) => `<button class="chip ${rc.pay_source === k ? "info" : ""}" onclick="rc.pay_source='${k}';render()">${l}</button>`).join("")}</div><div class="tiny mut" style="margin-top:4px">Who paid. It becomes an expense of that fund.</div>`
+          : rc.pay_mode === "bill" ? `<div class="tiny mut" style="margin-top:4px">Goes into the ${esc(skRunLabel(today()))} run of ${esc(rc.supplier || "the supplier")}. Keep the paper with today's unpaid receipts.</div>` : ""}</div></section>
     ${rc.kind !== "pullout" ? `<div>${photoBtn(rc.kind === "purchase" ? "Photo of the receipt (required)" : "Photo of the invoice or goods (required)", "rc.photo=id;render()", rc.photo)}${thumb(rc.photo, "big")}</div>` : ""}
-    <div class="bottom-act"><button class="btn primary full" ${need.length ? "disabled" : ""} onclick="rcSave()">Save · ${rc.lines.length} line${rc.lines.length === 1 ? "" : "s"}${priced.length ? " · " + peso(tot) : ""}</button></div>
+    <div class="bottom-act"><button class="btn primary full" ${need.length ? "disabled" : ""} onclick="rcSave()">Save · ${rc.lines.length} line${rc.lines.length === 1 ? "" : "s"}${totOk ? " · " + peso(parseFloat(rc.total)) : ""}</button></div>
     ${need.length ? `<div class="tiny mut" style="text-align:center">Needed: ${need.join(", ")}.</div>` : ""}${padHTML()}`, { back: role() === "crew" ? "#/today" : "#/stock" });
 }
+
+function skRunLabel(d) { const day = +String(d).slice(8, 10), m = new Date(d + "T00:00:00").toLocaleString("en-PH", { month: "short" }); return day <= 15 ? `1–15 ${m}` : `16–end ${m}`; }
 
 /* ---------- RECEIPTS (deliveries log) ---------- */
 function viewReceipts() {
