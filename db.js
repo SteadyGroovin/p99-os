@@ -9,7 +9,7 @@ const bootEl = document.getElementById("app");
 const bootEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /* every release loads as one matching set: GitHub Pages caches files for 10 minutes, and a stale db.js next to a new app.js left Tasks blank (v0.10.0, 2026-11-07) */
-const APP_V = "0.13.1";
+const APP_V = "0.14.0";
 function loadScript(src) {
   return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src + (src.includes("?") ? "&" : "?") + "v=" + APP_V; s.onload = ok; s.onerror = () => no(new Error("could not load " + src)); document.body.appendChild(s); });
 }
@@ -108,6 +108,6 @@ async function start() {
     window.OS_LOADED = L;
   }
   bootEl.innerHTML = "";
-  for (const s of ["data.js", "icons.js", "sync.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "tasks-v2.js", "finance-v2.js", "walk-v2.js", "transfer-v2.js", "order-v2.js", "app.js"]) await loadScript(s);
+  for (const s of ["data.js", "icons.js", "sync.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "tasks-v2.js", "finance-v2.js", "walk-v2.js", "transfer-v2.js", "order-v2.js", "suppliers-v2.js", "app.js"]) await loadScript(s);
 }
 start().catch(e => bootScreen(`<span class="band-bad">${bootEsc(e.message)}</span>`));

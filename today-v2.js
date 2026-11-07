@@ -102,6 +102,8 @@ function viewMore() {
     ...(["lead", "master"].includes(role()) ? [row("Order today", `${REORDER.filter(r => r.order_now).length} item${REORDER.filter(r => r.order_now).length === 1 ? "" : "s"} due`, "go('#/order')")] : []),
     ...(["lead", "master"].includes(role()) ? [row("Pack sizes", `${ITEMS.filter(i => i.sizeUnknown).length} items without a size yet`, "go('#/sizes')")] : []),
     ...(role() === "master" ? [row("Approve orders", `${(S.orders || []).filter(o => o.status === "requested" && o.approval_needed).length} waiting`, "go('#/approve')")] : []),
+    ...(["master", "admin", "lead"].includes(role()) ? [row("Suppliers", "terms, delivery days, what we buy, prices", "go('#/suppliers')")] : []),
+    ...(["master", "admin"].includes(role()) ? [row("Stores & places", "where stock is sent and received", "go('#/stores')")] : []),
     ...(["master", "admin"].includes(role()) ? [row("Bills & expenses", `${MONEY.filter(m => m.mode === "bill" && !m.paid_on).length} open bills · download for the sheets`, "go('#/bills')")] : [])]);
   const review = group("Review", [row("Transactions", "every ticket, cash box without a sale", "salesTab='txns';go('#/sales')"), ...(role() === "master" ? [row("Finance", "expenses, payables, the book", "go('#/finance')")] : []), row("Variance", "counted against expected", "go('#/variance')"), row("Tickets", "problems and repairs", "go('#/report')"), row("Tasks", "the board for every venue", "go('#/tasks')")]);
   const me2 = group("This device", [

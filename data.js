@@ -97,7 +97,7 @@ const RECEIPT_KINDS = [["delivery", "Delivery"], ["purchase", "Bought with cash"
    The app's item keeps its old meaning: unit = what is counted, packUnit/pack = the bigger unit and how many count units it holds.
    Par in the database is in base units when the pack size is known, else in count units (os_item_base stores those "as typed"). */
 const PAY_SOURCES = [["store_fund", "Store cash"], ["office_fund", "Office fund"], ["gcash", "GCash"], ["stefan", "Stefan"], ["mike", "Mike"], ["bank", "Bank"]];
-let SUPPLIER_INFO = {}, REORDER = [], ORDERS = [], MONEY = [], OS_SETTINGS = {};
+let SUPPLIER_INFO = {}, REORDER = [], ORDERS = [], MONEY = [], OS_SETTINGS = {}, PRICES = [];
 function dbCatalogue(L) {
   if (!L || L.dev || !Array.isArray(L.items) || !L.items.length) return false;
   const n = v => v == null || v === "" ? null : +v;
@@ -119,7 +119,7 @@ function dbCatalogue(L) {
 function dbRefresh(L) {   /* the parts that change during the day: reorder levels, open orders, bills */
   SUPPLIER_INFO = Object.fromEntries((L.suppliers || []).map(s => [s.name, s]));
   REORDER = (L.reorder || []).map(r => Object.assign({}, r, { expected: r.expected == null ? null : +r.expected, rop: r.rop == null ? null : +r.rop, per_day: r.per_day == null ? null : +r.per_day, cover: r.cover == null ? null : +r.cover, suggest: r.suggest == null ? null : +r.suggest, buy_qty: r.buy_qty == null ? null : +r.buy_qty, on_order: +r.on_order || 0 }));
-  ORDERS = L.orders || []; MONEY = L.money || []; OS_SETTINGS = L.settings || {};
+  ORDERS = L.orders || []; MONEY = L.money || []; OS_SETTINGS = L.settings || {}; PRICES = L.prices || [];   /* v0.14: prices per base unit (office, owners) */
 }
 const DB_CATALOGUE = dbCatalogue(window.OS_LOADED);
 
@@ -239,7 +239,7 @@ const Store = {
     if (this._s) return this._s;
     try { this._s = JSON.parse(localStorage.getItem(this.key) || "null"); } catch (e) { this._s = null; }
     if (!this._s) this._s = { counts: SEED_COUNTS.slice(), receipts: SEED_RECEIPTS.slice(), tickets: [], tasks: SEED_TASKS.slice(), runs: {}, cash: [], walks: [], photos: {}, draft: null, me: null, theme: "light", transfers: [], locations: [], held: [], orders: [], approvals: [], billPaid: [] };
-    this._s.orders = this._s.orders || []; this._s.approvals = this._s.approvals || []; this._s.billPaid = this._s.billPaid || []; this._s.sizeDecisions = this._s.sizeDecisions || []; /* v0.12, v0.13 */
+    this._s.orders = this._s.orders || []; this._s.approvals = this._s.approvals || []; this._s.billPaid = this._s.billPaid || []; this._s.sizeDecisions = this._s.sizeDecisions || []; this._s.edits = this._s.edits || []; /* v0.12–v0.14 */
     this._s.transfers = this._s.transfers || []; this._s.locations = this._s.locations || []; this._s.held = this._s.held || []; /* stock moves between locations (2026-11-03) */
     return this._s;
   },
