@@ -346,3 +346,17 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
   .ss-c{border-top:0} .ss-c.lead{grid-column:auto} .sstrip .ss-c:nth-child(2), .sstrip .ss-c:nth-child(4){border-left:1px solid var(--line)}
   .ss-c .val{padding-top:8px} .ss-c.lead .val{font-size:34px; line-height:40px; padding-top:0}
 }
+/* v0.11.3 — every tile row becomes the same joined number strip as Sales (Stock, Clean, Report, Finance, Today, item pages):
+   one card, cells split by hairlines, no gaps; rows fill the width, an odd last cell on a phone spans the row */
+.wrap .grid2{gap:1px; background:var(--line); border:1px solid var(--line); border-radius:var(--r-card); overflow:hidden; box-shadow:var(--shadow-xs)}
+.wrap .grid2 > .card, .wrap .grid2 > section{border:0; border-radius:0; box-shadow:none; background:var(--surf); margin:0}
+@media (max-width:899px){ .wrap .grid2 > :last-child:nth-child(odd){grid-column:1 / -1} }
+@media (min-width:900px){ .wrap .grid2{grid-template-columns:repeat(auto-fit, minmax(160px, 1fr))} }
+/* Finance section tabs = the same segmented switch as Sales; the month chips stay pills after a divider */
+.wrap .fnav{background:var(--surf2); border:1px solid var(--line); border-radius:999px; padding:3px; gap:2px; flex:none}
+.wrap .fnav button{border:0; background:transparent; height:30px; color:var(--ink2)}
+.wrap .fnav button.on{background:var(--surf); color:var(--ink); box-shadow:var(--shadow-xs), 0 0 0 1px var(--line)}
+@media (min-width:900px){ .pbar .fnav + .rng, .pbar .fnav + div{margin-left:6px; padding-left:12px; border-left:1px solid var(--line)} }
+/* Sales: the month picker sits with the range pills */
+.rng .rngsel{flex:none; width:auto; height:36px; min-height:36px; padding:0 30px 0 14px; border-radius:999px; font-size:14px; font-weight:600; color:var(--ink2); border:1px solid var(--line2)}
+.rng .rngsel.on{background:var(--p99); border-color:var(--p99); color:var(--on-accent)}

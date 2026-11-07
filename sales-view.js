@@ -4,8 +4,8 @@
    one blue for magnitude, fixed categorical order, status colours only for up/down, every chart has a table behind it. */
 const WD = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const wdOf = d => (new Date(d + "T00:00:00").getDay() + 6) % 7;
-const RANGES = [["day", "Day"], ["7", "7 days"], ["30", "30 days"], ["90", "90 days"], ["365", "12 months"], ["all", "All"]];
-let salesRange = "30", salesDay = null, salesItemBy = "gross", salesTable = false, salesTab = "overview", salesYestMiss = false;
+const RANGES = [["day", "Day"], ["7", "7 days"], ["30", "30 days"], ["mtd", "This month"], ["lm", "Last month"], ["365", "12 months"], ["all", "All"]];   /* v0.11.3: months, not 90 days (Stefan: most things here run per month) */
+let salesRange = "mtd", salesDay = null, salesItemBy = "gross", salesTable = false, salesTab = "overview", salesYestMiss = false;
 const bizToday = () => ymd(new Date(Date.now() - 4 * 3600e3)); const bizYesterday = () => addDays(bizToday(), -1);
 const kfmt = v => v >= 1e6 ? "₱" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : v >= 1e3 ? "₱" + (v / 1e3).toFixed(v >= 1e4 ? 0 : 1).replace(/\.0$/, "") + "k" : "₱" + Math.round(v);
 const monthName = m => new Date(m + "-01T00:00:00").toLocaleDateString("en-PH", { month: "short", year: "numeric" });
@@ -14,8 +14,21 @@ const pct = (a, b) => b ? (a - b) / b : null;
 
 /* ---------- data ---------- */
 function calDays(from, to) { const o = []; for (let d = from; d <= to; d = addDays(d, 1)) o.push(d); return o; }
+const prevMonth = m => { const d = new Date(+m.slice(0, 4), +m.slice(5, 7) - 2, 1); return ymd(d).slice(0, 7); };
+const monthEnd = m => addDays(ymd(new Date(+m.slice(0, 4), +m.slice(5, 7), 1)), -1);
 function rangeOf(r, end) {
-  const first = SDAYS[0]; let n = r === "all" ? null : +r;
+  const first = SDAYS[0];
+  /* month ranges: This month = the month of the newest data day, compared with the same days of the month before (1–6 Nov vs 1–6 Oct);
+     a whole month is compared with the whole month before */
+  if (r === "mtd" || r === "lm" || String(r).startsWith("m:")) {
+    const cur = end.slice(0, 7), m = r === "mtd" ? cur : r === "lm" ? prevMonth(cur) : r.slice(2);
+    const s0 = m + "-01", s = s0 < first ? first : s0, e = monthEnd(m) > end ? end : monthEnd(m);
+    const days = calDays(s, e), pm = prevMonth(m); let prev = null, lab = "";
+    if (e < monthEnd(m)) { const ps = pm + "-01", pe = addDays(ps, days.length - 1); if (ps >= first) { prev = calDays(ps, pe); lab = `vs ${new Date(ps + "T00:00:00").toLocaleDateString("en-PH", { month: "short", day: "numeric" })}–${+pe.slice(8)}`; } }
+    else if (pm + "-01" >= first) { prev = calDays(pm + "-01", monthEnd(pm)); lab = `vs ${monthName(pm)}`; }
+    return { days, prev, n: days.length, lab, month: m };
+  }
+  let n = r === "all" ? null : +r;
   const start = n ? (addDays(end, -(n - 1)) < first ? first : addDays(end, -(n - 1))) : first;
   const days = calDays(start, end);
   let prev = null;
@@ -160,7 +173,9 @@ function insights(a, p, h, days) {
 function rangeBar() {
   const y = bizYesterday();
   const chips = [["yest", "Yesterday", salesRange === "day" && salesDay === y], ["day", "Pick day", salesRange === "day" && salesDay !== y]].concat(RANGES.slice(1).map(([k, l]) => [k, l, salesRange === k]));
-  return `<div class="rng" role="tablist">${chips.map(([k, l, on]) => `<button class="${on ? "on" : ""}" role="tab" aria-selected="${on}" onclick="pickRange('${k}')">${l}</button>`).join("")}</div>`;
+  const months = [...new Set(SDAYS.map(d => d.slice(0, 7)))].reverse(), mOn = String(salesRange).startsWith("m:");
+  const pick = `<select class="in rngsel ${mOn ? "on" : ""}" aria-label="Pick a month" onchange="if(this.value)pickRange('m:'+this.value)"><option value="">${mOn ? esc(monthName(salesRange.slice(2))) : "Pick month"}</option>${months.map(m => `<option value="${m}">${esc(monthName(m))}</option>`).join("")}</select>`;
+  return `<div class="rng" role="tablist">${chips.map(([k, l, on]) => `<button class="${on ? "on" : ""}" role="tab" aria-selected="${on}" onclick="pickRange('${k}')">${l}</button>`).join("")}${pick}</div>`;
 }
 function pickRange(k) {
   const y = bizYesterday(); salesYestMiss = false;
@@ -179,7 +194,7 @@ function viewSales() {
 function viewSalesRange(tabs) {
   const R = rangeOf(salesRange, LAST_DAY); const a = agg(R.days), p = R.prev ? agg(R.prev) : null; const size = R.n > 120 ? 7 : 1;
   const pts = bucket(R.days, size), pp = R.prev ? bucket(R.prev, size) : null; const h = heat(R.days);
-  const lab = salesRange === "all" ? "" : `vs previous ${R.n} days`;
+  const lab = salesRange === "all" ? "" : (R.lab || `vs previous ${R.n} days`);
   const daily = a.daily.map(x => x ? x.total : null), tk = a.daily.map(x => x ? x.tickets : null), at = a.daily.map(x => x && x.tickets ? x.total / x.tickets : null), gs = a.daily.map(x => { if (!x) return null; const t = (x.pay.cash || 0) + (x.pay.gcash || 0) + (x.pay.card || 0); return t ? (x.pay.gcash || 0) / t : null; });
   const wk = arr => { if (R.n <= 120) return arr; const o = []; for (let i = 0; i < arr.length; i += 7) { const c = arr.slice(i, i + 7).filter(x => x != null); o.push(c.length ? sum(c) / c.length : null); } return o; };
   const from = R.days[0], to = R.days[R.days.length - 1]; const dn = R.n > 200 ? (d => new Date(d + "T00:00:00").toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })) : dayName;
@@ -200,7 +215,7 @@ function viewSalesRange(tabs) {
     <section class="card"><h2>Average per weekday</h2>${weekdayBars(h)}<div class="tiny mut" style="margin-top:6px">Open days only; the best weekday is highlighted.</div></section>` : "";
   const sells = `<section class="card"><div class="split"><h2>What sells</h2><div class="seg sm"><button class="btn ${salesItemBy === "gross" ? "on" : ""}" onclick="salesItemBy='gross';render()">₱</button><button class="btn ${salesItemBy === "qty" ? "on" : ""}" onclick="salesItemBy='qty';render()">Qty</button></div></div>${itemBars(a, salesItemBy)}</section>
     <section class="card"><h2>Mix <span class="tiny mut">by category, ₱</span></h2>${stackBar(catParts(a.cats, "gross"), peso)}<h2 style="margin-top:18px">Payment <span class="tiny mut">how customers paid</span></h2>${stackBar([{ name: "Cash", v: a.cash, c: CATC[0] }, { name: "GCash", v: a.gcash, c: CATC[1] }, { name: "Card", v: a.card, c: CATC[2] }], peso)}</section>`;
-  let months = ""; if (R.n >= 90) {
+  let months = ""; if (R.n >= 90 && !R.month) {
     const ms = [...new Set(R.days.filter(d => SD[d]).map(d => d.slice(0, 7)))]; const rows = ms.map(m => { const ds = SDAYS.filter(d => d.startsWith(m)); const aa = agg(ds); return { m, ...aa, ds: ds.length }; });
     const mx = Math.max(...rows.map(r => r.total), 1);
     months = `<section class="card"><h2>By month</h2><table class="t mt"><thead><tr><th>Month</th><th class="n">Sales</th><th class="n">vs month before</th><th class="n">Avg ticket</th></tr></thead><tbody>${rows.slice().reverse().map((r, i, arr) => { const prv = arr[i + 1]; return `<tr><td>${monthName(r.m)}<div class="mbar"><i style="width:${(100 * r.total / mx).toFixed(0)}%"></i></div></td><td class="n num">${peso(r.total)}</td><td class="n">${prv ? delta(r.perDay, prv.perDay) : ""}</td><td class="n num">${peso(r.avgTicket)}</td></tr>`; }).join("")}</tbody></table><div class="tiny mut">Month-on-month compares sales per open day, so a short month is not penalised.</div></section>`;
