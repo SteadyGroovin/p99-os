@@ -77,12 +77,15 @@ function catParts(cats, key) {
 /* ---------- trend chart (bars up to 45 points, area above), previous period dashed, hover + tap ---------- */
 window.CH = window.CH || {};
 function trendChart(id, pts, prevPts, { onDay = true } = {}) {
-  const W = 640, H = 230, L = 46, R = 10, T = 12, B = 28; const n = pts.length; if (!n) return "";
+  /* v0.11.2: the drawing is as wide as the card, so axis text stays 12 px instead of growing to 20 px on a laptop; ticks are round (₱10k steps, not ₱12.5k) */
+  const vw = window.innerWidth || 1024, cardW = vw >= 900 ? Math.min(vw - 240, 1480) - 64 - 34 : vw - 32 - 34;
+  const W = Math.round(Math.max(320, Math.min(1200, cardW))), H = vw >= 900 ? 220 : 190, L = 46, R = 10, T = 12, B = 26; const n = pts.length; if (!n) return "";
   const vals = pts.map(p => p.v || 0).concat((prevPts || []).map(p => p.v || 0)); const mx0 = Math.max(...vals, 1);
-  const mag = Math.pow(10, Math.floor(Math.log10(mx0))); const nice = [1, 2, 2.5, 5, 10].map(x => x * mag).find(x => x >= mx0 * 1.02) || mx0; const mx = nice;
+  const raw = mx0 / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))); const stepV = [1, 2, 5, 10].map(x => x * mag).find(x => x >= raw) || raw; const mx = Math.ceil(mx0 * 1.02 / stepV) * stepV;
+  const ticks = []; for (let v = 0; v <= mx + 1e-9; v += stepV) ticks.push(v);
   const iw = W - L - R, ih = H - T - B; const bw = iw / n; const X = i => L + bw * (i + .5); const Y = v => T + ih - ih * v / mx;
   const bars = n <= 45;
-  let g = [0, .25, .5, .75, 1].map(f => `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(mx * f)}" y2="${Y(mx * f)}"/><text x="${L - 6}" y="${Y(mx * f) + 4}" text-anchor="end">${kfmt(mx * f)}</text>`).join("");
+  let g = ticks.map(v => `<line class="grid" x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end">${kfmt(v)}</text>`).join("");
   let marks = "";
   if (bars) marks = pts.map((p, i) => p.v == null ? "" : `<rect class="sbar" data-i="${i}" x="${(L + bw * i + Math.max(1, bw * .14)).toFixed(1)}" y="${Y(p.v).toFixed(1)}" width="${Math.max(2, bw * .72).toFixed(1)}" height="${(T + ih - Y(p.v)).toFixed(1)}" rx="${bw > 9 ? 3 : 1.5}"/>`).join("");
   else {
@@ -90,7 +93,7 @@ function trendChart(id, pts, prevPts, { onDay = true } = {}) {
     marks = `<path class="area" d="${d}L${X(last).toFixed(1)} ${T + ih}L${X(first).toFixed(1)} ${T + ih}Z"/><path class="line" d="${d}"/>`;
   }
   let pv = ""; if (prevPts && prevPts.length) { let d = "", pen = false; prevPts.forEach((p, i) => { if (i >= n) return; if (p.v == null) { pen = false; return; } d += `${pen ? "L" : "M"}${X(i).toFixed(1)} ${Y(p.v).toFixed(1)}`; pen = true; }); pv = `<path class="prev" d="${d}"/>`; }
-  const step = Math.max(1, Math.ceil(n / (bars ? 7 : 6))); const xl = pts.map((p, i) => i % step === 0 ? `<text x="${X(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(p.label.replace("Week of ", "").split(" ").slice(-2).join(" "))}</text>` : "").join("");
+  const step = Math.max(1, Math.ceil(n / Math.max(4, Math.min(bars ? 10 : 8, Math.floor(W / 110))))); const xl = pts.map((p, i) => i % step === 0 ? `<text x="${X(i).toFixed(1)}" y="${H - 8}" text-anchor="middle">${esc(p.label.replace("Week of ", "").split(" ").slice(-2).join(" "))}</text>` : "").join("");
   CH[id] = { pts, prevPts, L, bw, W, X, Y, T, ih, last: -1, onDay };
   return `<svg class="chart trend" id="${id}" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Sales over time">${g}${pv}${marks}<line class="xh" x1="0" x2="0" y1="${T}" y2="${T + ih}" style="display:none"/><circle class="xd" r="4.5" style="display:none"/>${xl}<rect class="hit" x="${L}" y="${T}" width="${iw}" height="${ih}" onpointermove="trendMove(event,'${id}')" onpointerdown="trendMove(event,'${id}')" onpointerleave="trendOut('${id}')" onclick="trendTap('${id}')"/></svg>`;
 }
@@ -180,14 +183,16 @@ function viewSalesRange(tabs) {
   const daily = a.daily.map(x => x ? x.total : null), tk = a.daily.map(x => x ? x.tickets : null), at = a.daily.map(x => x && x.tickets ? x.total / x.tickets : null), gs = a.daily.map(x => { if (!x) return null; const t = (x.pay.cash || 0) + (x.pay.gcash || 0) + (x.pay.card || 0); return t ? (x.pay.gcash || 0) / t : null; });
   const wk = arr => { if (R.n <= 120) return arr; const o = []; for (let i = 0; i < arr.length; i += 7) { const c = arr.slice(i, i + 7).filter(x => x != null); o.push(c.length ? sum(c) / c.length : null); } return o; };
   const from = R.days[0], to = R.days[R.days.length - 1]; const dn = R.n > 200 ? (d => new Date(d + "T00:00:00").toLocaleDateString("en-PH", { day: "numeric", month: "short", year: "numeric" })) : dayName;
-  const hero = `<section class="card hero2"><div class="lab">Sales · ${esc(dn(from))} – ${esc(dn(to))}</div><div class="big num">${peso(a.total)}</div><div class="trend">${p ? delta(a.total, p.total, lab) : '<span class="mut">no full earlier period to compare yet</span>'}</div>
-    <div class="sub num">${peso(a.perDay)} per open day · ${a.trading} open days${p ? ` · previous ${peso(p.total)}` : ""}</div>${spark(wk(daily), 520, 46)}</section>`;
-  const tiles = `<div class="grid2">
-    ${tile("Tickets", fmt(a.tickets), p ? delta(a.tickets, p.tickets) : "", spark(wk(tk)))}
-    ${tile("Average ticket", peso(a.avgTicket), p ? delta(a.avgTicket, p.avgTicket) : "", spark(wk(at)))}
-    ${tile("Pizzas", fmt(a.slices + a.wholes), `${fmt(a.slices)} slices · ${fmt(a.wholes)} whole`, "")}
-    ${tile("GCash share", Math.round(a.gshare * 100) + "%", p ? `was ${Math.round(p.gshare * 100)}%` : "of takings", spark(wk(gs)))}
-  </div>`;
+  /* v0.11.2 (Stefan): one strip of numbers — the total leads, the four measures beside it; no sparklines here, the chart below shows the trend */
+  const cell = (lab, val, note, cls = "") => `<div class="ss-c ${cls}"><div class="lab">${lab}</div><div class="val num">${val}</div><div class="note">${note}</div></div>`;
+  const hero = `<section class="card sstrip">
+    ${cell("Sales", peso(a.total), `${p ? delta(a.total, p.total, lab) : '<span class="mut">no earlier period to compare</span>'}<div class="mut">${peso(a.perDay)} per open day · ${a.trading} open days</div>`, "lead")}
+    ${cell("Tickets", fmt(a.tickets), p ? delta(a.tickets, p.tickets) : "")}
+    ${cell("Average ticket", peso(a.avgTicket), p ? delta(a.avgTicket, p.avgTicket) : "")}
+    ${cell("Pizzas", fmt(a.slices + a.wholes), `<span class="mut">${fmt(a.slices)} slices · ${fmt(a.wholes)} whole</span>`)}
+    ${cell("GCash share", Math.round(a.gshare * 100) + "%", `<span class="mut">${p ? `was ${Math.round(p.gshare * 100)}%` : "of takings"}</span>`)}
+  </section>`;
+  const tiles = "";
   const chart = `<section class="card"><h2>Sales over time <span class="tiny mut">${size === 7 ? "per full week, Mon–Sun" : "per day"}${pp ? " · dashed = previous period" : ""}</span></h2>${trendChart("tc", pts, pp)}
     <div class="legend"><span><b style="background:var(--s1)"></b>${size === 7 ? "Week" : "Day"}</span>${pp ? `<span><b class="dash"></b>Previous period</span>` : ""}<span class="mut">${size === 1 ? "tap a bar to open the day" : ""}</span></div>
     <details class="tbl" ${salesTable ? "open" : ""} ontoggle="salesTable=this.open"><summary>Show as table</summary><table class="t"><thead><tr><th>${size === 7 ? "Week" : "Day"}</th><th class="n">Sales</th>${pp ? '<th class="n">Previous</th>' : ""}</tr></thead><tbody>${pts.slice().reverse().map((q, i) => `<tr><td>${esc(q.label)}</td><td class="n num">${q.v == null ? '<span class="mut">no data</span>' : peso(q.v)}</td>${pp ? `<td class="n num mut">${pp[pts.length - 1 - i] && pp[pts.length - 1 - i].v != null ? peso(pp[pts.length - 1 - i].v) : ""}</td>` : ""}</tr>`).join("")}</tbody></table></details></section>`;
