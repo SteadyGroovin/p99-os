@@ -314,3 +314,17 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .wrap .skact .btn{min-height:36px; height:36px; padding:0 14px; font-size:14px; flex:none}
 .wrap .c2big, .wrap .c2big.full{width:auto; min-height:36px; height:36px; padding:0 16px; font-size:14px; justify-self:start}
 @media (max-width:699px){ .wrap .skact .btn{flex:1 1 auto} .wrap .c2big{width:100%} }
+/* v0.11.1 — sidebar: the label's letters centred on the icon, not Inter's tall line box (Stefan: "icon and label not always level") */
+.sidebar button .sl{line-height:1; text-box:trim-both cap alphabetic}
+.sidebar button .ic{display:block; vertical-align:0}
+/* v0.11.1 — Today's yesterday card: number left, 14 clear bars right; stacked on a phone */
+.wrap .hero2.tdy{display:grid; grid-template-columns:minmax(0, 1fr); gap:8px}
+.tdy .sub{margin-bottom:0}
+.tdy-c{display:grid; gap:4px; align-content:end}
+.tdybars{display:block; height:auto; max-height:96px}
+.tdybars .tb{fill:var(--n200)} .tdybars .tb.same{fill:var(--brand300)} .tdybars .tb.on{fill:var(--p99)}
+:root[data-theme="dark"] .tdybars .tb{fill:var(--n700)}
+.tdybars text{font-size:11px; fill:var(--mut); font-family:var(--f)} .tdybars text.on{fill:var(--ink); font-weight:600}
+.tdybars .tu{stroke:var(--ink2); stroke-width:1.25; stroke-dasharray:4 4; opacity:.7}
+.tdybars .hitb{fill:transparent}
+@media (min-width:700px){ .wrap .hero2.tdy{grid-template-columns:minmax(220px, 1fr) minmax(0, 1.4fr); gap:20px; align-items:end} }

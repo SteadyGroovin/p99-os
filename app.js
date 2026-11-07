@@ -63,7 +63,7 @@ function shell(title, sub, body, { back } = {}) {
   const openT = S.tickets.filter(t => t.status !== "done").length;
   const tabHTML = tabs.map(([id, label, icon, href]) => `<button class="${cur === id ? "on" : ""}" onclick="go('${href}')" aria-label="${label}">${id === "report" && openT ? `<span class="bdg">${openT}</span>` : ""}${ic(ICON[icon])}${label}</button>`).join("");
   return `
-  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Rocket OS</div>${side.map(([id, label, icon, href]) => `<button class="${scur === id ? "on" : ""}" onclick="go('${href}')">${ic(ICON[icon], "sm")}${label}</button>`).join("")}</nav>
+  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Rocket OS</div>${side.map(([id, label, icon, href]) => `<button class="${scur === id ? "on" : ""}" onclick="go('${href}')">${ic(ICON[icon], "sm")}<span class="sl">${label}</span></button>`).join("")}</nav>
   <div class="page">
     <header class="top">${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>

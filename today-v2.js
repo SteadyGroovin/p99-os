@@ -43,9 +43,10 @@ function viewToday() {
   const last14 = calDays(addDays(LAST_DAY, -13), LAST_DAY).map(x => SD[x] ? SD[x].total : null);
   /* hero: yesterday */
   const hero = y
-    ? `<section class="card hero2 tapc" onclick="salesRange='day';salesDay='${yd}';salesTab='overview';go('#/sales')"><div class="lab">Yesterday · ${esc(dayLong(yd))}</div><div class="big num">${peso(y.total)}</div>
+    ? `<section class="card hero2 tdy tapc" onclick="salesRange='day';salesDay='${yd}';salesTab='overview';go('#/sales')"><div class="tdy-n"><div class="lab">Yesterday · ${esc(dayLong(yd))}</div><div class="big num">${peso(y.total)}</div>
         <div class="trend">${u ? delta(y.total, u.avg, `vs a usual ${WD[wdOf(yd)]} (${peso(u.avg)})`) : '<span class="mut">no earlier same weekday to compare</span>'}</div>
-        <div class="sub num">${y.tickets} tickets · avg ${peso(y.total / Math.max(1, y.tickets))}${u ? ` · usual ${Math.round(u.tk)} tickets` : ""}</div>${spark(last14, 520, 46)}<div class="tiny mut">last 14 days · tap for the day</div></section>`
+        <div class="sub num">${y.tickets} tickets · avg ${peso(y.total / Math.max(1, y.tickets))}${u ? ` · usual ${Math.round(u.tk)}` : ""}</div></div>
+        <div class="tdy-c"><div class="tiny mut">Sales per day, last 14 days${u ? ` · dashed = a usual ${WD[wdOf(yd)]}` : ""}</div>${tdyBars(yd, u)}</div></section>`
     : `<section class="card hero2"><div class="lab">Yesterday · ${esc(dayLong(yd))}</div><div class="big num mut">—</div><div class="trend"><span class="dl down"><i>▼</i>not in the database yet</span></div><div class="sub">The newest day we have is ${esc(dayLong(LAST_DAY))}. Press <b>Sync now</b> above.</div></section>`;
   /* morning run + cash */
   const runs = RUN.rows || [], todayRun = runs.find(r => r.day === d), lastRun = runs[0];
@@ -140,4 +141,22 @@ async function pwSave() {
     : /fetch|network/i.test(t) ? { ok: false, t: "No internet. Try again when online." }
     : { ok: false, t: "Could not change the password: " + t };
   render();
+}
+
+/* Today's 14-day bars (v0.11.1, Stefan: the sparkline "is hard to understand"): one bar per day, yesterday in the brand colour,
+   the same weekday as yesterday a shade darker, a dashed line at the usual level for that weekday; weekday letters under the bars,
+   every bar has a tooltip (day + amount + tickets). */
+function tdyBars(yd, u) {
+  const days = calDays(addDays(yd, -13), yd), vals = days.map(x => SD[x] ? SD[x].total : null);
+  const W = 460, H = 92, T = 6, B = 18, L = 2, R = 2, iw = W - L - R, ih = H - T - B, bw = iw / days.length;
+  const hi = Math.max(1, ...vals.filter(v => v != null), u ? u.avg : 0) * 1.08, Y = v => T + ih - v / hi * ih;
+  const ywd = wdOf(yd);
+  const bars = days.map((x, i) => { const v = vals[i], tip = `data-tt="${esc(dayName(x))}|${v == null ? "no record" : peso(v) + " · " + SD[x].tickets + " tickets"}"`;
+    const hit = `<rect class="hitb" x="${(L + bw * i).toFixed(1)}" y="${T}" width="${bw.toFixed(1)}" height="${ih}" ${tip}/>`;
+    const cls = x === yd ? "on" : wdOf(x) === ywd ? "same" : "";
+    const lab = `<text x="${(L + bw * (i + .5)).toFixed(1)}" y="${H - 4}" text-anchor="middle" class="${x === yd ? "on" : ""}">${WD[wdOf(x)][0]}</text>`;
+    if (v == null) return lab + hit;
+    const y1 = Y(v); return `<rect class="tb ${cls}" x="${(L + bw * i + bw * .18).toFixed(1)}" y="${y1.toFixed(1)}" width="${(bw * .64).toFixed(1)}" height="${(T + ih - y1).toFixed(1)}" rx="3"/>${lab}${hit}`; }).join("");
+  const usual = u ? `<line class="tu" x1="${L}" x2="${W - R}" y1="${Y(u.avg).toFixed(1)}" y2="${Y(u.avg).toFixed(1)}"/>` : "";
+  return `<svg class="tdybars" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Sales per day, last 14 days">${usual}${bars}</svg>`;
 }
