@@ -360,3 +360,6 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 /* Sales: the month picker sits with the range pills */
 .rng .rngsel{flex:none; width:auto; height:36px; min-height:36px; padding:0 30px 0 14px; border-radius:999px; font-size:14px; font-weight:600; color:var(--ink2); border:1px solid var(--line2)}
 .rng .rngsel.on{background:var(--p99); border-color:var(--p99); color:var(--on-accent)}
+/* v0.11.4 — sign-in code field */
+.who .sicode{font-size:24px; letter-spacing:.3em; text-align:center; font-variant-numeric:tabular-nums}
+.who .sicode::placeholder{letter-spacing:0; font-size:16px}
