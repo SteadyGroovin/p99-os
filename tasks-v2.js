@@ -14,7 +14,9 @@ let ntask = null;
 
 /* ---------- small helpers ---------- */
 const daysBetween = (a, b) => Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 864e5);
-const tkStores = () => [{ code: "GROUP", name: "Group", color: "#717680" }].concat((S.stores && S.stores.length ? S.stores : TK_FALLBACK_STORES));
+const TK_ORDER = ["MCC", "DC", "MCBC", "P99", "BK", "OK", "SP", "DH"];   /* Stefan's order and short names (2026-11-07); the full name shows on hover and in the pickers */
+const tkStores = () => [{ code: "GROUP", name: "Group", color: "#717680" }].concat((S.stores && S.stores.length ? S.stores : TK_FALLBACK_STORES).slice().sort((a, b) => ((TK_ORDER.indexOf(a.code) + 1) || 99) - ((TK_ORDER.indexOf(b.code) + 1) || 99)));
+const tkShort = code => code === "GROUP" ? "Group" : code;
 const tkVenue = code => tkStores().find(s => s.code === code) || { code, name: code || "?", color: "#A4A7AE" };
 const tkStoreOf = t => t.store || "P99";                     /* records from before v0.10 carry no venue: they were Pizza 99's */
 const tkPeople = () => (S.people && S.people.length ? S.people : PEOPLE.filter(p => p.id !== "store"));
@@ -23,7 +25,7 @@ const tkAllVenues = () => !window.DB_ROLE || ["master", "admin"].includes(window
 const tkS = t => +(t && t.sort) || 0;
 const tkSortKey = t => [tkS(t), t.due || "9999", t.created || ""];
 const tkCmp = (a, b) => { const x = tkSortKey(a), y = tkSortKey(b); return x[0] - y[0] || (x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0) || (x[2] < y[2] ? -1 : 1); };
-const tkVenueChip = code => { const v = tkVenue(code); return `<span class="tkvenue" style="--c:${esc(v.color || "#A4A7AE")}"><i></i>${esc(v.code === "GROUP" ? "Group" : v.name)}</span>`; };
+const tkVenueChip = code => { const v = tkVenue(code); return `<span class="tkvenue" title="${esc(v.name)}" style="--c:${esc(v.color || "#A4A7AE")}"><i></i>${esc(tkShort(v.code))}</span>`; };
 const tkAreaChip = a => a ? `<span class="tkarea">${esc(a)}</span>` : "";
 const tkLog = (t, ev, v) => { t.log = t.log || []; t.log.push({ at: nowISO(), by: tkMe(), ev, v }); };
 const tkActive = t => t.status !== "done";
@@ -165,10 +167,10 @@ function tkQuickAdd() {
   const store = TK.qa.store || (TK.venue !== "all" ? TK.venue : "GROUP");
   const first = (S.tasks || []).filter(x => x.status === "open").sort(tkCmp)[0];
   const at = nowISO(); S.tasks.unshift({ id: "k-" + Date.now(), title, detail: "", owner: TK.qa.owner || null, due: TK.qa.due || null, status: "open", store, area: (TK.qa.area || "").trim() || null, sort: first ? tkS(first) - 10 : 0, source: fname(tkMe()) || "Rocket OS", created: at, log: [{ at, by: tkMe(), ev: "created" }] });
-  TK.qa.title = ""; save(); toast(`Task added to ${tkVenue(store).name}.`); render();
+  TK.qa.title = ""; save(); toast(`Task added to ${tkShort(store)}.`); render();
 }
 const tkPersonOpts = (cur, blank) => (blank ? `<option value="">${blank}</option>` : "") + tkPeople().map(p => `<option value="${p.id}" ${cur === p.id ? "selected" : ""}>${esc(p.short || p.name)}</option>`).join("");
-const tkVenueOpts = cur => tkStores().map(s => `<option value="${s.code}" ${cur === s.code ? "selected" : ""}>${esc(s.code === "GROUP" ? "Group (all venues)" : s.name)}</option>`).join("");
+const tkVenueOpts = cur => tkStores().map(s => `<option value="${s.code}" ${cur === s.code ? "selected" : ""}>${esc(s.code === "GROUP" ? "Group (all venues)" : s.code + " · " + s.name)}</option>`).join("");
 const tkAreaList = () => `<datalist id="tkareas">${[...new Set(TK_AREAS.concat((S.tasks || []).map(t => t.area).filter(Boolean)))].sort().map(a => `<option value="${esc(a)}">`).join("")}</datalist>`;
 
 function viewTasks() {
@@ -180,7 +182,7 @@ function viewTasks() {
   const act = inVenue.filter(tkActive), od = act.filter(t => tkOverdue(t, d)), wt = act.filter(t => t.status === "blocked"), dw = inVenue.filter(t => t.status === "done" && (t.done_at || "").slice(0, 10) >= wk);
   /* v0.10.2 (Stefan: "see more of the actual board"): no tiles, one toolbar — filters left, the add box right; its extra fields open in a small panel only while you type */
   const openIn = code => all.filter(t => tkActive(t) && tkStoreOf(t) === code).length;
-  const pills = `<div class="rng tkvenues" role="tablist"><button class="${TK.venue === "all" ? "on" : ""}" onclick="tkSet('venue','all')"><span class="l">All venues</span><span class="n">${all.filter(tkActive).length}</span></button>${venues.map(v => `<button class="${TK.venue === v.code ? "on" : ""}" style="--c:${esc(v.color || "#A4A7AE")}" onclick="tkSet('venue','${v.code}')"><i></i><span class="l">${esc(v.code === "GROUP" ? "Group" : v.name)}</span><span class="n">${openIn(v.code)}</span></button>`).join("")}</div>`;
+  const pills = `<div class="rng tkvenues" role="tablist"><button class="${TK.venue === "all" ? "on" : ""}" onclick="tkSet('venue','all')"><span class="l">All venues</span><span class="n">${all.filter(tkActive).length}</span></button>${venues.map(v => `<button class="${TK.venue === v.code ? "on" : ""}" style="--c:${esc(v.color || "#A4A7AE")}" title="${esc(v.name)}" onclick="tkSet('venue','${v.code}')"><i></i><span class="l">${esc(tkShort(v.code))}</span><span class="n">${openIn(v.code)}</span></button>`).join("")}</div>`;
   const owners = [...new Set(all.map(t => t.owner).filter(Boolean))].sort((a, b) => fname(a).localeCompare(fname(b)));
   const areas = [...new Set(inVenue.map(t => t.area).filter(Boolean))].sort();
   const qStore = TK.qa.store || (TK.venue !== "all" ? TK.venue : "GROUP");
@@ -198,7 +200,7 @@ function viewTasks() {
     ${add}</div>`;
   const ts = tkFiltered();
   const body = TK.view === "board" ? tkBoard(ts, d) : (tkList(ts, d) || `<div class="card mut small">Nothing in this view.</div>`);
-  const sub = `${act.length} open · ${od.length ? `<span class="band-bad">${od.length} overdue</span> · ` : ""}${wt.length} waiting · ${dw.length} done this week · ${TK.venue === "all" ? "every venue" : esc(tkVenue(TK.venue).name)}`;
+  const sub = `${act.length} open · ${od.length ? `<span class="band-bad">${od.length} overdue</span> · ` : ""}${wt.length} waiting · ${dw.length} done this week · ${TK.venue === "all" ? "every venue" : esc(tkShort(TK.venue))}`;
   return shell("Tasks", sub, `<div class="tkpage ${TK.view}">${pills}${bar}${body}</div>`);
 }
 function tkView(k) { TK.view = k; render(); }
