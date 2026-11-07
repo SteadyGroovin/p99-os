@@ -100,7 +100,7 @@ function viewBills() {
     ${ticked.length ? `<div class="bottom-act"><button class="btn primary full" onclick="bpMarkPaid()">Mark ${ticked.length} bill${ticked.length === 1 ? "" : "s"} paid</button></div>` : ""}
     <section class="card"><h2>Paid now <span class="tiny mut">${since ? "since " + esc(dayName(since)) : "last 7 days"} · ${peso(expTot)}</span></h2><div class="list">${exps.map(e => `<div class="row"><div class="main"><div class="name">${esc(e.supplier)} · ${peso(+e.total)} ${chip("", esc(src[e.source] || e.source || ""))}</div><div class="meta">${esc(dayName(e.day))} · ${esc(e.lines || "")}</div></div></div>`).join("") || `<div class="mut small">None.</div>`}</div></section>
     <section class="card"><h2>Download for the sheets</h2><div class="tiny mut" style="margin-bottom:8px">One line per item, the columns of the expense ledger: date, store, item, qty, unit, unit price, amount, supplier, SI, paid now or bill, who paid, run.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="bpExport('paid_now')">Expenses CSV</button><button class="btn" onclick="bpExport('bill')">Bills CSV</button></div></section>`, { back: "#/finance" });
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="bpExport('paid_now')">Expenses CSV</button><button class="btn" onclick="bpExport('bill')">Bills CSV</button><button class="btn" onclick="go('#/money')">Money moves</button></div></section>`, { back: "#/finance" });
 }
 function bpMarkPaid() {
   const ids = Object.keys(bpSel).filter(k => bpSel[k]); if (!ids.length) return;

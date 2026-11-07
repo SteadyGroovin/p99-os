@@ -104,7 +104,8 @@ function viewMore() {
     ...(role() === "master" ? [row("Approve orders", `${(S.orders || []).filter(o => o.status === "requested" && o.approval_needed).length} waiting`, "go('#/approve')")] : []),
     ...(["master", "admin", "lead"].includes(role()) ? [row("Suppliers", "terms, delivery days, what we buy, prices", "go('#/suppliers')")] : []),
     ...(["master", "admin"].includes(role()) ? [row("Stores & places", "where stock is sent and received", "go('#/stores')")] : []),
-    ...(["master", "admin"].includes(role()) ? [row("Bills & expenses", `${MONEY.filter(m => m.mode === "bill" && !m.paid_on).length} open bills · download for the sheets`, "go('#/bills')")] : [])]);
+    ...(["master", "admin"].includes(role()) ? [row("Bills & expenses", `${MONEY.filter(m => m.mode === "bill" && !m.paid_on).length} open bills · download for the sheets`, "go('#/bills')")] : []),
+    ...(["master", "admin"].includes(role()) ? [row("Money", "who paid, who is owed, money moved between people and funds", "go('#/money')")] : [])]);
   const review = group("Review", [row("Transactions", "every ticket, cash box without a sale", "salesTab='txns';go('#/sales')"), ...(role() === "master" ? [row("Finance", "expenses, payables, the book", "go('#/finance')")] : []), row("Variance", "counted against expected", "go('#/variance')"), row("Tickets", "problems and repairs", "go('#/report')"), row("Tasks", "the board for every venue", "go('#/tasks')")]);
   const me2 = group("This device", [
     `<button class="row tap" onclick="S.theme=S.theme==='dark'?'light':'dark';save();applyTheme();render()"><div class="main"><div class="name">Dark theme</div><div class="meta">easier in a dim kitchen</div></div><span class="sw ${S.theme === "dark" ? "on" : ""}"><i></i></span></button>`,

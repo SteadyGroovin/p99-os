@@ -52,7 +52,7 @@ const tabsFor = () => TABS[role() === "crew" ? "crew" : role() === "lead" ? "lea
 const SIDEBAR = [["today", "Today", "home", "#/today"], ["walk", "Morning run", "sun", "#/walk"], ["sales", "Sales", "cash", "#/sales"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["report", "Report", "alert", "#/report"], ["tasks", "Tasks", "list", "#/tasks"], ["finance", "Finance", "finance", "#/finance"], ["more", "More", "dots", "#/more"]];
 const sidebarFor = () => role() === "master" ? SIDEBAR : role() === "admin" ? SIDEBAR.filter(t => t[0] !== "finance") : tabsFor();   /* walk, lead and crew keep their short bars */
 function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split("/")[1] || "today";
-  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", transfers: "stock", transfer: "stock", order: "stock", approve: "more", bills: "finance", sizes: "stock", suppliers: "more", supplier: "more", stores: "more", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
+  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", transfers: "stock", transfer: "stock", order: "stock", approve: "more", bills: "finance", money: "finance", sizes: "stock", suppliers: "more", supplier: "more", stores: "more", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
   if (seg === "finance") return role() === "master" ? "finance" : "more";
   if (seg === "tickets" && ids.includes("report")) return "report";
   if (ids.includes(seg)) return seg; const m = map[seg]; if (m && ids.includes(m)) return m; return "more"; }
@@ -391,7 +391,7 @@ function render() {
   let html;
   { /* route guard: the screens mirror the database rules (the database refuses the data anyway) */
     const r = role(), s0 = seg[0] || "", ownerOnly = ["sales", "finance"], walkOk = ["walk", "tasks", "task", "report", "more", "who", "password", "receive", "transfers", "transfer", ""]; /* the office also records deliveries at Head Office and releases stock to the stores */
-    const officeOnly = ["bills", "stores"], leadOk = ["order", "sizes"]; /* v0.12–v0.14 */
+    const officeOnly = ["bills", "stores", "money"], leadOk = ["order", "sizes"]; /* v0.12–v0.14 */
     if ((r !== "master" && ownerOnly.includes(s0)) || (r === "walk" && !walkOk.includes(s0)) || (officeOnly.includes(s0) && !["master", "admin"].includes(r)) || (leadOk.includes(s0) && !["master", "lead"].includes(r)) || (s0 === "approve" && r !== "master") || (["suppliers", "supplier"].includes(s0) && !["master", "admin", "lead"].includes(r))) { location.hash = r === "walk" ? "#/walk" : "#/today"; return; }
   }
   if (/^#\/tasks?(\/|$)/.test(location.hash) && typeof viewTasks !== "function") { $("#app").innerHTML = `<div class="wrap"><section class="card"><b>A new version of Rocket OS is ready.</b><div class="small mut" style="margin:6px 0 12px">Part of the old version is still in this phone's cache.</div><button class="btn primary full" onclick="location.reload()">Reload</button></section></div>`; return; }
@@ -420,6 +420,7 @@ function render() {
     case "approve": html = viewApprove(); break;
     case "bills": html = viewBills(); break;
     case "sizes": html = viewSizes(); break;               /* v0.13: pack sizes written down by the team */
+    case "money": html = viewMoney(); break;              /* v0.15: money moves */
     case "suppliers": html = viewSuppliers(); break;       /* v0.14: suppliers, stores, prices */
     case "supplier": html = viewSupplier(seg[1]); break;
     case "stores": html = viewStores(); break;
