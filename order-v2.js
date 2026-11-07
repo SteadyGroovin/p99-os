@@ -137,3 +137,23 @@ async function pushOn() {
   } catch (e) { toast("Could not switch alerts on: " + (e.message || e)); }
 }
 function pushState() { try { return localStorage.getItem("p99os_push") === "on"; } catch (e) { return false; } }
+
+/* ---------- PACK SIZES (v0.13, migration 021) ---------- */
+/* Stefan, 2026-11-08: no photo reading; the team writes the size down. Receive asks for it when an item without a size arrives;
+   here the lead or a master types the rest. The first size converts what was recorded in counted units, once (os_set_pack_size). */
+let szEdit = {};
+function viewSizes() {
+  if (!["lead", "master"].includes(role())) return shell("Pack sizes", "", `<div class="alert info">For the store lead and the owners.</div>`, { back: "#/stock" });
+  const unknown = ITEMS.filter(i => i.sizeUnknown);
+  const rows = unknown.map(it => `<div class="row"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">counted per ${esc(it.unit)}${it.supplier ? " · " + esc(it.supplier) : ""}</div></div>
+    <div class="right" style="display:flex;gap:6px;align-items:center"><input class="in num" inputmode="decimal" style="width:90px" placeholder="${esc(it.base)}" aria-label="${esc(it.base)} in one ${esc(it.unit)}" value="${szEdit[it.id] != null ? szEdit[it.id] : ""}" oninput="szEdit['${it.id}']=this.value===''?null:parseFloat(this.value)"><span class="l">${esc(it.base)}</span><button class="btn primary" onclick="szSave('${it.id}')">Save</button></div></div>`).join("");
+  return shell("Pack sizes", `${unknown.length} without a size`, `
+    <div class="alert info">Write how much ONE counted unit holds, as printed on the label (one can of tuna = ? g). Receive also asks for it when one of these arrives. Weigh it once if the label does not say.</div>
+    <section class="card"><div class="list">${rows || `<div class="mut">Every item has a size.</div>`}</div></section>`, { back: "#/stock" });
+}
+function szSave(code) {
+  const qty = szEdit[code]; if (!(qty > 0)) return toast("Type the size first.");
+  S.sizeDecisions = S.sizeDecisions || []; S.sizeDecisions.push({ id: "sz-" + code + "-" + Date.now(), item: code, qty, synced: false });
+  const it = Store.item(code); if (it) { it.per = qty; it.sizeUnknown = false; }
+  delete szEdit[code]; save(); toast("Size saved."); render();
+}

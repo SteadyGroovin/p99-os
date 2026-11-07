@@ -31,7 +31,7 @@ const Sync = {
       st.runs = {}; Object.keys(L.runs || {}).forEach(k => { const r = L.runs[k]; const ph = {}; Object.keys(r.ph || {}).forEach(pk => { const id = regPhoto(r.ph[pk]); if (id) ph[pk] = id; }); Object.values(r.done || {}).forEach(d => { if (d.at) d.at = this.local(d.at); }); st.runs[k] = pending["checklist_run:" + k] || { done: r.done || {}, ph }; });
       st.transfers = arr("transfer", L.transfers, r => { r.photo = regPhoto(r.photo_path); r.lines.forEach(l => { if (l.released != null) l.released = +l.released; if (l.received != null) l.received = +l.received; }); });
       st.orders = arr("po", L.orders, r => { r.lines.forEach(l => { l.qty = +l.qty; }); });
-      st.approvals = (st.approvals || []).filter(a => !a.synced); st.billPaid = (st.billPaid || []).filter(a => !a.synced);
+      st.approvals = (st.approvals || []).filter(a => !a.synced); st.billPaid = (st.billPaid || []).filter(a => !a.synced); st.sizeDecisions = (st.sizeDecisions || []).filter(a => !a.synced);
       if (typeof dbRefresh === "function") dbRefresh(L);
       st.locations = L.locations || []; st.held = (L.held || []).map(h => ({ location: h.location, item: h.item, on_hand: +h.on_hand, count_units: h.count_units == null ? null : +h.count_units }));
       /* v0.10.0: no more re-seeding the HR list into an empty table — a store login that sees no tasks would have re-created them */
@@ -50,7 +50,8 @@ const Sync = {
   ts(s) { if (!s || typeof s !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(s) || /(Z|[+-]\d\d:?\d\d)$/.test(s)) return s || null; const d = new Date(s); return isNaN(d) ? s : d.toISOString(); },
   payload(kind, r) {
     const ph = id => id ? (this.photos[id] || null) : null; const ts = s => this.ts(s); const log = l => (l || []).map(e => Object.assign({}, e, { at: ts(e.at) })); const unit = id => { const it = typeof Store !== "undefined" && Store.item(id); return it ? it.unit : null; };
-    if (kind === "receipt") return { id: r.id, day: r.day, kind: r.kind, supplier: r.supplier, by: r.by, photo_path: ph(r.photo), amount: r.amount, location: r.location || null, invoice: r.invoice || null, total: r.total == null ? null : r.total, pay_mode: r.pay_mode || null, pay_source: r.pay_source || null, po: r.po || null, lines: r.lines.map(l => ({ item: l.item, qty: l.qty, unit: unit(l.item), text: l.text || null, price: l.price == null ? null : l.price })) };
+    if (kind === "receipt") return { id: r.id, day: r.day, kind: r.kind, supplier: r.supplier, by: r.by, photo_path: ph(r.photo), amount: r.amount, location: r.location || null, invoice: r.invoice || null, total: r.total == null ? null : r.total, pay_mode: r.pay_mode || null, pay_source: r.pay_source || null, po: r.po || null, lines: r.lines.map(l => ({ item: l.item, qty: l.qty, unit: unit(l.item), text: l.text || null, price: l.price == null ? null : l.price, size: l.size > 0 ? l.size : null })) };
+    if (kind === "pack_size") return { id: r.id, item: r.item, qty: r.qty };
     if (kind === "po") return { id: r.id, day: r.day, supplier: r.supplier, by: r.by || null, expected: r.expected || null, note: r.note || null, lines: r.lines.map(l => ({ item: l.item, qty: l.qty, unit: l.unit })) };
     if (kind === "po_approve") return { id: r.id, decision: r.decision, note: r.note || null };
     if (kind === "bill_paid") return { id: r.id, receipts: r.receipts, paid_on: r.paid_on, note: r.note || null };
@@ -74,6 +75,7 @@ const Sync = {
     (st.orders || []).forEach(r => fn("po", r));                                      /* v0.12: the evening order list */
     (st.approvals || []).forEach(r => { if (!r.synced) fn("po_approve", r); });          /* one-shot: dropped once the database has it */
     (st.billPaid || []).forEach(r => { if (!r.synced) fn("bill_paid", r); });
+    (st.sizeDecisions || []).forEach(r => { if (!r.synced) fn("pack_size", r); });   /* v0.13 */
   },
   snapAll() { this.snap = {}; this.each((k, r) => { if (r.synced !== false) this.snap[k + ":" + r.id] = JSON.stringify(this.payload(k, r)); }); this.put(this.K.snap, this.snap); },
   /* after every save: anything whose server shape differs from the last synced shape goes to the outbox */
@@ -95,12 +97,12 @@ const Sync = {
           this.failed[o.kind + ":" + o.rec.id] = msg; this.outbox.shift(); continue; /* the server refused this one: drop it from the queue, keep the reason */
         }
         this.snap[o.kind + ":" + o.rec.id] = JSON.stringify(o.rec); delete this.failed[o.kind + ":" + o.rec.id]; this.outbox.shift(); this.lastOk = new Date();
-        const st = Store.load(); const col = { receipt: "receipts", count: "counts", ticket: "tickets", task: "tasks", cash: "cash", transfer: "transfers", po: "orders", po_approve: "approvals", bill_paid: "billPaid" }[o.kind];
+        const st = Store.load(); const col = { receipt: "receipts", count: "counts", ticket: "tickets", task: "tasks", cash: "cash", transfer: "transfers", po: "orders", po_approve: "approvals", bill_paid: "billPaid", pack_size: "sizeDecisions" }[o.kind];
         if (o.kind === "po" && res.data) { const rec = (st.orders || []).find(x => x.id === o.rec.id); if (rec && rec.status === "draft") rec.status = res.data.approval_needed ? "requested" : "approved"; if (rec) rec.approval_needed = !!res.data.approval_needed; }
         if (col) { const rec = (st[col] || []).find(x => x.id === o.rec.id); if (rec) { rec.synced = true; if (o.kind === "transfer") { if (res.data && res.data.status) rec.status = res.data.status; delete rec._side; } } }
       }
       this.put(this.K.outbox, this.outbox); this.put(this.K.snap, this.snap);
-    } finally { this.busy = false; if (typeof render === "function" && /#\/(more|today|transfers?|order|approve|bills)/.test(location.hash || "#/today")) render(); }
+    } finally { this.busy = false; if (typeof render === "function" && /#\/(more|today|transfers?|order|approve|bills|sizes)/.test(location.hash || "#/today")) render(); }
   },
   pending() { return this.outbox.length; },
   state() { const n = this.pending(), f = Object.keys(this.failed).length; return { n, f, err: this.err, label: n ? `${n} waiting to save${this.err ? " · " + (navigator.onLine ? "retrying" : "offline") : ""}` : f ? `${f} refused by the database` : "all saved", cls: n ? "warn" : f ? "bad" : "ok" }; },

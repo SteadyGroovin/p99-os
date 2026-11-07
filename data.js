@@ -107,7 +107,7 @@ function dbCatalogue(L) {
     const per = d.packUnit ? n(d.pack) : 1;                                   /* base units in one count unit; null = not known yet */
     const it = { id: d.id, name: d.name, place: d.place || "", cat: String(d.cat || "").toLowerCase(), unit: d.packUnit || d.unit, base: d.unit, per,
       par: d.par == null ? null : (d.packUnit && per ? n(d.par) / per : n(d.par)), nightly: !!d.nightly, supplier: d.supplier || undefined, buys: d.buys || [],
-      verify: !d.confirmed || (!!d.packUnit && per == null) };
+      verify: !d.confirmed || (!!d.packUnit && per == null), sizeUnknown: !!d.packUnit && per == null };   /* v0.13: Receive asks the crew to write the size off the label */
     if (d.caseUnit && n(d.case)) { it.packUnit = d.caseUnit; it.pack = n(d.case); }
     if (d.pos) it.pos = d.pos;
     return it; }));
@@ -239,7 +239,7 @@ const Store = {
     if (this._s) return this._s;
     try { this._s = JSON.parse(localStorage.getItem(this.key) || "null"); } catch (e) { this._s = null; }
     if (!this._s) this._s = { counts: SEED_COUNTS.slice(), receipts: SEED_RECEIPTS.slice(), tickets: [], tasks: SEED_TASKS.slice(), runs: {}, cash: [], walks: [], photos: {}, draft: null, me: null, theme: "light", transfers: [], locations: [], held: [], orders: [], approvals: [], billPaid: [] };
-    this._s.orders = this._s.orders || []; this._s.approvals = this._s.approvals || []; this._s.billPaid = this._s.billPaid || []; /* v0.12 */
+    this._s.orders = this._s.orders || []; this._s.approvals = this._s.approvals || []; this._s.billPaid = this._s.billPaid || []; this._s.sizeDecisions = this._s.sizeDecisions || []; /* v0.12, v0.13 */
     this._s.transfers = this._s.transfers || []; this._s.locations = this._s.locations || []; this._s.held = this._s.held || []; /* stock moves between locations (2026-11-03) */
     return this._s;
   },
