@@ -5,7 +5,9 @@
 .tkpage{display:grid; gap:12px; min-width:0}
 
 /* venue pills: colour dot + open count */
-.tkvenues button{display:inline-flex; align-items:center; gap:6px}
+.tkvenues button{display:inline-flex; align-items:center; justify-content:center; gap:6px; line-height:1}
+.tkvenues .l, .tkvenues .n{line-height:1; text-box:trim-both cap alphabetic}   /* centre the letters themselves, not Inter's tall line box (Stefan, 2026-11-07) */
+.tkvenues{-webkit-mask-image:linear-gradient(to right, #000 calc(100% - 28px), transparent); mask-image:linear-gradient(to right, #000 calc(100% - 28px), transparent); padding-right:28px}
 .tkvenues button i{width:8px; height:8px; border-radius:50%; background:var(--c, var(--mut)); flex:none}
 .tkvenues button .n{font-size:12px; font-weight:600; color:var(--mut); font-variant-numeric:tabular-nums}
 .tkvenues button.on .n{color:var(--on-accent); opacity:.85}
