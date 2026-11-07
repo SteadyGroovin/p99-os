@@ -1,4 +1,4 @@
-/* clean-v2.js — Clean, Report (tickets), Tasks and Cash, rebuilt 2026-10-28. The old views stay in app.js as *_v1.
+/* clean-v2.js — Clean, Report (tickets) and Cash (Tasks moved to tasks-v2.js in v0.10.0), rebuilt 2026-10-28. The old views stay in app.js as *_v1.
    Patterns: shift lists with due windows, "now" and "late" states and name + time on every tick (Jolt, Taqtics, Xenia);
    a completion strip per list with streaks and misses (Xenia/Taqtics store dashboards); a failed check or audit offers a ticket (Xenia corrective
    actions, MeazureUp/Yoobic); tickets with priority, ageing and a status board (UpKeep work orders); a cash-up that counts by denomination, checks
@@ -6,7 +6,7 @@
    Data shapes are only added to: tickets gain area/source/log/fixPhoto, tasks gain created/log, cash records keep their fields.
    The business day runs 09:00 to 04:00 the next morning (P99.pos_cutoff 04:00), so a closing ticked at 00:40 belongs to the day it closed. */
 
-const C2 = { hygDb: null, hygState: "idle", vals: {}, tkPri: "all", tkView: "board", tsOwner: "all", tsShow: "open", qa: { title: "", owner: "", due: "" }, cc: null };
+const C2 = { hygDb: null, hygState: "idle", vals: {}, tkPri: "all", tkView: "board", cc: null };   /* the to-do list moved to tasks-v2.js (v0.10.0) */
 const bday = () => typeof bizToday === "function" ? bizToday() : today();
 const fname = id => { const p = Store.person(id); return p ? p.short : ""; };
 const firstWord = s => String(s || "").trim().split(/\s+/)[0] || "";
@@ -305,77 +305,6 @@ function viewTicket(id) {
       <div class="field" style="margin-top:10px"><label for="tkn">Add an update</label><textarea class="in" id="tkn" placeholder="e.g. Technician comes Thursday"></textarea></div><button class="btn full" style="margin-top:8px" onclick="c2TkNote('${t.id}')">Add update</button></section>`, { back: "#/report" });
 }
 function c2TkFix(id, ph) { const t = S.tickets.find(x => x.id === id); t.fixPhoto = ph; t.log = t.log || []; t.log.push({ at: nowISO(), by: S.me, ev: "note", v: "photo of the fix added" }); save(); render(); }
-
-/* =====================================================================================================================
-   TASKS
-   ===================================================================================================================== */
-const C2G = [["overdue", "Overdue"], ["today", "Due today"], ["week", "Next 7 days"], ["later", "Later"], ["nodate", "No due date"], ["blocked", "Blocked"], ["done", "Done"]];
-function c2Bucket(t, d) { if (t.status === "done") return "done"; if (t.status === "blocked") return "blocked"; if (!t.due) return "nodate"; if (t.due < d) return "overdue"; if (t.due === d) return "today"; if (t.due <= addDays(d, 7)) return "week"; return "later"; }
-const daysBetween = (a, b) => Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 864e5);
-function c2DueChip(t, d) {
-  if (t.status === "done") return chip("ok", "✓ done" + (t.done_at ? " " + dayName(t.done_at.slice(0, 10)) : ""));
-  if (!t.due) return `<span class="tiny mut">no due date</span>`;
-  if (t.due < d) { const n = daysBetween(t.due, d); return chip("bad", `▲ ${n} d late`); }
-  if (t.due === d) return chip("warn", "due today");
-  if (t.due === addDays(d, 1)) return chip("", "due tomorrow");
-  return chip("", "due " + dayName(t.due));
-}
-const c2Owner = id => id ? `<span class="c2own"><i>${esc((fname(id) || "?")[0])}</i>${esc(fname(id))}</span>` : `<span class="c2own none"><i>?</i>no owner</span>`;
-function c2TaskDone(id) { const t = S.tasks.find(x => x.id === id); if (!t) return; t.log = t.log || []; if (t.status === "done") { t.status = "open"; delete t.done_at; t.log.push({ at: nowISO(), by: S.me, ev: "status", v: "open" }); toast("Reopened."); } else { t.status = "done"; t.done_at = nowISO(); t.log.push({ at: t.done_at, by: S.me, ev: "status", v: "done" }); toast("Done — " + t.title); } save(); render(); }
-const c2TsRow = (t, d) => `<div class="c2ts ${c2Bucket(t, d)}"><button class="c2chk ${t.status === "done" ? "on" : ""}" onclick="c2TaskDone('${t.id}')" aria-label="${t.status === "done" ? "Reopen" : "Mark done"}: ${esc(t.title)}">${ic("check")}</button><button class="b" onclick="go('#/task/${t.id}')"><b>${esc(t.title)}</b><span class="m">${c2Owner(t.owner)}${c2DueChip(t, d)}${t.status === "in_progress" ? chip("info", "in progress") : t.status === "blocked" ? chip("bad", "■ blocked") : ""}</span>${t.source ? `<span class="tiny mut">${esc(t.source)}</span>` : ""}</button></div>`;
-function c2TsOwner(k) { C2.tsOwner = k; render(); }
-function c2TsShow(k) { C2.tsShow = k; render(); }
-function c2QuickDue(k) { const d = today(); C2.qa.due = k === "today" ? d : k === "tomorrow" ? addDays(d, 1) : k === "week" ? addDays(d, 7) : ""; render(); }
-function c2QuickAdd() {
-  const el = $("#qat"); const title = (el ? el.value : C2.qa.title).trim(); if (!title) { toast("Type the task first."); if (el) el.focus(); return; }
-  const at = nowISO(); S.tasks.unshift({ id: "k-" + Date.now(), title, detail: "", owner: C2.qa.owner || S.me, due: C2.qa.due || null, status: "open", source: fname(S.me) || "P99 OS", created: at, log: [{ at, by: S.me, ev: "created" }] });
-  C2.qa.title = ""; save(); toast("Task added."); render();
-}
-function viewTasks() {
-  const d = today(), all = S.tasks || [], wk = addDays(d, -6);
-  const owners = [...new Set(all.map(t => t.owner).filter(Boolean))].sort((a, b) => fname(a).localeCompare(fname(b)));
-  const of = t => C2.tsOwner === "all" || t.owner === C2.tsOwner;
-  const act = all.filter(t => t.status !== "done"); const od = act.filter(t => t.due && t.due < d && t.status !== "blocked"); const bl = act.filter(t => t.status === "blocked"); const dw = all.filter(t => t.status === "done" && t.done_at && t.done_at.slice(0, 10) >= wk);
-  const tiles = `<div class="grid2">
-    ${tile("Open", String(act.length), `${act.filter(t => t.status === "in_progress").length} in progress`, "")}
-    ${tile("Overdue", String(od.length), od.length ? chip("bad", "▲ past due date") : chip("ok", "✓ none"), "")}
-    ${tile("Blocked", String(bl.length), bl.length ? esc(bl[0].title) : `<span class="mut">none</span>`, "")}
-    ${tile("Done · 7 days", String(dw.length), `<span class="mut">${all.filter(t => t.status === "done").length} done in total</span>`, "")}
-  </div>`;
-  const ownerSel = `<select class="in" onchange="C2.qa.owner=this.value" aria-label="Owner">${PEOPLE.map(p => `<option value="${p.id}" ${(C2.qa.owner || S.me) === p.id ? "selected" : ""}>${esc(p.short)}</option>`).join("")}</select>`;
-  const quick = `<section class="card c2qa"><div class="c2qa-r"><input class="in" id="qat" placeholder="Add a task…" value="${esc(C2.qa.title)}" oninput="C2.qa.title=this.value" onkeydown="if(event.key==='Enter')c2QuickAdd()"><button class="btn primary" onclick="c2QuickAdd()">Add</button></div>
-    <div class="c2qa-r2">${ownerSel}<div class="c2picks sm">${[["today", "Today"], ["tomorrow", "Tomorrow"], ["week", "In a week"], ["none", "No date"]].map(([k, l]) => { const v = k === "today" ? d : k === "tomorrow" ? addDays(d, 1) : k === "week" ? addDays(d, 7) : ""; return `<button class="${(C2.qa.due || "") === v ? "on" : ""}" onclick="c2QuickDue('${k}')">${l}</button>`; }).join("")}</div></div>
-    <a class="tiny" href="#/task/new" onclick="ntask={title:C2.qa.title,detail:'',owner:C2.qa.owner||S.me,due:C2.qa.due,status:'open'}">More detail ›</a></section>`;
-  const filt = `<div class="c2filt">${c2tabs([["all", "Everyone"]].concat(owners.map(o => [o, `${esc(fname(o))} ${all.filter(t => t.owner === o && t.status !== "done").length}`])), C2.tsOwner, "c2TsOwner")}${c2tabs([["open", "To do"], ["done", "Done"], ["all", "All"]], C2.tsShow, "c2TsShow")}</div>`;
-  const show = all.filter(of).filter(t => C2.tsShow === "all" || (C2.tsShow === "done" ? t.status === "done" : t.status !== "done"));
-  const groups = C2G.map(([k, l]) => { const ts = show.filter(t => c2Bucket(t, d) === k).sort((a, b) => (a.due || "9") < (b.due || "9") ? -1 : (a.due || "9") > (b.due || "9") ? 1 : 0); if (k === "done") ts.sort((a, b) => (b.done_at || "") < (a.done_at || "") ? -1 : 1);
-    return ts.length ? `<section class="c2grp ${k}"><h3>${l} <span class="num">${ts.length}</span></h3><div class="list">${ts.map(t => c2TsRow(t, d)).join("")}</div></section>` : ""; }).join("");
-  const load = owners.map(o => ({ o, n: act.filter(t => t.owner === o).length, od: od.filter(t => t.owner === o).length })).filter(x => x.n).sort((a, b) => b.n - a.n); const lmx = Math.max(1, ...load.map(x => x.n));
-  const loadCard = load.length ? `<section class="card"><h2>Open per person <span class="tiny mut">overdue in the tooltip</span></h2><div class="hb">${load.map(x => `<div class="hbr c2load" data-tt="${esc(fname(x.o))}|${x.n} open · ${x.od} overdue"><span class="nm">${esc(fname(x.o))}</span><span class="tr"><i style="width:${(100 * x.n / lmx).toFixed(0)}%"></i></span><span class="vl num">${x.n}${x.od ? `<small class="band-bad">${x.od} late</small>` : ""}</span></div>`).join("")}</div></section>` : "";
-  return shell("Tasks", "Pizza 99 to-do list", `${tiles}${quick}${filt}${groups || `<div class="card mut small">${C2.tsShow === "done" ? "Nothing done yet in this view." : "Nothing to do in this view."}</div>`}${loadCard}`);
-}
-function c2TSet(id, f, v) { const t = S.tasks.find(x => x.id === id); if (!t || t[f] === v) return; t.log = t.log || []; t[f] = v; if (f === "status") { if (v === "done") t.done_at = nowISO(); else delete t.done_at; t.log.push({ at: nowISO(), by: S.me, ev: "status", v }); } if (f === "owner" || f === "due") t.log.push({ at: nowISO(), by: S.me, ev: f, v }); save(); render(); }
-function viewTask(id) {
-  const d = today(); const owners = cur => PEOPLE.map(p => `<option value="${p.id}" ${cur === p.id ? "selected" : ""}>${esc(p.short)}</option>`).join("");
-  const dueChips = (cur, fn) => `<div class="c2picks sm">${[["Today", d], ["Tomorrow", addDays(d, 1)], ["In a week", addDays(d, 7)], ["No date", ""]].map(([l, v]) => `<button class="${(cur || "") === v ? "on" : ""}" onclick="${fn}('${v}')">${l}</button>`).join("")}</div>`;
-  if (id === "new") {
-    if (!ntask) ntask = { title: "", detail: "", owner: S.me, due: "", status: "open" };
-    window._ntDue = v => { ntask.due = v; render(); };
-    return shell("New task", "what · who · by when", `<section class="card"><div class="field"><label for="ntt2">Task</label><input class="in" id="ntt2" value="${esc(ntask.title)}" oninput="ntask.title=this.value"></div><div class="field" style="margin-top:10px"><label>Detail</label><textarea class="in" oninput="ntask.detail=this.value">${esc(ntask.detail)}</textarea></div></section>
-      <section class="card"><div class="field"><label>Owner</label><select class="in" onchange="ntask.owner=this.value">${owners(ntask.owner)}</select></div><div class="field" style="margin-top:10px"><label>Due</label>${dueChips(ntask.due, "_ntDue")}<input class="in" type="date" value="${ntask.due || ""}" onchange="ntask.due=this.value"></div></section>
-      <div class="bottom-act"><button class="btn primary full" onclick="if(!ntask.title.trim()){toast('Type the task first.');return}const at=nowISO();S.tasks.unshift({id:'k-'+Date.now(),title:ntask.title.trim(),detail:ntask.detail,owner:ntask.owner,due:ntask.due||null,status:'open',source:fname(S.me)||'P99 OS',created:at,log:[{at,by:S.me,ev:'created'}]});ntask=null;C2.qa.title='';save();toast('Task added.');go('#/tasks')">Add task</button></div>`, { back: "#/tasks" });
-  }
-  const t = S.tasks.find(x => x.id === id); if (!t) return viewTasks();
-  window._tDue = v => c2TSet(t.id, "due", v || null);
-  const log = (t.log || []).slice().reverse();
-  const evT = e => e.ev === "status" ? `set status to <b>${esc(String(e.v).replace("_", " "))}</b>` : e.ev === "owner" ? `gave it to <b>${esc(fname(e.v))}</b>` : e.ev === "due" ? `set due to <b>${e.v ? esc(dayName(e.v)) : "no date"}</b>` : e.ev === "created" ? "added it" : esc(e.v || "");
-  return shell(t.title, `${esc(fname(t.owner) || "no owner")}${t.due ? " · due " + dayName(t.due) : ""}`, `
-    <section class="card"><div class="c2tkh">${c2Owner(t.owner)}${c2DueChip(t, d)}${t.source ? chip("", esc(t.source)) : ""}</div>
-      <div class="field" style="margin-top:10px"><label>Detail</label><textarea class="in" onchange="c2TSet('${t.id}','detail',this.value)">${esc(t.detail || "")}</textarea></div></section>
-    <section class="card"><h3>Status</h3><div class="seg">${["open", "in_progress", "blocked", "done"].map(s => `<button class="btn ${t.status === s ? "on" : ""}" onclick="c2TSet('${t.id}','status','${s}')">${s.replace("_", " ")}</button>`).join("")}</div></section>
-    <section class="card"><h3>Owner</h3><select class="in" onchange="c2TSet('${t.id}','owner',this.value)">${owners(t.owner)}</select><h3 style="margin-top:14px">Due</h3>${dueChips(t.due, "_tDue")}<input class="in" type="date" value="${t.due || ""}" onchange="_tDue(this.value)"></section>
-    ${log.length || t.created ? `<section class="card"><h3>History</h3><ol class="c2log">${log.map(e => `<li><span class="tiny mut num">${esc(dayName(String(e.at).slice(0, 10)))} ${timeOf(e.at)}</span><div><b>${esc(fname(e.by) || "—")}</b> ${evT(e)}</div></li>`).join("")}${!log.some(e => e.ev === "created") && t.created ? `<li><span class="tiny mut num">${esc(dayName(t.created.slice(0, 10)))}</span><div>added</div></li>` : ""}</ol></section>` : ""}`, { back: "#/tasks" });
-}
 
 /* =====================================================================================================================
    CASH (closing count)

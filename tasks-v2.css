@@ -1,0 +1,74 @@
+/* tasks-v2.css — the company-wide to-do board (Rocket OS v0.10.0, 2026-11-07). Tokens from styles.css; list rows reuse .c2ts / .c2own / .c2qa from clean-v2.css. */
+
+/* the board page gets more room on a laptop: five columns side by side */
+@media (min-width:900px){ .wrap:has(.tkpage){max-width:1480px} }
+.tkpage{display:grid; gap:12px; min-width:0}
+
+/* venue pills: colour dot + open count */
+.tkvenues button{display:inline-flex; align-items:center; gap:6px}
+.tkvenues button i{width:8px; height:8px; border-radius:50%; background:var(--c, var(--mut)); flex:none}
+.tkvenues button .n{font-size:12px; font-weight:600; color:var(--mut); font-variant-numeric:tabular-nums}
+.tkvenues button.on .n{color:var(--on-accent); opacity:.85}
+.tkvenues button.on i{box-shadow:0 0 0 2px var(--on-accent)}
+
+/* controls */
+.tkctl{display:flex; flex-wrap:wrap; gap:8px; align-items:center}
+.tkctl .rng{flex:none}
+.tkctl select.in{width:auto; min-width:130px; min-height:36px; height:36px; padding:0 10px; font-size:14px; flex:none}
+.tkq{display:flex; gap:6px}
+.tkq button{height:36px; padding:0 14px; border-radius:999px; border:1px solid var(--line2); background:var(--surf); color:var(--ink2); font-size:14px; font-weight:600}
+.tkq button.on{background:var(--p99-soft); border-color:var(--p99); color:var(--p99-deep)}
+.c2qa-r2 .tkareain{width:140px; flex:none}
+
+/* chips on cards and rows */
+.tkvenue{display:inline-flex; align-items:center; gap:5px; font-size:12px; line-height:18px; font-weight:600; color:var(--ink2); padding:1px 8px; border-radius:999px; background:var(--surf2); border:1px solid var(--line)}
+.tkvenue i{width:7px; height:7px; border-radius:50%; background:var(--c, var(--mut))}
+.tkarea{display:inline-flex; font-size:12px; line-height:18px; font-weight:500; color:var(--mut); padding:1px 8px; border-radius:999px; border:1px dashed var(--line2)}
+.tkst{font-size:12px; line-height:18px; font-weight:600; padding:1px 8px; border-radius:999px; background:var(--info-bg); color:var(--info)}
+.tkst.blocked{background:var(--warn-bg); color:var(--warn)}
+
+/* the board: a swipeable strip on a phone, five columns on a tablet or laptop */
+.tkboard{display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x mandatory; padding-bottom:8px; margin:0 -16px; padding-left:16px; padding-right:16px; scroll-padding:0 16px}
+.tkcol{flex:0 0 84%; scroll-snap-align:start; display:flex; flex-direction:column; gap:8px; background:var(--surf2); border:1px solid var(--line); border-radius:var(--r-card); padding:10px; min-height:220px}
+.tkcol h3{margin:0; font-size:14px; line-height:20px; font-weight:600; color:var(--ink2); display:flex; align-items:center; gap:6px; padding:2px 4px}
+.tkcol h3 .num{display:inline-grid; place-items:center; min-width:22px; height:20px; border-radius:10px; background:var(--surf); color:var(--ink2); font-size:12px; padding:0 6px}
+.tkcol.next h3{color:var(--p99-deep)} .tkcol.in_progress h3{color:var(--info)} .tkcol.blocked h3{color:var(--warn)} .tkcol.done h3{color:var(--ok)}
+:root[data-theme="dark"] .tkcol.next h3{color:var(--brand300)}
+.tkcards{display:flex; flex-direction:column; gap:8px; flex:1; min-height:80px; border-radius:10px; transition:background .12s}
+.tkcards.over{background:var(--p99-soft); outline:2px dashed var(--p99); outline-offset:2px}
+.tkempty{font-size:13px; color:var(--mut); text-align:center; padding:18px 8px; border:1px dashed var(--line2); border-radius:10px}
+.tkcards.over .tkempty{display:none}
+.tkph{height:56px; border-radius:10px; border:2px dashed var(--p99); background:var(--surf); opacity:.7; flex:none}
+.tkmore{min-height:36px; font-size:13px}
+@media (min-width:700px){ .tkboard{display:grid; grid-template-columns:repeat(5, minmax(210px, 1fr)); overflow-x:auto; scroll-snap-type:none; margin:0; padding-left:0; padding-right:0} .tkcol{flex:none; min-height:360px} }
+
+/* a card */
+.tkcard{background:var(--surf); border:1px solid var(--line); border-radius:10px; box-shadow:var(--shadow-xs); padding:10px 10px 10px 12px; display:grid; gap:6px; cursor:grab;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:pan-x pan-y}
+.tkcard:hover{border-color:var(--line2)}
+.tkcard:active{cursor:grabbing}
+.tkcard.overdue{border-left:4px solid var(--bad-dot)} .tkcard.today{border-left:4px solid var(--warn-dot)}
+.tkcard.done b{text-decoration:line-through; color:var(--mut)}
+.tkcard.dragging{opacity:.35}
+.tkcard .tkt{display:flex; gap:6px; align-items:flex-start}
+.tkcard .tkt b{flex:1; min-width:0; font-size:15px; line-height:21px; font-weight:600; overflow-wrap:anywhere}
+.tkcard .m{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+.tkcard .m:empty{display:none}
+.tkcard .chip{font-size:12px; min-height:20px; padding:0 7px}
+.tkcard .c2own{font-size:13px}
+.tkmove{flex:none; width:32px; height:32px; margin:-4px -4px 0 0; border-radius:8px; border:0; background:transparent; color:var(--mut); display:grid; place-items:center}
+.tkmove:hover{background:var(--surf2); color:var(--ink)}
+.tkghost{position:fixed; z-index:30; pointer-events:none; box-shadow:0 12px 28px rgba(0,0,0,.18); transform:rotate(2deg); opacity:.95}
+
+/* the move sheet (phone) */
+.tkmovegrid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px}
+.tkmovegrid .btn{min-height:52px; font-size:16px}
+.tkmovegrid .btn.on{background:var(--p99-soft); border-color:var(--p99); color:var(--p99-deep)}
+.tkseg .btn{min-width:0; padding:0 8px}
+
+/* phone: the board first — the add form opens while you type, the four tiles move below the board */
+@media (max-width:699px){
+  .tkpage > .grid2{order:9}
+  .tkpage .c2qa:not(:focus-within):not(.has) .c2qa-r2, .tkpage .c2qa:not(:focus-within):not(.has) > a{display:none}
+  .tkctl select.in{min-width:0; flex:1 1 40%}
+}

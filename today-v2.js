@@ -23,7 +23,7 @@ function viewTodayStore() {
     <div class="tiny mut" style="margin-top:8px">${at ? `Newest sale in the system: ${esc(at)}` : "No sales synced yet"}</div>
     ${typeof sb !== "undefined" ? `<div style="margin-top:10px"><button class="btn" ${SYNC.busy ? "disabled" : ""} onclick="syncNow()">${SYNC.busy ? "Updating…" : "Update"}</button>${SYNC.msg ? ` <span class="tiny mut">${esc(SYNC.msg)}</span>` : ""}</div>` : ""}</section>`;
   const openT = S.tickets.filter(t => t.status !== "done"), high = openT.filter(t => t.priority === "high");
-  const tasks = S.tasks.filter(t => t.status !== "done"), over = tasks.filter(t => t.due && t.due < d);
+  const tasks = S.tasks.filter(t => t.status !== "done" && (t.store || "P99") === "P99")   /* Today is Pizza 99's day; the other venues live on the Tasks board */, over = tasks.filter(t => t.due && t.due < d);
   const nightly = ITEMS.filter(i => i.nightly), draft = S.draft, counted = draft ? Object.keys(draft.lines).length : 0;
   const trWait = typeof trAwaitingMe === "function" ? trAwaitingMe() : [];
   const tiles = `<div class="grid2">${tile("Count tonight", counted ? `${counted}/${nightly.length}` : `${nightly.length}`, counted ? "in progress, continue" : "short list at closing", "")}${tile("Tickets open", `${openT.length}`, high.length ? `${high.length} high` : "none urgent", "")}${tile("To-dos open", `${tasks.length}`, over.length ? `${over.length} overdue` : "none overdue", "")}${tile("Stock in / out", `${trWait.length}`, trWait.length ? '<span class="dl down"><i>▼</i>to confirm</span>' : "nothing waiting", "")}</div>`
@@ -62,7 +62,7 @@ function viewToday() {
   const tiles = `<div class="grid2">${runTile}${gapTile}${boxTile}${countTile}</div>`;
   /* needs attention */
   const openT = S.tickets.filter(t => t.status !== "done"), high = openT.filter(t => t.priority === "high");
-  const tasks = S.tasks.filter(t => t.status !== "done"), over = tasks.filter(t => t.due && t.due < d), blocked = tasks.filter(t => t.status === "blocked");
+  const tasks = S.tasks.filter(t => t.status !== "done" && (t.store || "P99") === "P99")   /* Today is Pizza 99's day; the other venues live on the Tasks board */, over = tasks.filter(t => t.due && t.due < d), blocked = tasks.filter(t => t.status === "blocked");
   const A = [];
   if (behind) A.push(attnItem("▼", "bad", `UTAK data is ${behind} day${behind > 1 ? "s" : ""} behind`, `newest day in the database: ${esc(dayName(LAST_DAY))}`, "syncNow()"));
   if (RUN.rows && !todayRun && hour >= 11) A.push(attnItem("○", "warn", "No morning run recorded today", "Cherry's store walk usually lands by 10:30", "salesTab='run';go('#/sales')"));
@@ -98,7 +98,7 @@ function viewMore() {
   </div><div class="tiny mut" style="margin-top:8px">Sales come in every night at 05:30; Sync now reads the day so far.</div><div style="margin-top:10px"><button class="btn ${behind ? "primary" : ""}" ${SYNC.busy ? "disabled" : ""} onclick="syncNow()">${SYNC.busy ? "Syncing…" : "Sync now"}</button> ${typeof Sync !== "undefined" && Sync.on ? `<button class="btn" onclick="Sync.reload()">Reload records</button>` : ""}</div></section>`;
   const group = (title, rows) => `<section class="card mg"><h3>${title}</h3><div class="list">${rows.join("")}</div></section>`;
   const daily = group("Every day", [row("Store walk", "Cherry's morning run, the old form", "go('#/walk')"), row("Morning run results", "from the database, with the cash gap", "salesTab='run';go('#/sales')"), row("Receive a delivery", "at the store or at Head Office", "go('#/receive')"), row("Stock in / out", "Head Office releases, the store confirms", "go('#/transfers')")]);
-  const review = group("Review", [row("Transactions", "every ticket, cash box without a sale", "salesTab='txns';go('#/sales')"), ...(role() === "master" ? [row("Finance", "expenses, payables, the book", "go('#/finance')")] : []), row("Variance", "counted against expected", "go('#/variance')"), row("Tickets", "problems and repairs", "go('#/report')"), row("To-do list", "", "go('#/tasks')")]);
+  const review = group("Review", [row("Transactions", "every ticket, cash box without a sale", "salesTab='txns';go('#/sales')"), ...(role() === "master" ? [row("Finance", "expenses, payables, the book", "go('#/finance')")] : []), row("Variance", "counted against expected", "go('#/variance')"), row("Tickets", "problems and repairs", "go('#/report')"), row("Tasks", "the board for every venue", "go('#/tasks')")]);
   const me2 = group("This device", [
     `<button class="row tap" onclick="S.theme=S.theme==='dark'?'light':'dark';save();applyTheme();render()"><div class="main"><div class="name">Dark theme</div><div class="meta">easier in a dim kitchen</div></div><span class="sw ${S.theme === "dark" ? "on" : ""}"><i></i></span></button>`,
     row("Put a name on my entries", `optional · ${esc(me().name)} now`, "go('#/who')"),
@@ -107,7 +107,7 @@ function viewMore() {
     `<button class="row tap" onclick="if(confirm('Reset everything typed on this device?')){Store.reset();location.hash='#/who';location.reload()}"><div class="main"><div class="name band-bad">Reset this device</div><div class="meta">clears counts, receipts, tickets and photos typed here</div></div></button>`]);
   const owner = role() === "master";
   const saved = typeof Sync !== "undefined" && Sync.on ? `<div class="tiny mut" style="margin:0 0 8px">${esc(Sync.state().label === "all saved" ? "Everything typed here is saved to the database." : Sync.state().label)}</div>` : "";
-  return shell("More", `${esc(p.name)} · ${esc(p.position)}`, (owner ? health : saved) + (owner ? daily : role() === "walk" ? group("Every day", [row("Store walk", "the morning run", "go('#/walk')"), row("Delivery at Head Office", "a supplier dropped goods at the office", "go('#/receive')"), row("Stock out to a store", "release, or confirm a store's pull-out", "go('#/transfers')")]) : group("Every day", [row("Stock in / out", "pull-outs from Head Office or another store", "go('#/transfers')"), row("Tickets", "problems and repairs", "go('#/report')"), row("To-do list", "", "go('#/tasks')")])) + (owner ? review : "") + me2 + `<div class="tiny mut">Pizza 99 OS v0.9 · what you see depends on your login: owners, store team, Head Office.</div>`);
+  return shell("More", `${esc(p.name)} · ${esc(p.position)}`, (owner ? health : saved) + (owner ? daily : role() === "walk" ? group("Every day", [row("Store walk", "the morning run", "go('#/walk')"), row("Delivery at Head Office", "a supplier dropped goods at the office", "go('#/receive')"), row("Stock out to a store", "release, or confirm a store's pull-out", "go('#/transfers')")]) : group("Every day", [row("Stock in / out", "pull-outs from Head Office or another store", "go('#/transfers')"), row("Tickets", "problems and repairs", "go('#/report')"), row("Tasks", "the board for every venue", "go('#/tasks')")])) + (owner ? review : "") + me2 + `<div class="tiny mut">Rocket OS v0.10 · what you see depends on your login: owners, store team, Head Office.</div>`);
 }
 
 

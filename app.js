@@ -22,7 +22,7 @@ const me = () => Store.person(S.me);
 /* ROLES_ON = false (Stefan, 2026-10-17 via the plugin message): the app runs as a one-person show — whoever is signed in sees and encodes everything.
    The name is kept only for "who did it". Flip to true to restore crew / lead / walk / office views. */
 const ROLES_ON = false;
-const role = () => window.DB_ROLE ? window.DB_ROLE : (!me() ? "crew" : ROLES_ON ? me().role : "master"); /* signed in: the role comes from the database */
+const role = () => { const r = window.DB_ROLE ? window.DB_ROLE : (!me() ? "crew" : ROLES_ON ? me().role : "master"); return r === "admin" ? "walk" : r; }; /* signed in: the role comes from the database. admin (Chris) gets the office screens of walk; the to-do board shows her every venue (migration 019) */
 const isOffice = () => ["walk", "admin", "master"].includes(role());
 const canManage = () => role() !== "crew";
 
@@ -63,7 +63,7 @@ function shell(title, sub, body, { back } = {}) {
   const openT = S.tickets.filter(t => t.status !== "done").length;
   const tabHTML = tabs.map(([id, label, icon, href]) => `<button class="${cur === id ? "on" : ""}" onclick="go('${href}')" aria-label="${label}">${id === "report" && openT ? `<span class="bdg">${openT}</span>` : ""}${ic(ICON[icon])}${label}</button>`).join("");
   return `
-  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Pizza 99 OS</div>${side.map(([id, label, icon, href]) => `<button class="${scur === id ? "on" : ""}" onclick="go('${href}')">${ic(ICON[icon], "sm")}${label}</button>`).join("")}</nav>
+  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Rocket OS</div>${side.map(([id, label, icon, href]) => `<button class="${scur === id ? "on" : ""}" onclick="go('${href}')">${ic(ICON[icon], "sm")}${label}</button>`).join("")}</nav>
   <div class="page">
     <header class="top">${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
@@ -84,7 +84,7 @@ function viewWho() {
   const names = PEOPLE.filter(p => p.id !== "store").map(p => `<button class="btn ${pinWho === p.id ? "primary" : ""}" onclick="S.me='${p.id}';save();go('#/today')">${esc(p.short)}<span class="tiny" style="margin-left:6px;opacity:.7">${esc(p.position)}</span></button>`).join("");
   const pad = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"].map(k => k === "" ? "<span></span>" : `<button class="btn" onclick="pinKey('${k}')">${k}</button>`).join("");
   return `<div class="who"><div class="box">
-    <div style="text-align:center"><span class="store-dot"></span><b>Pizza 99 OS</b><div class="mut small">Optional: pick your name so entries say who did them</div></div>
+    <div style="text-align:center"><span class="store-dot"></span><b>Rocket OS</b><div class="mut small">Optional: pick your name so entries say who did them</div></div>
     <div class="names">${names}</div>
   </div></div>`;
 }
@@ -299,23 +299,7 @@ function viewTicket_v1(id) {
     ${canManage() ? `<section class="card"><h3>Status</h3><div class="seg">${["open", "scheduled", "in_progress", "done"].map(s => `<button class="btn ${t.status === s ? "on" : ""}" onclick="_set('status','${s}')">${s.replace("_", " ")}</button>`).join("")}</div>${t.status === "scheduled" ? `<div class="field" style="margin-top:10px"><label>Scheduled day</label><input class="in" type="date" value="${t.scheduled || ""}" onchange="_set('scheduled',this.value)"></div>` : ""}</section>` : `<div class="mut small">Maintenance updates the status; you see it change here.</div>`}`, { back: "#/report" });
 }
 
-/* ---------- TASKS ---------- */
-let ntask = null;
-function viewTasks_v1() {
-  const groups = [["in_progress", "In progress"], ["open", "Open"], ["blocked", "Blocked"], ["done", "Done"]];
-  const row = t => `<button class="row tap" onclick="go('#/task/${t.id}')"><div class="main"><div class="name">${esc(t.title)}</div><div class="meta">${t.owner ? esc(Store.person(t.owner).short) : "no owner"}${t.due ? ` · due ${dayName(t.due)}` : ""}${t.due && t.due < today() && t.status !== "done" ? ` · <span class="band-bad">overdue</span>` : ""} · ${esc(t.source || "")}</div></div>${chip(t.status === "blocked" ? "bad" : t.status === "in_progress" ? "info" : t.status === "done" ? "ok" : "", t.status.replace("_", " "))}</button>`;
-  return shell("Tasks", "Pizza 99 to-do list", `<button class="btn primary full" onclick="ntask={title:'',detail:'',owner:S.me,due:'',status:'open'};go('#/task/new')">New task</button>${groups.map(([s, l]) => { const ts = S.tasks.filter(t => t.status === s); return ts.length ? `<section class="card"><h3>${l} (${ts.length})</h3><div class="list">${ts.map(row).join("")}</div></section>` : ""; }).join("")}`);
-}
-function viewTask_v1(id) {
-  const owners = cur => PEOPLE.map(p => `<option value="${p.id}" ${cur === p.id ? "selected" : ""}>${esc(p.short)}</option>`).join("");
-  if (id === "new") { if (!ntask) ntask = { title: "", detail: "", owner: S.me, due: "", status: "open" };
-    return shell("New task", "", `<div class="field"><label>Task</label><input class="in" value="${esc(ntask.title)}" oninput="ntask.title=this.value"></div><div class="field"><label>Detail</label><textarea class="in" oninput="ntask.detail=this.value">${esc(ntask.detail)}</textarea></div><div class="field"><label>Owner</label><select class="in" onchange="ntask.owner=this.value">${owners(ntask.owner)}</select></div><div class="field"><label>Due</label><input class="in" type="date" value="${ntask.due}" onchange="ntask.due=this.value"></div>
-      <div class="bottom-act"><button class="btn primary full" ${ntask.title.trim() ? "" : "disabled"} onclick="S.tasks.unshift({id:'k-'+Date.now(),title:ntask.title.trim(),detail:ntask.detail,owner:ntask.owner,due:ntask.due||null,status:'open',source:Store.person(S.me).short});ntask=null;save();go('#/tasks')">Add task</button></div>`, { back: "#/tasks" }); }
-  const t = S.tasks.find(x => x.id === id); if (!t) return viewTasks(); window._tset = (f, v) => { t[f] = v; if (f === "status" && v === "done") t.done_at = nowISO(); save(); render(); };
-  return shell(t.title, `${t.owner ? esc(Store.person(t.owner).short) : "no owner"}${t.due ? " · due " + dayName(t.due) : ""} · ${esc(t.source || "")}`, `${t.detail ? `<section class="card">${esc(t.detail)}</section>` : ""}
-    <section class="card"><h3>Status</h3><div class="seg">${["open", "in_progress", "blocked", "done"].map(s => `<button class="btn ${t.status === s ? "on" : ""}" onclick="_tset('status','${s}')">${s.replace("_", " ")}</button>`).join("")}</div></section>
-    <section class="card"><h3>Owner · due</h3><div class="pair"><select class="in" onchange="_tset('owner',this.value)">${owners(t.owner)}</select><input class="in" type="date" value="${t.due || ""}" onchange="_tset('due',this.value)"></div></section>`, { back: "#/tasks" });
-}
+/* ---------- TASKS: tasks-v2.js (the company-wide board, v0.10.0) ---------- */
 
 /* ---------- denomination keypad (cash + walk) ---------- */
 let cpad = null; let cpadTarget = null;

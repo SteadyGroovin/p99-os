@@ -214,7 +214,7 @@ const Store = {
   prunePhotos(n) { const ids = Object.keys(this._s.photos); ids.slice(0, Math.max(0, ids.length - n)).forEach(id => delete this._s.photos[id]); },
   reset() { localStorage.removeItem(this.key); this._s = null; },
   item(id) { return ITEMS.find(i => i.id === id); },
-  person(id) { return PEOPLE.find(p => p.id === id); },
+  person(id) { return PEOPLE.find(p => p.id === id) || ((this._s && this._s.people) || []).find(p => p.id === id); },   /* people from tasks_load (other venues) after the local list */
   localLast(itemId) { const cs = this.load().counts.filter(c => c.submitted && c.lines[itemId] != null).sort((a, b) => a.day < b.day ? 1 : -1); return cs[0] ? { day: cs[0].day, qty: cs[0].lines[itemId], seed: !!cs[0].seed } : null; },
   walkLast(itemId) { const rows = (window.WALK_ROWS || []).filter(r => r.item_key === itemId); return rows.length ? rows.reduce((a, b) => b.day > a.day ? b : a) : null; }, /* Cherry's morning quick counts, mirrored from the old OS (walk_quick_count) */
   /* newest of a count typed in this app and Cherry's morning count. Her count is taken ~10:00 after the business day closed at 04:00, so sales are counted from the day AFTER the previous business day (calcDay = day - 1). */

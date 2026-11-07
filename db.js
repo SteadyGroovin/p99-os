@@ -13,7 +13,7 @@ function loadScript(src) {
 }
 function bootScreen(html) {
   bootEl.innerHTML = `<div class="who"><div class="box">
-    <div style="text-align:center;margin-bottom:16px"><span class="store-dot"></span><b>Pizza 99 OS</b></div>${html}</div></div>`;
+    <div style="text-align:center;margin-bottom:16px"><span class="store-dot"></span><b>Rocket OS</b></div>${html}</div></div>`;
 }
 function signInForm(msg) {
   bootScreen(`<div class="mut small" style="text-align:center">Sign in with your e-mail and password.</div>
@@ -39,13 +39,24 @@ function signInForm(msg) {
 }
 async function signOut() { await sb.auth.signOut(); location.hash = ""; location.reload(); }
 
+/* the store's records (os_load, Pizza 99) plus the company-wide to-do board (tasks_load, every venue the login may see; migration 019) */
+async function loadRecords() {
+  const [a, b] = await Promise.all([sb.rpc("os_load", { p_store: "P99", p_days: 120 }), sb.rpc("tasks_load")]);
+  if (a.error) return { error: a.error }; if (b.error) return { error: b.error };
+  const L = a.data, T = b.data || {};
+  L.tasks = T.tasks || []; L.people = T.people || []; L.stores = T.stores || []; L.me = T.me || null;
+  window.DB_ME = T.me && T.me.key || null;
+  return { data: L };
+}
+window.loadRecords = loadRecords;
+
 async function start() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return signInForm();
   bootScreen(`<div class="mut" style="text-align:center">Loading sales from the database…</div>`);
   const { data: member, error: mErr } = await sb.from("os_member").select("role").maybeSingle();
   if (mErr || !member) return bootScreen(`<div><b>Signed in as ${bootEsc(session.user.email)}</b></div>
-    <div class="small mut" style="margin:8px 0 16px">This account is not on the Pizza 99 OS member list yet. Ask Stefan to add it.</div>
+    <div class="small mut" style="margin:8px 0 16px">This account is not on the Rocket OS member list yet. Ask Stefan to add it.</div>
     <button class="btn full" onclick="signOut()">Sign out</button>`);
   window.DB_ROLE = member.role; /* master | lead | walk | crew — the database enforces it too (migration 011); this only shapes the screens */
   let data = { source: "", days: {} };
@@ -59,11 +70,11 @@ async function start() {
   if (member.role === "master") try { const { data: wq } = await sb.from("walk_quick_count").select("day,item_key,qty").eq("store", "P99").order("day", { ascending: false }).limit(2000); window.WALK_ROWS = wq || []; } catch (e) { window.WALK_ROWS = []; } /* Cherry's morning counts feed Stock */
   window.DB_USER = session.user.email;
   { /* the store's own records: receipts, counts, checklist ticks, tickets, tasks, cash counts, transfers (migration 016; sync.js keeps them in step) */
-    const { data: L, error: lErr } = await sb.rpc("os_load", { p_store: "P99", p_days: 120 });
+    const { data: L, error: lErr } = await loadRecords();
     if (lErr) return bootScreen(`<span class="band-bad">Could not load the store's records: ${bootEsc(lErr.message)}</span><div class="small mut" style="margin-top:8px">Nothing was changed. Check the connection and open the app again.</div>`);
     window.OS_LOADED = L;
   }
   bootEl.innerHTML = "";
-  for (const s of ["data.js", "icons.js", "sync.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "finance-v2.js", "walk-v2.js", "transfer-v2.js", "app.js"]) await loadScript(s);
+  for (const s of ["data.js", "icons.js", "sync.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "tasks-v2.js", "finance-v2.js", "walk-v2.js", "transfer-v2.js", "app.js"]) await loadScript(s);
 }
 start().catch(e => bootScreen(`<span class="band-bad">${bootEsc(e.message)}</span>`));

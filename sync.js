@@ -25,15 +25,14 @@ const Sync = {
       st.receipts = arr("receipt", L.receipts, r => { r.photo = regPhoto(r.photo_path); r.amount = r.amount == null ? null : +r.amount; r.lines.forEach(l => { l.qty = +l.qty; if (l.price != null) l.price = +l.price; }); });
       st.counts = arr("count", L.counts, r => { for (const k in r.lines) r.lines[k] = +r.lines[k]; r.submitted = r.submitted ? this.local(r.submitted) : r.submitted; r.started = r.started ? this.local(r.started) : r.started; });
       st.tickets = arr("ticket", L.tickets, r => { r.photo = regPhoto(r.photo_path); r.fixPhoto = regPhoto(r.fix_photo_path); r.created = this.local(r.created); if (r.closed) r.closed = this.local(r.closed); });
-      st.tasks = arr("task", L.tasks, r => { r.created = this.local(r.created); if (r.done_at) r.done_at = this.local(r.done_at); });
+      st.tasks = arr("task", L.tasks, r => { r.created = this.local(r.created); if (r.done_at) r.done_at = this.local(r.done_at); r.store = r.store || "GROUP"; r.sort = +r.sort || 0; });
+      st.people = L.people || st.people || []; st.stores = L.stores || st.stores || [];   /* tasks_load(): everyone who can own a task, every venue (v0.10.0) */
       st.cash = arr("cash", L.cash, r => { r.photo = regPhoto(r.photo_path); r.total = +r.total; ["fund", "pos", "pos_gcash", "gcash", "variance"].forEach(k => { if (r[k] != null) r[k] = +r[k]; }); r.at = this.local(r.at); for (const k in r.d) r.d[k] = +r.d[k]; });
       st.runs = {}; Object.keys(L.runs || {}).forEach(k => { const r = L.runs[k]; const ph = {}; Object.keys(r.ph || {}).forEach(pk => { const id = regPhoto(r.ph[pk]); if (id) ph[pk] = id; }); Object.values(r.done || {}).forEach(d => { if (d.at) d.at = this.local(d.at); }); st.runs[k] = pending["checklist_run:" + k] || { done: r.done || {}, ph }; });
       st.transfers = arr("transfer", L.transfers, r => { r.photo = regPhoto(r.photo_path); r.lines.forEach(l => { if (l.released != null) l.released = +l.released; if (l.received != null) l.received = +l.received; }); });
       st.locations = L.locations || []; st.held = (L.held || []).map(h => ({ location: h.location, item: h.item, on_hand: +h.on_hand, count_units: h.count_units == null ? null : +h.count_units }));
-      /* the HR to-do list seeded in data.js becomes real to-dos once, the first time an owner or lead opens the app with an empty task table */
-      if (!st.tasks.length && typeof SEED_TASKS !== "undefined" && ["master", "lead"].includes(window.DB_ROLE)) st.tasks = SEED_TASKS.map(t => Object.assign({}, t, { created: t.created || Sync.local(new Date().toISOString()) }));
-      const seeded = st.tasks.filter(t => !t.synced && /^k-\d{1,2}$/.test(t.id)).map(t => "task:" + t.id);
-      this.snapAll(); seeded.forEach(k => delete this.snap[k]); this.lastLoad = new Date(); Store.save();
+      /* v0.10.0: no more re-seeding the HR list into an empty table — a store login that sees no tasks would have re-created them */
+      this.snapAll(); this.lastLoad = new Date(); Store.save();
       this.fetchPhotos();
     } else { const st = Store.load(); st.transfers = st.transfers || []; st.locations = st.locations || [{ code: "P99", name: "Pizza 99", kind: "store" }, { code: "HO", name: "Head Office", kind: "office" }, { code: "DC", name: "Dragon Crepe", kind: "store" }, { code: "MCC", name: "My Crepes Cafe", kind: "store" }, { code: "MCBC", name: "My Crepes Beach Club", kind: "store" }, { code: "BK", name: "Burger Kong", kind: "store" }]; st.held = st.held || []; }
     const orig = Store.save.bind(Store); Store.save = () => { orig(); if (Sync.on) Sync.collect(); };
@@ -51,7 +50,7 @@ const Sync = {
     if (kind === "receipt") return { id: r.id, day: r.day, kind: r.kind, supplier: r.supplier, by: r.by, photo_path: ph(r.photo), amount: r.amount, location: r.location || null, invoice: r.invoice || null, lines: r.lines.map(l => ({ item: l.item, qty: l.qty, unit: unit(l.item), text: l.text || null, price: l.price == null ? null : l.price })) };
     if (kind === "count") { const units = {}; Object.keys(r.lines).forEach(k => units[k] = unit(k)); return { id: r.id, day: r.day, kind: r.kind, by: r.by, started: ts(r.started), submitted: ts(r.submitted), note: r.note || null, lines: r.lines, text: r.text || {}, units, var: r.var || null }; }
     if (kind === "ticket") return { id: r.id, title: r.title, note: r.note || null, priority: r.priority, status: r.status, by: r.by, created: ts(r.created), photo_path: ph(r.photo), fix_photo_path: ph(r.fixPhoto), assigned: r.assigned || null, scheduled: r.scheduled || null, closed: ts(r.closed), closed_note: r.closed_note || null, log: log(r.log) };
-    if (kind === "task") return { id: r.id, title: r.title, detail: r.detail || null, owner: r.owner || null, due: r.due || null, status: r.status, source: r.source || null, created: ts(r.created), done_at: ts(r.done_at), log: log(r.log) };
+    if (kind === "task") return { id: r.id, title: r.title, detail: r.detail || null, owner: r.owner || null, due: r.due || null, status: r.status, source: r.source || null, created: ts(r.created), done_at: ts(r.done_at), log: log(r.log), store: r.store || "P99", area: r.area || null, sort: +r.sort || 0 };
     if (kind === "cash") return { id: r.id, day: r.day, kind: r.kind, d: r.d, total: r.total, fund: r.fund, pos: r.pos, pos_gcash: r.pos_gcash, gcash: r.gcash, ref: r.ref || null, photo_path: ph(r.photo), variance: r.variance, reason: r.reason || null, by: r.by, at: ts(r.at) };
     if (kind === "checklist_run") { const phs = {}; Object.keys(r.ph || {}).forEach(k => { const p = ph(r.ph[k]); if (p) phs[k] = p; }); const done = {}; Object.keys(r.done || {}).forEach(k => done[k] = Object.assign({}, r.done[k], { at: ts(r.done[k].at) })); return { id: r.id, done, ph: phs }; }
     if (kind === "transfer") { const side = r._side || (r.received_at ? "receive" : "release"); return { id: r.id, from: r.from, to: r.to, day: r.day, side, by: side === "release" ? r.released_by : r.received_by, at: ts(side === "release" ? r.released_at : r.received_at), note: side === "release" ? r.released_note : r.received_note, photo_path: ph(r.photo), lines: r.lines.map(l => ({ item: l.item, qty: side === "release" ? l.released : l.received, unit: unit(l.item), text: l.text || null })).filter(l => l.qty != null) }; }
@@ -113,7 +112,7 @@ const Sync = {
     } catch (e) { /* thumbnails stay empty; the record is still there */ }
   },
   /* a fresh read of the database (More → Refresh); local unsent records are kept */
-  async reload() { if (typeof sb === "undefined" || !sb.rpc) return; const { data, error } = await sb.rpc("os_load", { p_store: "P99", p_days: 120 }); if (error) { this.err = error.message; return; } const ob = this.outbox; this.init(data); this.outbox = ob; this.put(this.K.outbox, ob); if (typeof render === "function") render(); },
+  async reload() { if (typeof sb === "undefined" || !sb.rpc || typeof loadRecords !== "function") return; const { data, error } = await loadRecords(); if (error) { this.err = error.message; return; } const ob = this.outbox; this.init(data); this.outbox = ob; this.put(this.K.outbox, ob); if (typeof render === "function") render(); },
 };
 /* the camera capture goes to the bucket as soon as it is taken; app.js (loaded after this file) calls hookPhoto() once takePhoto exists */
 Sync.hookPhoto = function () { if (typeof takePhoto !== "function" || takePhoto._synced) return; const _takePhoto = takePhoto; takePhoto = function (cb) { _takePhoto(id => { Sync.upload(id); cb(id); }); }; takePhoto._synced = true; };
