@@ -389,7 +389,10 @@ function render() {
     if ((r !== "master" && ownerOnly.includes(s0)) || (r === "walk" && !walkOk.includes(s0))) { location.hash = r === "walk" ? "#/walk" : "#/today"; return; }
   }
   if (/^#\/tasks?(\/|$)/.test(location.hash) && typeof viewTasks !== "function") { $("#app").innerHTML = `<div class="wrap"><section class="card"><b>A new version of Rocket OS is ready.</b><div class="small mut" style="margin:6px 0 12px">Part of the old version is still in this phone's cache.</div><button class="btn primary full" onclick="location.reload()">Reload</button></section></div>`; return; }
-  if (!S.me) { S.me = "store"; save(); } // no sign-in (Stefan, 2026-10-18): the app opens straight in; a name is optional, under More
+  /* signed in: the app is that person (v0.11.6, Stefan: "she should be named Cherry in the app"); entries carry their name.
+     Without a login (dev page) the app still opens as the store, a name optional under More (2026-10-18). */
+  if (window.DB_ME && Store.person(window.DB_ME)) { if (S.me !== window.DB_ME) { S.me = window.DB_ME; save(); } }
+  else if (!S.me) { S.me = "store"; save(); }
   if (seg[0] === "who") html = viewWho();
   else switch (seg[0]) {
     case "sales": html = viewSales(); break;
