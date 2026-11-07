@@ -178,31 +178,28 @@ function viewTasks() {
   if (TK.venue !== "all" && !venues.some(v => v.code === TK.venue)) TK.venue = "all";
   const inVenue = all.filter(t => TK.venue === "all" || tkStoreOf(t) === TK.venue);
   const act = inVenue.filter(tkActive), od = act.filter(t => tkOverdue(t, d)), wt = act.filter(t => t.status === "blocked"), dw = inVenue.filter(t => t.status === "done" && (t.done_at || "").slice(0, 10) >= wk);
-  const tiles = `<div class="grid2">
-    ${tile("Open", String(act.length), `${act.filter(t => t.status === "in_progress").length} doing · ${act.filter(t => t.status === "next").length} next`, "")}
-    ${tile("Overdue", String(od.length), od.length ? chip("bad", "▲ past due date") : chip("ok", "✓ none"), "")}
-    ${tile("Waiting", String(wt.length), wt.length ? esc(wt[0].title) : `<span class="mut">none</span>`, "")}
-    ${tile("Done · 7 days", String(dw.length), `<span class="mut">${inVenue.filter(t => t.status === "done").length} done in total</span>`, "")}
-  </div>`;
+  /* v0.10.2 (Stefan: "see more of the actual board"): no tiles, one toolbar — filters left, the add box right; its extra fields open in a small panel only while you type */
   const openIn = code => all.filter(t => tkActive(t) && tkStoreOf(t) === code).length;
   const pills = `<div class="rng tkvenues" role="tablist"><button class="${TK.venue === "all" ? "on" : ""}" onclick="tkSet('venue','all')">All venues <span class="n">${all.filter(tkActive).length}</span></button>${venues.map(v => `<button class="${TK.venue === v.code ? "on" : ""}" style="--c:${esc(v.color || "#A4A7AE")}" onclick="tkSet('venue','${v.code}')"><i></i>${esc(v.code === "GROUP" ? "Group" : v.name)} <span class="n">${openIn(v.code)}</span></button>`).join("")}</div>`;
   const owners = [...new Set(all.map(t => t.owner).filter(Boolean))].sort((a, b) => fname(a).localeCompare(fname(b)));
   const areas = [...new Set(inVenue.map(t => t.area).filter(Boolean))].sort();
-  const ctl = `<div class="tkctl">${c2tabs([["board", "Board"], ["list", "List"]], TK.view, "tkView")}
+  const qStore = TK.qa.store || (TK.venue !== "all" ? TK.venue : "GROUP");
+  const dueOpts = [["", "No date"], [d, "Today"], [addDays(d, 1), "Tomorrow"], [addDays(d, 7), "In a week"]];
+  const add = `<div class="tkadd ${TK.qa.title ? "has" : ""}"><div class="tkadd-r"><input class="in" id="qat" placeholder="Add a task…" value="${esc(TK.qa.title)}" oninput="TK.qa.title=this.value;this.closest('.tkadd').classList.toggle('has',!!this.value)" onkeydown="if(event.key==='Enter')tkQuickAdd();if(event.key==='Escape')this.blur()"><button class="btn primary" onclick="tkQuickAdd()">Add</button></div>
+    <div class="tkadd-p"><select class="in" aria-label="Venue" onchange="TK.qa.store=this.value">${tkVenueOpts(qStore)}</select><select class="in" aria-label="Owner" onchange="TK.qa.owner=this.value">${tkPersonOpts(TK.qa.owner, "No owner yet")}</select>
+      <input class="in" list="tkareas" placeholder="Area" value="${esc(TK.qa.area)}" oninput="TK.qa.area=this.value" aria-label="Area">${tkAreaList()}
+      <select class="in" aria-label="Due" onchange="TK.qa.due=this.value">${dueOpts.map(([v, l]) => `<option value="${v}" ${(TK.qa.due || "") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <a class="tiny" href="#/task/new" onclick="ntask={title:TK.qa.title,detail:'',owner:TK.qa.owner||'',due:TK.qa.due,store:TK.qa.store||(TK.venue!=='all'?TK.venue:'GROUP'),area:TK.qa.area,status:'open'}">More detail ›</a></div></div>`;
+  const bar = `<div class="tkbar">${c2tabs([["board", "Board"], ["list", "List"]], TK.view, "tkView")}
     <select class="in" aria-label="Owner" onchange="tkSet('owner',this.value)"><option value="all">Everyone</option>${owners.map(o => `<option value="${o}" ${TK.owner === o ? "selected" : ""}>${esc(fname(o) || o)}</option>`).join("")}<option value="none" ${TK.owner === "none" ? "selected" : ""}>No owner</option></select>
     <select class="in" aria-label="Area" onchange="tkSet('area',this.value)"><option value="all">All areas</option>${areas.map(a => `<option ${TK.area === a ? "selected" : ""}>${esc(a)}</option>`).join("")}</select>
-    <div class="tkq"><button class="${TK.quick === "overdue" ? "on" : ""}" onclick="tkQuick('overdue')">Overdue</button><button class="${TK.quick === "mine" ? "on" : ""}" onclick="tkQuick('mine')">Mine</button></div>
-    ${TK.view === "list" ? `${c2tabs([["due", "By due date"], ["person", "By person"]], TK.listBy, "tkListBy")}${c2tabs([["active", "To do"], ["done", "Done"], ["all", "All"]], TK.show, "tkShow")}` : ""}</div>`;
-  const qStore = TK.qa.store || (TK.venue !== "all" ? TK.venue : "GROUP");
-  const quick = `<section class="card c2qa ${TK.qa.title ? "has" : ""}"><div class="c2qa-r"><input class="in" id="qat" placeholder="Add a task…" value="${esc(TK.qa.title)}" oninput="TK.qa.title=this.value;this.closest('.c2qa').classList.toggle('has',!!this.value)" onkeydown="if(event.key==='Enter')tkQuickAdd()"><button class="btn primary" onclick="tkQuickAdd()">Add</button></div>
-    <div class="c2qa-r2"><select class="in" aria-label="Venue" onchange="TK.qa.store=this.value">${tkVenueOpts(qStore)}</select><select class="in" aria-label="Owner" onchange="TK.qa.owner=this.value">${tkPersonOpts(TK.qa.owner, "No owner yet")}</select>
-      <input class="in tkareain" list="tkareas" placeholder="Area" value="${esc(TK.qa.area)}" oninput="TK.qa.area=this.value" aria-label="Area">${tkAreaList()}
-      <div class="c2picks sm">${[["today", "Today"], ["tomorrow", "Tomorrow"], ["week", "In a week"], ["none", "No date"]].map(([k, l]) => { const v = k === "today" ? d : k === "tomorrow" ? addDays(d, 1) : k === "week" ? addDays(d, 7) : ""; return `<button class="${(TK.qa.due || "") === v ? "on" : ""}" onclick="tkQuickDue('${k}')">${l}</button>`; }).join("")}</div></div>
-    <a class="tiny" href="#/task/new" onclick="ntask={title:TK.qa.title,detail:'',owner:TK.qa.owner||'',due:TK.qa.due,store:TK.qa.store||(TK.venue!=='all'?TK.venue:'GROUP'),area:TK.qa.area,status:'open'}">More detail ›</a></section>`;
+    <div class="tkq"><button class="${TK.quick === "overdue" ? "on" : ""} ${od.length ? "bad" : ""}" onclick="tkQuick('overdue')">Overdue <span class="n">${od.length}</span></button><button class="${TK.quick === "mine" ? "on" : ""}" onclick="tkQuick('mine')">Mine</button></div>
+    ${TK.view === "list" ? `${c2tabs([["due", "By due date"], ["person", "By person"]], TK.listBy, "tkListBy")}${c2tabs([["active", "To do"], ["done", "Done"], ["all", "All"]], TK.show, "tkShow")}` : ""}
+    ${add}</div>`;
   const ts = tkFiltered();
   const body = TK.view === "board" ? tkBoard(ts, d) : (tkList(ts, d) || `<div class="card mut small">Nothing in this view.</div>`);
-  const sub = TK.venue === "all" ? `${act.length} open · every venue` : `${act.length} open · ${esc(tkVenue(TK.venue).name)}`;
-  return shell("Tasks", sub, `<div class="tkpage">${pills}${tiles}${quick}${ctl}${body}</div>`);
+  const sub = `${act.length} open · ${od.length ? `<span class="band-bad">${od.length} overdue</span> · ` : ""}${wt.length} waiting · ${dw.length} done this week · ${TK.venue === "all" ? "every venue" : esc(tkVenue(TK.venue).name)}`;
+  return shell("Tasks", sub, `<div class="tkpage ${TK.view}">${pills}${bar}${body}</div>`);
 }
 function tkView(k) { TK.view = k; render(); }
 function tkListBy(k) { TK.listBy = k; render(); }
