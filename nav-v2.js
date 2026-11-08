@@ -14,12 +14,12 @@ const moneyOK = () => role() === "master" || officeLogin();
    More lists every module in groups (like Zoho's More Modules); "Customize" picks the three on the bottom bar. Inside a group a row of sibling shortcuts stays. */
 const MODULES = [
   ["items", "Items", "#/items", "box", "Items"], ["recipes", "Recipes", "#/recipes", "list", "Items"], ["sizes", "Pack sizes", "#/sizes", "box", "Items"],
-  ["stock", "Stock overview", "#/stock", "grid", "Inventory"], ["count", "Count", "#/count", "grid", "Inventory"], ["receive", "Receive", "#/receive", "box", "Inventory"], ["transfers", "Transfers", "#/transfers", "box", "Inventory"], ["variance", "Variance", "#/variance", "grid", "Inventory"],
-  ["suppliers", "Suppliers", "#/suppliers", "coins", "Purchases"], ["order", "Order today", "#/order", "coins", "Purchases"], ["approve", "Approve orders", "#/approve", "check", "Purchases"], ["bills", "Bills & expenses", "#/bills", "coins", "Purchases"], ["purchases", "Other purchases", "#/purchases", "coins", "Purchases"],
-  ["sales", "Sales", "#/sales", "cash", "Sales"], ["cash", "Cash counts", "#/cash", "cash", "Sales"], ["walk", "Morning run", "#/walk", "sun", "Sales"],
-  ["money", "Banking", "#/money", "finance", "Banking & accountant"], ["finance", "Finance & P&L", "#/finance", "finance", "Banking & accountant"], ["accounts", "Chart of accounts", "#/accounts", "finance", "Banking & accountant"], ["books", "Opening balances & month close", "#/books", "finance", "Banking & accountant"],
+  ["stock", "Stock", "#/stock", "grid", "Inventory"], ["count", "Count", "#/count", "grid", "Inventory"], ["receive", "Receive", "#/receive", "box", "Inventory"], ["transfers", "Transfers", "#/transfers", "box", "Inventory"], ["variance", "Variance", "#/variance", "grid", "Inventory"],
+  ["suppliers", "Suppliers", "#/suppliers", "coins", "Purchases"], ["order", "Order", "#/order", "coins", "Purchases"], ["approve", "Approve", "#/approve", "check", "Purchases"], ["bills", "Bills", "#/bills", "coins", "Purchases"], ["purchases", "Purchases", "#/purchases", "coins", "Purchases"],
+  ["sales", "Sales", "#/sales", "cash", "Sales"], ["cash", "Cash count", "#/cash", "cash", "Sales"], ["walk", "Morning run", "#/walk", "sun", "Sales"],
+  ["money", "Funds", "#/money", "finance", "Money"], ["finance", "P&L", "#/finance", "finance", "Money"], ["accounts", "Accounts", "#/accounts", "finance", "Money"], ["books", "Month close", "#/books", "finance", "Money"],
   ["tasks", "Tasks", "#/tasks", "list", "Operations"], ["report", "Tickets", "#/report", "alert", "Operations"], ["clean", "Clean", "#/clean", "check", "Operations"],
-  ["users", "Users & roles", "#/users", "dots", "Settings"], ["stores", "Stores & places", "#/stores", "dots", "Settings"], ["rules", "Order rules", "#/rules", "dots", "Settings"], ["more", "Device, alerts & data health", "#/more", "dots", "Settings"],
+  ["users", "Users", "#/users", "dots", "Settings"], ["stores", "Stores", "#/stores", "dots", "Settings"], ["rules", "Rules", "#/rules", "dots", "Settings"], ["more", "Device", "#/more", "dots", "Settings"],
 ];
 const GROUPS = [...new Set(MODULES.map(m => m[4]))];
 const SEG_MODULE = { item: "items", recipe: "recipes", receipts: "receive", transfer: "transfers", task: "tasks", supplier: "suppliers" };
@@ -38,7 +38,7 @@ function pins() {
 const homeHref = () => role() === "walk" && !officeLogin() ? "#/walk" : "#/today";
 const modIcon = id => (MODULES.find(m => m[0] === id) || [])[3] || "dots";
 const modLabel = id => (MODULES.find(m => m[0] === id) || [])[1] || id;
-const modShort = id => ({ "Stock overview": "Stock", "Bills & expenses": "Bills", "Order today": "Order", "Approve orders": "Approve", "Other purchases": "Purchases", "Cash counts": "Cash", "Morning run": "Run", "Finance & P&L": "Finance", "Chart of accounts": "Accounts", "Opening balances & month close": "Books", "Users & roles": "Users", "Stores & places": "Stores", "Order rules": "Rules", "Device, alerts & data health": "Device" })[modLabel(id)] || modLabel(id);
+const modShort = id => modLabel(id);   /* Stefan: short names everywhere */
 
 /* the one place that says who may open what (the database refuses the data anyway) */
 function canOpen(s0) {
@@ -77,7 +77,7 @@ function viewModules() {
     return `<section class="card mg"><h3>${esc(g)}</h3><div class="list">${ms.map(x => modCustom
       ? `<button class="row tap" onclick="pinToggle('${x[0]}')"><div class="main"><div class="name">${esc(x[1])}</div></div>${ps.includes(x[0]) ? chip("info", "on the bar") : `<span class="tiny mut">add</span>`}</button>`
       : `<button class="row tap" onclick="go('${x[2]}')"><div class="main"><div class="name">${esc(x[1])}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("")}</div></section>`; }).join("");
-  return shell("More modules", modCustom ? "tap three modules for the bottom bar" : "", `
+  return shell("More", modCustom ? "tap three modules for the bottom bar" : "", `
     <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn ${modCustom ? "primary" : ""} sm" onclick="modCustom=!modCustom;render()">${modCustom ? "Done" : "Customize"}</button></div>
     ${modCustom ? `<div class="alert info">On the bar now: ${ps.map(modLabel).map(esc).join(", ")}. Tap a module to put it on the bar; the oldest one makes room.</div>` : ""}
     ${groups}`);
@@ -150,7 +150,7 @@ function viewUsers() {
   const mine = (window.DB_USER || "").toLowerCase();
   const rows = MEMBERS.map(m => `<div class="row"><div class="main"><div class="name">${esc(m.email)}</div><div class="meta">${esc((ROLE_INFO.find(r => r[0] === m.role) || [0, m.role])[1])}${m.person ? " · " + esc(m.person) : ""}</div></div>
     ${m.email.toLowerCase() === mine ? `<span class="tiny mut">you</span>` : `<select class="in" style="width:auto" onchange="usRole('${esc(m.email)}',this.value)">${ROLE_INFO.map(r => `<option value="${r[0]}" ${m.role === r[0] ? "selected" : ""}>${r[1]}</option>`).join("")}</select>`}</div>`).join("");
-  return shell("Users & roles", "who has which login", `
+  return shell("Users", "who has which login", `
     <section class="card"><div class="list">${rows || `<div class="mut small">No members loaded.</div>`}</div></section>
     <section class="card"><h2>What each role sees</h2><div class="list">${ROLE_INFO.map(r => `<div class="row"><div class="main"><div class="name">${r[1]}</div><div class="meta">${r[2]}</div></div></div>`).join("")}</div>
       <div class="tiny mut" style="margin-top:8px">A new login is created by Stefan with Claude (it needs an email invite). Roles change here at once.</div></section>`, { back: "#/settings" });
@@ -163,7 +163,7 @@ function usRole(email, r) {
 /* ---------- Order rules (owners) ---------- */
 function viewRules() {
   const v = k => { const x = OS_SETTINGS[k]; return x == null ? "" : String(x).replace(/"/g, ""); };
-  return shell("Order rules", "how the Order today list and approvals work", `
+  return shell("Rules", "how the Order today list and approvals work", `
     <section class="card">
       <div class="field"><label>Orders above ₱ go to Mike for approval</label><input class="in num" id="r-ap" inputmode="decimal" placeholder="no limit set" value="${esc(v("approval_peso"))}"></div>
       <div class="field"><label>Safety days (extra days of stock on top of delivery time)</label><input class="in num" id="r-sd" inputmode="numeric" value="${esc(v("default_safety_days"))}"></div>

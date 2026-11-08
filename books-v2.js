@@ -23,7 +23,7 @@ function viewPurchases() {
   const need = []; if (!pu.description.trim()) need.push("what was bought"); if (!(+pu.total > 0)) need.push("the total"); if (!pu.account) need.push("a category"); if (!pu.photo) need.push("a photo of the receipt");
   if (pu.pay_mode === "bill" && !SUPPLIERS.includes(pu.supplier)) need.push("a known supplier for a bill");
   if (isClosed(pu.day)) need.push("a day in an open month");
-  return shell("Other purchases", "not stock: uniforms, decorations, repairs, equipment", `
+  return shell("Purchases", "not stock: uniforms, decor, repairs", `
     <section class="card"><h2>Record a purchase</h2>
       <div class="field"><label>What was bought</label><input class="in" placeholder="e.g. 6 staff shirts, Christmas tree" value="${esc(pu.description)}" oninput="pu.description=this.value"></div>
       <div class="field"><label>Where (shop or supplier)</label><input class="in" list="pu-sups" placeholder="e.g. Gaisano, Lazada" value="${esc(pu.supplier)}" oninput="pu.supplier=this.value"><datalist id="pu-sups">${SUPPLIERS.map(s => `<option value="${esc(s)}">`).join("")}</datalist></div>
@@ -48,7 +48,7 @@ function puSave() {
 let acNew = null;
 function viewAccounts() {
   const groups = [...new Set(ACCOUNTS.map(a => a.grp))];
-  return shell("Chart of accounts", "expense categories, as in the accounting book", `
+  return shell("Accounts", "expense categories", `
     <div class="alert info">The categories of Mike's accounting book. Every purchase and expense gets one, so the downloads land in the right column. Switch off what you don't use; add what is missing.</div>
     ${groups.map(g => `<section class="card"><h2>${esc(g)}</h2><div class="list">${ACCOUNTS.filter(a => a.grp === g).map(a => `<div class="row"><div class="main"><div class="name">${esc(a.name)}${a.sheet === false ? " " + chip("info", "added here") : ""}</div></div><button class="chip ${a.active !== false ? "ok" : ""}" onclick="acToggle('${esc(a.code)}')">${a.active !== false ? "in use" : "off"}</button></div>`).join("")}</div></section>`).join("")}
     <section class="card">${acNew ? `<h2>New category</h2><div class="field"><label>Name</label><input class="in" value="${esc(acNew.name)}" oninput="acNew.name=this.value" placeholder="e.g. Uniforms"></div>
@@ -70,7 +70,7 @@ function viewBooks() {
   const m = role() === "master", bal = typeof mvBalances === "function" ? mvBalances() : [];
   const months = [0, 1, 2, 3].map(i => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - i); return ymd(d).slice(0, 7); });
   const op = Object.fromEntries(OPENINGS.map(o => [o.party, o]));
-  return shell("Opening balances & month close", "", `
+  return shell("Month close", "opening balances, closed months", `
     <section class="card"><h2>Opening balances</h2><div class="tiny mut" style="margin-bottom:8px">What each fund or person held on a day. From that day the app adds what came in and takes off what went out. For a person, money the company owed them is a minus.</div>
       <div class="list">${PAY_SOURCES.map(([k, l]) => { const o = op[k], b = bal.find(x => x.party === k); const e = bkOpen[k];
         return `<div class="row"><div class="main"><div class="name">${esc(l)}: ${o ? peso(+o.amount) + " on " + esc(dayName(o.as_of)) : `<span class="mut">not set</span>`}</div><div class="meta">now ${b ? peso(Math.round(b.net)) : "—"}</div>

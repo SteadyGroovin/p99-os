@@ -68,11 +68,11 @@ function viewMoney() {
   const bal = mvBalances(), people = bal.filter(r => mvPerson(r.party)), funds = bal.filter(r => !mvPerson(r.party));
   const moves = (S.moves || []).slice().sort((a, b) => a.day < b.day ? 1 : a.day > b.day ? -1 : 0);
   const list = moves.slice(0, 60).map(m => `<div class="row"><div class="main"><div class="name">${esc(mvName(m.from))} → ${esc(mvName(m.to))} · ${peso(+m.amount)} ${chip("", esc((Object.fromEntries(MOVE_METHODS)[m.method]) || m.method))}${m.synced === false ? " " + chip("warn", "not saved yet") : ""}</div><div class="meta">${esc(dayName(m.day))}${m.reason ? " · " + esc(m.reason) : ""}${(m.receipts || []).length ? ` · pays back ${m.receipts.length} deliver${m.receipts.length === 1 ? "y" : "ies"}` : ""}</div></div></div>`).join("");
-  return shell("Banking", "who holds it, who is owed", `
+  return shell("Funds", "cash, GCash, bank, who is owed", `
     <div class="alert info">Every delivery paid now says who paid. Record here when money moves between people and funds, and the app keeps who is owed what. The Google Sheets stay the books.</div>
     <section class="card"><h2>People</h2><div class="list">${people.map(mvCard).join("")}</div></section>
     ${mvFormHtml()}
-    <section class="card"><h2>Funds</h2><div class="list">${funds.map(mvCard).join("")}</div><div class="tiny mut" style="margin-top:6px">Without an opening balance a fund shows the change since the app started recording. Set them under Settings → Opening balances & month close.</div></section>
+    <section class="card"><h2>Funds</h2><div class="list">${funds.map(mvCard).join("")}</div><div class="tiny mut" style="margin-top:6px">Without an opening balance a fund shows the change since the app started recording. Set them under Month close.</div></section>
     <section class="card"><h2>Moves <span class="tiny mut">${moves.length}</span></h2><div class="list">${list || `<div class="mut small">No moves recorded yet.</div>`}</div>
       <div style="margin-top:10px"><button class="btn" onclick="mvExport()">Moves CSV</button></div></section>`, { back: "#/more" });
 }

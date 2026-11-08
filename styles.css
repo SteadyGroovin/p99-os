@@ -387,3 +387,4 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .hcard .lab{font-size:12px; color:var(--mut); font-weight:600}
 .hcard .val{font-size:24px; font-weight:700; margin-top:4px}
 .sidebar .sgroup{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--mut); padding:12px 12px 4px; font-weight:700}
+.tabbar button{white-space:nowrap; letter-spacing:-.01em}

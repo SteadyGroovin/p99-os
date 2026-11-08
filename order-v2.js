@@ -93,14 +93,14 @@ function viewBills() {
     return `<section class="card"><h2>${esc(sup)} <span class="tiny mut">run ${esc(run || "—")} · paid around ${esc(bs[0].due ? dayName(bs[0].due) : "—")} · ${peso(tot)}</span></h2><div class="list">${bs.map(b => `<label class="row"><div class="main"><div class="name">${esc(dayName(b.day))} · ${peso(+b.total)}${b.invoice ? ` · ${esc(b.invoice)}` : ""} ${b.paid_on ? chip("ok", "paid " + esc(dayName(b.paid_on))) : chip("", "open")}</div><div class="meta">${esc(b.lines || "")}</div></div>${b.paid_on ? "" : `<input type="checkbox" ${bpSel[b.id] ? "checked" : ""} onchange="bpSel['${b.id}']=this.checked;render()" style="width:24px;height:24px">`}</label>`).join("")}</div></section>`; }).join("");
   const expTot = exps.reduce((a, b) => a + (+b.total || 0), 0);
   const src = Object.fromEntries(PAY_SOURCES);
-  return shell("Bills & expenses", "from the deliveries the store recorded", `
+  return shell("Bills", "deliveries, expenses, bills", `
     <div class="alert info">Every delivery recorded in the app lands here. Bills wait for their run (1–15 paid on the 15th, 16–end paid at month end). The Google Sheets stay the books: download and paste, or tick bills once they are paid.</div>
     <div class="chips" style="margin:8px 0">${[["open", "Open bills"], ["30", "30 days"], ["90", "90 days"]].map(([k, l]) => `<button class="chip ${bpRange === k ? "info" : ""}" onclick="bpRange='${k}';render()">${l}</button>`).join("")}</div>
     ${billCards || `<section class="card"><div class="mut">No ${bpRange === "open" ? "open " : ""}bills.</div></section>`}
     ${ticked.length ? `<div class="bottom-act"><button class="btn primary full" onclick="bpMarkPaid()">Mark ${ticked.length} bill${ticked.length === 1 ? "" : "s"} paid</button></div>` : ""}
     <section class="card"><h2>Paid now <span class="tiny mut">${since ? "since " + esc(dayName(since)) : "last 7 days"} · ${peso(expTot)}</span></h2><div class="list">${exps.map(e => `<div class="row"><div class="main"><div class="name">${esc(e.supplier)} · ${peso(+e.total)} ${chip("", esc(src[e.source] || e.source || ""))}</div><div class="meta">${esc(dayName(e.day))} · ${esc(e.lines || "")}</div></div></div>`).join("") || `<div class="mut small">None.</div>`}</div></section>
     <section class="card"><h2>Download for the sheets</h2><div class="tiny mut" style="margin-bottom:8px">One line per item, the columns of the expense ledger: date, store, item, qty, unit, unit price, amount, supplier, SI, paid now or bill, who paid, run.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="bpExport('paid_now')">Expenses CSV</button><button class="btn" onclick="bpExport('bill')">Bills CSV</button><button class="btn" onclick="go('#/money')">Banking</button><button class="btn" onclick="go('#/purchases')">Other purchases</button></div></section>`, { back: "#/finance" });
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="bpExport('paid_now')">Expenses CSV</button><button class="btn" onclick="bpExport('bill')">Bills CSV</button><button class="btn" onclick="go('#/money')">Funds</button><button class="btn" onclick="go('#/purchases')">Other purchases</button></div></section>`, { back: "#/finance" });
 }
 function bpMarkPaid() {
   const ids = Object.keys(bpSel).filter(k => bpSel[k]); if (!ids.length) return;
