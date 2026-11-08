@@ -9,7 +9,7 @@ const bootEl = document.getElementById("app");
 const bootEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /* every release loads as one matching set: GitHub Pages caches files for 10 minutes, and a stale db.js next to a new app.js left Tasks blank (v0.10.0, 2026-11-07) */
-const APP_V = "0.16.0";
+const APP_V = "0.16.1";
 function loadScript(src) {
   return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src + (src.includes("?") ? "&" : "?") + "v=" + APP_V; s.onload = ok; s.onerror = () => no(new Error("could not load " + src)); document.body.appendChild(s); });
 }
@@ -72,9 +72,9 @@ async function siSend() {
 }
 async function signOut() { await sb.auth.signOut(); location.hash = ""; location.reload(); }
 
+const OS_STORE = (() => { try { const c = JSON.parse(localStorage.getItem("rocketos_stores") || "null"); return c && c.rec ? c.rec : "P99"; } catch (e) { return "P99"; } })();   /* v0.16: the store picked under Stores */
 /* the store's records (os_load, Pizza 99) plus the company-wide to-do board (tasks_load, every venue the login may see; migration 019) */
 async function loadRecords() {
-  const OS_STORE = (() => { try { const c = JSON.parse(localStorage.getItem("rocketos_stores") || "null"); return c && c.rec ? c.rec : "P99"; } catch (e) { return "P99"; } })();   /* v0.16: the store picked under Stores */
   const [a, b] = await Promise.all([sb.rpc("os_load", { p_store: OS_STORE, p_days: 120 }), sb.rpc("tasks_load")]);
   if (a.error) return { error: a.error }; if (b.error) return { error: b.error };
   const L = a.data, T = b.data || {};
