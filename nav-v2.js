@@ -10,28 +10,35 @@ const storesOn = () => storeCfg().on;
 const officeLogin = () => window.DB_ROLE === "admin";               /* role() maps admin to walk (the morning-run screens); money screens need the raw role */
 const moneyOK = () => role() === "master" || officeLogin();
 
-const AREAS = [
-  { id: "today", label: "Today", icon: "home", subs: [["Today", "#/today"]] },
-  { id: "sales", label: "Sales", icon: "cash", subs: [["Overview", "#/sales"], ["Cash counts", "#/cash"]] },
-  { id: "stock", label: "Stock", icon: "grid", subs: [["Overview", "#/stock"], ["Count", "#/count"], ["Receive", "#/receive"], ["Order", "#/order"], ["Transfers", "#/transfers"], ["Items", "#/items"], ["Variance", "#/variance"]] },
-  { id: "money", label: "Money", icon: "finance", subs: [["Banking", "#/money"], ["Bills & expenses", "#/bills"], ["Other purchases", "#/purchases"], ["Approve orders", "#/approve"], ["Finance", "#/finance"]] },
-  { id: "ops", label: "Ops", icon: "list", subs: [["Tasks", "#/tasks"], ["Tickets", "#/report"], ["Clean", "#/clean"], ["Morning run", "#/walk"]] },
+/* v0.17 (Stefan: "the way Zoho Inventory has its menu navigation is probably better"): Home + three pinned modules + More.
+   More lists every module in groups (like Zoho's More Modules); "Customize" picks the three on the bottom bar. Inside a group a row of sibling shortcuts stays. */
+const MODULES = [
+  ["items", "Items", "#/items", "box", "Items"], ["recipes", "Recipes", "#/recipes", "list", "Items"], ["sizes", "Pack sizes", "#/sizes", "box", "Items"],
+  ["stock", "Stock overview", "#/stock", "grid", "Inventory"], ["count", "Count", "#/count", "grid", "Inventory"], ["receive", "Receive", "#/receive", "box", "Inventory"], ["transfers", "Transfers", "#/transfers", "box", "Inventory"], ["variance", "Variance", "#/variance", "grid", "Inventory"],
+  ["suppliers", "Suppliers", "#/suppliers", "coins", "Purchases"], ["order", "Order today", "#/order", "coins", "Purchases"], ["approve", "Approve orders", "#/approve", "check", "Purchases"], ["bills", "Bills & expenses", "#/bills", "coins", "Purchases"], ["purchases", "Other purchases", "#/purchases", "coins", "Purchases"],
+  ["sales", "Sales", "#/sales", "cash", "Sales"], ["cash", "Cash counts", "#/cash", "cash", "Sales"], ["walk", "Morning run", "#/walk", "sun", "Sales"],
+  ["money", "Banking", "#/money", "finance", "Banking & accountant"], ["finance", "Finance & P&L", "#/finance", "finance", "Banking & accountant"], ["accounts", "Chart of accounts", "#/accounts", "finance", "Banking & accountant"], ["books", "Opening balances & month close", "#/books", "finance", "Banking & accountant"],
+  ["tasks", "Tasks", "#/tasks", "list", "Operations"], ["report", "Tickets", "#/report", "alert", "Operations"], ["clean", "Clean", "#/clean", "check", "Operations"],
+  ["users", "Users & roles", "#/users", "dots", "Settings"], ["stores", "Stores & places", "#/stores", "dots", "Settings"], ["rules", "Order rules", "#/rules", "dots", "Settings"], ["more", "Device, alerts & data health", "#/more", "dots", "Settings"],
 ];
-const SETUP = [
-  ["Users & roles", "#/users", "who has which login and what they see"],
-  ["Stores & places", "#/stores", "where stock is sent and received"],
-  ["Suppliers", "#/suppliers", "terms, delivery days, what we buy, prices"],
-  ["Recipes", "#/recipes", "what each pizza, slice and batch uses"],
-  ["Pack sizes", "#/sizes", "how much is inside a can, pack or box"],
-  ["Chart of accounts", "#/accounts", "expense categories, as in the accounting book"],
-  ["Opening balances & month close", "#/books", "what each fund held, lock a finished month"],
-  ["Order rules", "#/rules", "₱ limit for Mike's approval, safety days"],
-];
-const AREA_OF = { today: "today", sales: "sales", cash: "sales", stock: "stock", count: "stock", receive: "stock", receipts: "stock", order: "stock", transfers: "stock", transfer: "stock", items: "stock", item: "stock", variance: "stock",
-  money: "money", bills: "money", purchases: "money", approve: "money", finance: "money", tasks: "ops", task: "ops", report: "ops", clean: "ops", walk: "ops",
-  settings: "settings", users: "settings", stores: "settings", suppliers: "settings", supplier: "settings", recipes: "settings", recipe: "settings", sizes: "settings", accounts: "settings", books: "settings", rules: "settings", more: "settings", password: "settings", who: "settings" };
-const SUB_OF = { item: "items", receipts: "receive", transfer: "transfers", task: "tasks", supplier: "suppliers", recipe: "recipes" };
-const areaOf = seg => AREA_OF[seg || "today"] || "today";
+const GROUPS = [...new Set(MODULES.map(m => m[4]))];
+const SEG_MODULE = { item: "items", recipe: "recipes", receipts: "receive", transfer: "transfers", task: "tasks", supplier: "suppliers" };
+const moduleOf = seg => SEG_MODULE[seg] || seg;
+const modsFor = () => MODULES.filter(m => canOpen(m[0]));
+const SETUP = MODULES.filter(m => ["users", "stores", "suppliers", "recipes", "sizes", "accounts", "books", "rules"].includes(m[0])).map(m => [m[1], m[2], ({ users: "who has which login and what they see", stores: "where stock is sent and received", suppliers: "terms, delivery days, what we buy, prices", recipes: "what each pizza, slice and batch uses", sizes: "how much is inside a can, pack or box", accounts: "expense categories, as in the accounting book", books: "what each fund held, lock a finished month", rules: "₱ limit for Mike's approval, safety days" })[m[0]]]);
+const PIN_KEY = "rocketos_pins";
+const PIN_DEFAULT = { master: ["sales", "stock", "money"], admin: ["bills", "money", "tasks"], lead: ["receive", "count", "order"], walk: ["tasks", "report", "receive"], crew: ["count", "receive", "clean"] };
+function pins() {
+  let p = null; try { p = JSON.parse(localStorage.getItem(PIN_KEY) || "null"); } catch (e) { }
+  const r = officeLogin() ? "admin" : role(); const ok = modsFor().map(m => m[0]);
+  const list = (Array.isArray(p) && p.length ? p : PIN_DEFAULT[r] || PIN_DEFAULT.crew).filter(id => ok.includes(id));
+  for (const id of ok) { if (list.length >= 3) break; if (!list.includes(id)) list.push(id); }
+  return list.slice(0, 3);
+}
+const homeHref = () => role() === "walk" && !officeLogin() ? "#/walk" : "#/today";
+const modIcon = id => (MODULES.find(m => m[0] === id) || [])[3] || "dots";
+const modLabel = id => (MODULES.find(m => m[0] === id) || [])[1] || id;
+const modShort = id => ({ "Stock overview": "Stock", "Bills & expenses": "Bills", "Order today": "Order", "Approve orders": "Approve", "Other purchases": "Purchases", "Cash counts": "Cash", "Morning run": "Run", "Finance & P&L": "Finance", "Chart of accounts": "Accounts", "Opening balances & month close": "Books", "Users & roles": "Users", "Stores & places": "Stores", "Order rules": "Rules", "Device, alerts & data health": "Device" })[modLabel(id)] || modLabel(id);
 
 /* the one place that says who may open what (the database refuses the data anyway) */
 function canOpen(s0) {
@@ -42,17 +49,56 @@ function canOpen(s0) {
   if (["order", "sizes"].includes(s0)) return m || r === "lead";
   if (["recipes", "recipe", "suppliers", "supplier"].includes(s0)) return m || adm || r === "lead";
   if (s0 === "walk") return m || r === "walk";               /* the morning run: Cherry, the office, the owners */
-  if (r === "walk") return adm ? true : ["walk", "tasks", "task", "report", "more", "settings", "who", "password", "receive", "transfers", "transfer", ""].includes(s0);
+  if (r === "walk") return adm ? true : ["walk", "tasks", "task", "report", "more", "settings", "who", "password", "receive", "transfers", "transfer", "modules", ""].includes(s0);
   return true;
 }
-const subHref = s => s[1].split("/")[1];
-function areasFor() { return AREAS.filter(a => a.subs.some(s => canOpen(subHref(s)))).filter(a => !(a.id === "today" && role() === "walk")); }
+function tabbarHTML(seg) {
+  const ps = pins(), m = moduleOf(seg), isHome = homeHref() === "#/" + seg || (seg === "today") || (!seg);
+  const grp = (MODULES.find(z => z[0] === m) || [])[4]; const sameGrp = ps.find(id => (MODULES.find(z => z[0] === id) || [])[4] === grp);
+  const cur = isHome ? "home" : ps.includes(m) ? m : sameGrp || "more";   /* a module of the same group as a pin lights that pin */
+  const openT = S.tickets.filter(t => t.status !== "done").length;
+  const btn = (id, label, icon, href) => `<button class="${cur === id ? "on" : ""}" onclick="go('${href}')" aria-label="${label}">${id === "report" && openT ? `<span class="bdg">${openT}</span>` : ""}${ic(ICON[icon] || ICON.dots)}${label}</button>`;
+  return btn("home", "Home", "home", homeHref()) + ps.map(id => btn(id, modShort(id), modIcon(id), "#/" + id)).join("") + btn("more", "More", "dots", "#/modules");
+}
+function sidebarHTML(seg) {   /* tablet and laptop: the whole menu, like Zoho's left navigation */
+  const m = moduleOf(seg), mods = modsFor();
+  return `<button class="${seg === "today" || !seg ? "on" : ""}" onclick="go('${homeHref()}')">${ic(ICON.home, "sm")}<span class="sl">Home</span></button>` +
+    GROUPS.map(g => { const ms = mods.filter(x => x[4] === g); if (!ms.length) return ""; return `<div class="sgroup">${esc(g)}</div>` + ms.map(x => `<button class="${m === x[0] ? "on" : ""}" onclick="go('${x[2]}')">${ic(ICON[x[3]] || ICON.dots, "sm")}<span class="sl">${esc(x[1])}</span></button>`).join(""); }).join("");
+}
+function subnavHTML(seg) {   /* sibling shortcuts inside a group (Stefan agreed: Receive one tap from Count) */
+  const m = moduleOf(seg), me1 = MODULES.find(x => x[0] === m); if (!me1) return "";
+  const sibs = modsFor().filter(x => x[4] === me1[4]); if (sibs.length < 2) return "";
+  return `<nav class="subnav" aria-label="${esc(me1[4])}">${sibs.map(x => `<button class="${x[0] === m ? "on" : ""}" onclick="go('${x[2]}')">${esc(modShort(x[0]))}</button>`).join("")}</nav>`;
+}
+let modCustom = false;
+function viewModules() {
+  const ps = pins(), mods = modsFor();
+  const groups = GROUPS.map(g => { const ms = mods.filter(x => x[4] === g); if (!ms.length) return "";
+    return `<section class="card mg"><h3>${esc(g)}</h3><div class="list">${ms.map(x => modCustom
+      ? `<button class="row tap" onclick="pinToggle('${x[0]}')"><div class="main"><div class="name">${esc(x[1])}</div></div>${ps.includes(x[0]) ? chip("info", "on the bar") : `<span class="tiny mut">add</span>`}</button>`
+      : `<button class="row tap" onclick="go('${x[2]}')"><div class="main"><div class="name">${esc(x[1])}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("")}</div></section>`; }).join("");
+  return shell("More modules", modCustom ? "tap three modules for the bottom bar" : "", `
+    <div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn ${modCustom ? "primary" : ""} sm" onclick="modCustom=!modCustom;render()">${modCustom ? "Done" : "Customize"}</button></div>
+    ${modCustom ? `<div class="alert info">On the bar now: ${ps.map(modLabel).map(esc).join(", ")}. Tap a module to put it on the bar; the oldest one makes room.</div>` : ""}
+    ${groups}`);
+}
+function pinToggle(id) {
+  let ps = pins(); if (ps.includes(id)) { if (ps.length <= 1) return; ps = ps.filter(x => x !== id); } else { ps = ps.concat(id); if (ps.length > 3) ps = ps.slice(-3); }
+  try { localStorage.setItem(PIN_KEY, JSON.stringify(ps)); } catch (e) { } render();
+}
 
-function subnavHTML(seg) {
-  const a = AREAS.find(x => x.id === areaOf(seg)); if (!a) return "";
-  const subs = a.subs.filter(s => canOpen(subHref(s))); if (subs.length < 2) return "";
-  const cur = SUB_OF[seg] || seg;
-  return `<nav class="subnav" aria-label="${esc(a.label)}">${subs.map(s => `<button class="${subHref(s) === cur ? "on" : ""}" onclick="go('${s[1]}')">${esc(s[0])}</button>`).join("")}</nav>`;
+/* ---------- Home: quick actions and what needs attention (like Zoho's dashboard) ---------- */
+function homeStripHTML() {
+  const acts = plusActions();
+  const cards = [];
+  if (canOpen("approve")) { const n = (S.orders || []).filter(o => o.status === "requested" && o.approval_needed).length; cards.push(["Orders to approve", n, "#/approve"]); }
+  if (canOpen("order")) cards.push(["Items to order", REORDER.filter(r => r.order_now).length, "#/order"]);
+  if (canOpen("bills")) cards.push(["Bills open", MONEY.filter(m => m.mode === "bill" && !m.paid_on).length, "#/bills"]);
+  if (canOpen("sizes")) cards.push(["Pack sizes missing", ITEMS.filter(i => i.sizeUnknown).length, "#/sizes"]);
+  if (canOpen("recipes")) cards.push(["Recipes not confirmed", (typeof RECIPES !== "undefined" ? RECIPES : []).filter(r => !r.confirmed).length, "#/recipes"]);
+  cards.push(["Tickets open", S.tickets.filter(t => t.status !== "done").length, "#/report"]);
+  return `<section class="card qa"><h3>Quick actions</h3><div class="qa-row">${acts.map(a => `<button onclick="${a[2]}"><span class="qa-ic">${ic(ICON[modIcon(a[1])] || ICON.dots)}</span><span>${esc(a[0])}</span></button>`).join("")}</div></section>
+    <div class="grid2 hcards">${cards.map(c => `<button class="card tap hcard" onclick="go('${c[2]}')"><div class="lab">${esc(c[0])}</div><div class="val num">${c[1]}</div></button>`).join("")}</div>`;
 }
 
 /* ---------- stores: tick the stores included, pick where new records go ---------- */
@@ -78,16 +124,11 @@ function stSave() {
 }
 
 /* ---------- "+" : record something from any screen ---------- */
-let plusOpen = false;
+const subHref = s => s[1].split("/")[1];
 function plusActions() {
-  return [["Receive a delivery", "receive", "go('#/receive')"], ["Other purchase", "purchases", "puStart();go('#/purchases')"], ["Money move", "money", "go('#/money');setTimeout(()=>mvStart(),60)"],
-    ["Cash count", "cash", "go('#/cash')"], ["Ticket (problem)", "report", "go('#/report/new')"], ["Task", "tasks", "go('#/task/new')"]].filter(a => canOpen(a[1]));
+  return [["Receive", "receive", "go('#/receive')"], ["Purchase", "purchases", "puStart();go('#/purchases')"], ["Money move", "money", "go('#/money');setTimeout(()=>mvStart(),60)"],
+    ["Cash count", "cash", "go('#/cash')"], ["Ticket", "report", "go('#/report/new')"], ["Task", "tasks", "go('#/task/new')"]].filter(a => canOpen(a[1]));
 }
-function plusHTML() {
-  const acts = plusActions(); if (!acts.length) return "";
-  return `<button class="fab" onclick="plusOpen=true;render()" aria-label="Record something">+</button>${plusOpen ? `<div class="sheet-bg" onclick="if(event.target===this){plusOpen=false;render()}"><div class="sheet"><h2>Record</h2><div class="list">${acts.map(a => `<button class="row tap" onclick="plusOpen=false;${a[2]}"><div class="main"><div class="name">${esc(a[0])}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("")}</div></div></div>` : ""}`;
-}
-
 /* ---------- Settings (behind the name badge) ---------- */
 function viewSettings() {
   const rows = SETUP.filter(s => canOpen(subHref(s))).map(s => `<button class="row tap" onclick="go('${s[1]}')"><div class="main"><div class="name">${esc(s[0])}</div><div class="meta">${esc(s[2])}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("");

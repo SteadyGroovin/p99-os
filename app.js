@@ -58,14 +58,10 @@ function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split(
   if (ids.includes(seg)) return seg; const m = map[seg]; if (m && ids.includes(m)) return m; return "more"; }
 
 /* ---------- shell ---------- */
-function shell(title, sub, body, { back } = {}) {   /* v0.16: areas + sub-tabs (nav-v2.js) */
-  const p = me(); const seg = (location.hash.slice(1) || "/today").split("/")[1] || "today"; const cur = areaOf(seg); const areas = areasFor();
-  const openT = S.tickets.filter(t => t.status !== "done").length;
-  const tabHTML = areas.map(a => `<button class="${cur === a.id ? "on" : ""}" onclick="go('${a.subs.find(s => canOpen(subHref(s)))[1]}')" aria-label="${a.label}">${a.id === "ops" && openT ? `<span class="bdg">${openT}</span>` : ""}${ic(ICON[a.icon])}${a.label}</button>`).join("");
-  const side = areas.map(a => `<button class="${cur === a.id ? "on" : ""}" onclick="go('${a.subs.find(s => canOpen(subHref(s)))[1]}')">${ic(ICON[a.icon], "sm")}<span class="sl">${a.label}</span></button>`).join("")
-    + `<button class="${cur === "settings" ? "on" : ""}" onclick="go('#/settings')">${ic(ICON.dots, "sm")}<span class="sl">Settings</span></button>`;
+function shell(title, sub, body, { back } = {}) {   /* v0.17: Home + three pinned modules + More (nav-v2.js) */
+  const p = me(); const seg = (location.hash.slice(1) || "/today").split("/")[1] || "today";
   return `
-  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Rocket OS</div>${side}</nav>
+  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Rocket OS</div>${sidebarHTML(seg)}</nav>
   <div class="page">
     <header class="top">${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
@@ -74,7 +70,7 @@ function shell(title, sub, body, { back } = {}) {   /* v0.16: areas + sub-tabs (
     ${subnavHTML(seg)}
     <main class="wrap">${body}</main>
   </div>
-  <nav class="tabbar">${tabHTML}</nav>${plusHTML()}${storeSheetHTML()}`;
+  <nav class="tabbar">${tabbarHTML(seg)}</nav>${storeSheetHTML()}`;
 }
 const card = (inner, onclick, cls = "") => `<section class="card ${onclick ? "tap" : ""} ${cls}" ${onclick ? `onclick="${onclick}"` : ""}>${inner}</section>`;
 const kpi = (lab, val, trend, cls = "") => `<div class="kpi"><div class="lab">${lab}</div><div class="val num ${cls}">${val}</div>${trend ? `<div class="trend">${trend}</div>` : ""}</div>`;
@@ -429,6 +425,7 @@ function render() {
     case "transfer": html = seg[1] === "new" ? viewTransferNew() : viewTransfer(seg[1]); break;
     case "finance": html = viewFinance(seg[1], seg[2]); break;
     case "more": html = viewMore(); break;
+    case "modules": html = viewModules(); break;            /* v0.17: More = every module in groups, Customize the bar */
     case "settings": html = viewSettings(); break;          /* v0.16: Settings behind the name badge */
     case "users": html = viewUsers(); break;
     case "rules": html = viewRules(); break;
@@ -440,6 +437,7 @@ function render() {
     case "password": html = viewPassword(); break;
     default: html = role() === "walk" ? viewWalk() : viewToday();
   }
+  if ((seg[0] || "today") === "today" && typeof homeStripHTML === "function") html = html.replace('<main class="wrap">', '<main class="wrap">' + homeStripHTML());   /* v0.17: Home = quick actions + what needs attention, then the day */
   $("#app").innerHTML = html;
   if (render._h !== location.hash) { render._h = location.hash; window.scrollTo(0, 0); } /* a new page opens at the top; a re-render of the same page keeps its place */
   if (pad || cpad) { const s = $(".sheet"); if (s) s.scrollIntoView({ block: "end" }); }
