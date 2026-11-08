@@ -83,7 +83,7 @@ function apDecide(id, decision) {
 
 /* ---------- BILLS & EXPENSES (master, admin) ---------- */
 function viewBills() {
-  if (!["master", "admin"].includes(role())) return shell("Bills", "", `<div class="alert info">For the office only.</div>`, { back: "#/today" });
+  if (!moneyOK()) return shell("Bills", "", `<div class="alert info">For the office only.</div>`, { back: "#/today" });
   const since = bpRange === "open" ? null : addDays(today(), -parseInt(bpRange, 10));
   const bills = MONEY.filter(m => m.mode === "bill" && (bpRange === "open" ? !m.paid_on : m.day >= since));
   const exps = MONEY.filter(m => m.mode === "paid_now" && (since ? m.day >= since : m.day >= addDays(today(), -7)));
@@ -100,7 +100,7 @@ function viewBills() {
     ${ticked.length ? `<div class="bottom-act"><button class="btn primary full" onclick="bpMarkPaid()">Mark ${ticked.length} bill${ticked.length === 1 ? "" : "s"} paid</button></div>` : ""}
     <section class="card"><h2>Paid now <span class="tiny mut">${since ? "since " + esc(dayName(since)) : "last 7 days"} · ${peso(expTot)}</span></h2><div class="list">${exps.map(e => `<div class="row"><div class="main"><div class="name">${esc(e.supplier)} · ${peso(+e.total)} ${chip("", esc(src[e.source] || e.source || ""))}</div><div class="meta">${esc(dayName(e.day))} · ${esc(e.lines || "")}</div></div></div>`).join("") || `<div class="mut small">None.</div>`}</div></section>
     <section class="card"><h2>Download for the sheets</h2><div class="tiny mut" style="margin-bottom:8px">One line per item, the columns of the expense ledger: date, store, item, qty, unit, unit price, amount, supplier, SI, paid now or bill, who paid, run.</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="bpExport('paid_now')">Expenses CSV</button><button class="btn" onclick="bpExport('bill')">Bills CSV</button><button class="btn" onclick="go('#/money')">Money moves</button></div></section>`, { back: "#/finance" });
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="bpExport('paid_now')">Expenses CSV</button><button class="btn" onclick="bpExport('bill')">Bills CSV</button><button class="btn" onclick="go('#/money')">Banking</button><button class="btn" onclick="go('#/purchases')">Other purchases</button></div></section>`, { back: "#/finance" });
 }
 function bpMarkPaid() {
   const ids = Object.keys(bpSel).filter(k => bpSel[k]); if (!ids.length) return;
@@ -112,10 +112,10 @@ function bpMarkPaid() {
 function bpExport(mode) {
   const since = bpRange === "open" ? addDays(today(), -120) : addDays(today(), -parseInt(bpRange, 10));
   const src = Object.fromEntries(PAY_SOURCES); const q = v => { const t = v == null ? "" : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
-  const rows = [["Date", "Store", "Item", "Qty", "Unit", "Unit price", "Amount", "Supplier", "SI / invoice", "Paid now or bill", "Paid by", "Run", "Receipt total"]];
+  const rows = [["Date", "Store", "Item", "Qty", "Unit", "Unit price", "Amount", "Supplier", "SI / invoice", "Paid now or bill", "Paid by", "Run", "Receipt total", "Category"]];
   (S.receipts || []).filter(r => r.pay_mode === mode && r.day >= since && (mode !== "bill" || bpRange !== "open" || !(MONEY.find(m => m.id === r.id) || {}).paid_on)).sort((a, b) => a.day < b.day ? -1 : 1)
-    .forEach(r => r.lines.forEach((l, i) => { const it = Store.item(l.item) || { name: l.item, unit: "" };
-      rows.push([r.day, "P99", it.name, l.qty, it.unit, l.price == null ? "" : l.price, l.price == null ? "" : Math.round(l.price * l.qty * 100) / 100, r.supplier, r.invoice || "", mode === "bill" ? "bill" : "paid now", mode === "bill" ? "" : (src[r.pay_source] || r.pay_source || ""), mode === "bill" ? skRunLabel(r.day) : "", i === 0 ? r.total : ""]); }));
+    .forEach(r => (r.kind === "other" ? [{ other: true }] : r.lines).forEach((l, i) => { if (l.other) { rows.push([r.day, curStore(), r.description || "", 1, "", r.total, r.total, r.supplier || "", r.invoice || "", mode === "bill" ? "bill" : "paid now", mode === "bill" ? "" : (src[r.pay_source] || r.pay_source || ""), mode === "bill" ? skRunLabel(r.day) : "", r.total, acName(r.account)]); return; } const it = Store.item(l.item) || { name: l.item, unit: "" };
+      rows.push([r.day, curStore(), it.name, l.qty, it.unit, l.price == null ? "" : l.price, l.price == null ? "" : Math.round(l.price * l.qty * 100) / 100, r.supplier, r.invoice || "", mode === "bill" ? "bill" : "paid now", mode === "bill" ? "" : (src[r.pay_source] || r.pay_source || ""), mode === "bill" ? skRunLabel(r.day) : "", i === 0 ? r.total : "", ""]); }));
   const blob = new Blob(["﻿" + rows.map(r => r.map(q).join(",")).join("\n")], { type: "text/csv" });
   const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `p99-${mode === "bill" ? "bills" : "expenses"}-${today()}.csv`; document.body.appendChild(a); a.click(); a.remove();
   toast(`${rows.length - 1} line${rows.length === 2 ? "" : "s"} downloaded.`);

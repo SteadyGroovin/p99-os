@@ -9,7 +9,7 @@ const bootEl = document.getElementById("app");
 const bootEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /* every release loads as one matching set: GitHub Pages caches files for 10 minutes, and a stale db.js next to a new app.js left Tasks blank (v0.10.0, 2026-11-07) */
-const APP_V = "0.15.0";
+const APP_V = "0.16.0";
 function loadScript(src) {
   return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src + (src.includes("?") ? "&" : "?") + "v=" + APP_V; s.onload = ok; s.onerror = () => no(new Error("could not load " + src)); document.body.appendChild(s); });
 }
@@ -74,7 +74,8 @@ async function signOut() { await sb.auth.signOut(); location.hash = ""; location
 
 /* the store's records (os_load, Pizza 99) plus the company-wide to-do board (tasks_load, every venue the login may see; migration 019) */
 async function loadRecords() {
-  const [a, b] = await Promise.all([sb.rpc("os_load", { p_store: "P99", p_days: 120 }), sb.rpc("tasks_load")]);
+  const OS_STORE = (() => { try { const c = JSON.parse(localStorage.getItem("rocketos_stores") || "null"); return c && c.rec ? c.rec : "P99"; } catch (e) { return "P99"; } })();   /* v0.16: the store picked under Stores */
+  const [a, b] = await Promise.all([sb.rpc("os_load", { p_store: OS_STORE, p_days: 120 }), sb.rpc("tasks_load")]);
   if (a.error) return { error: a.error }; if (b.error) return { error: b.error };
   const L = a.data, T = b.data || {};
   L.tasks = T.tasks || []; L.people = T.people || []; L.stores = T.stores || []; L.me = T.me || null;
@@ -94,13 +95,13 @@ async function start() {
   window.DB_ROLE = member.role; /* master | lead | walk | crew — the database enforces it too (migration 011); this only shapes the screens */
   let data = { source: "", days: {} };
   if (member.role === "master") { /* sales are for the owners only */
-    const { data: sh, error } = await sb.rpc("sales_history", { p_store: "P99" });
+    const { data: sh, error } = await sb.rpc("sales_history", { p_store: OS_STORE });
     if (error) return bootScreen(`<span class="band-bad">Could not load sales: ${bootEsc(error.message)}</span>`);
     data = sh;
   }
   window.SALES_HISTORY = data;
-  if (member.role === "lead" || member.role === "crew") { const { data: g } = await sb.rpc("store_sales_glance", { p_store: "P99" }); window.GLANCE = g || null; } /* today so far + yesterday, nothing else (migration 014) */
-  if (member.role === "master") try { const { data: wq } = await sb.from("walk_quick_count").select("day,item_key,qty").eq("store", "P99").order("day", { ascending: false }).limit(2000); window.WALK_ROWS = wq || []; } catch (e) { window.WALK_ROWS = []; } /* Cherry's morning counts feed Stock */
+  if (member.role === "lead" || member.role === "crew") { const { data: g } = await sb.rpc("store_sales_glance", { p_store: OS_STORE }); window.GLANCE = g || null; } /* today so far + yesterday, nothing else (migration 014) */
+  if (member.role === "master") try { const { data: wq } = await sb.from("walk_quick_count").select("day,item_key,qty").eq("store", OS_STORE).order("day", { ascending: false }).limit(2000); window.WALK_ROWS = wq || []; } catch (e) { window.WALK_ROWS = []; } /* Cherry's morning counts feed Stock */
   window.DB_USER = session.user.email;
   { /* the store's own records: receipts, counts, checklist ticks, tickets, tasks, cash counts, transfers (migration 016; sync.js keeps them in step) */
     const { data: L, error: lErr } = await loadRecords();
@@ -108,6 +109,6 @@ async function start() {
     window.OS_LOADED = L;
   }
   bootEl.innerHTML = "";
-  for (const s of ["data.js", "icons.js", "sync.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "tasks-v2.js", "finance-v2.js", "walk-v2.js", "transfer-v2.js", "order-v2.js", "suppliers-v2.js", "money-v2.js", "app.js"]) await loadScript(s);
+  for (const s of ["data.js", "icons.js", "sync.js", "sales-view.js", "today-v2.js", "stock-v2.js", "clean-v2.js", "tasks-v2.js", "finance-v2.js", "walk-v2.js", "transfer-v2.js", "order-v2.js", "suppliers-v2.js", "money-v2.js", "nav-v2.js", "books-v2.js", "app.js"]) await loadScript(s);
 }
 start().catch(e => bootScreen(`<span class="band-bad">${bootEsc(e.message)}</span>`));

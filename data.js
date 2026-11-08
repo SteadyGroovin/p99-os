@@ -119,7 +119,7 @@ function dbCatalogue(L) {
 function dbRefresh(L) {   /* the parts that change during the day: reorder levels, open orders, bills */
   SUPPLIER_INFO = Object.fromEntries((L.suppliers || []).map(s => [s.name, s]));
   REORDER = (L.reorder || []).map(r => Object.assign({}, r, { expected: r.expected == null ? null : +r.expected, rop: r.rop == null ? null : +r.rop, per_day: r.per_day == null ? null : +r.per_day, cover: r.cover == null ? null : +r.cover, suggest: r.suggest == null ? null : +r.suggest, buy_qty: r.buy_qty == null ? null : +r.buy_qty, on_order: +r.on_order || 0 }));
-  ORDERS = L.orders || []; MONEY = L.money || []; OS_SETTINGS = L.settings || {}; PRICES = L.prices || []; if (typeof MOVE_BAL !== "undefined") MOVE_BAL = L.balances || [];   /* v0.15 balances · v0.14: prices per base unit (office, owners) */
+  ORDERS = L.orders || []; MONEY = L.money || []; OS_SETTINGS = L.settings || {}; PRICES = L.prices || []; if (typeof MOVE_BAL !== "undefined") MOVE_BAL = L.balances || []; if (typeof booksRefresh === "function") booksRefresh(L);   /* v0.15 balances · v0.14: prices per base unit (office, owners) */
 }
 const DB_CATALOGUE = dbCatalogue(window.OS_LOADED);
 

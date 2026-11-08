@@ -306,7 +306,7 @@ function skRunLabel(d) { const day = +String(d).slice(8, 10), m = new Date(d + "
 /* ---------- RECEIPTS (deliveries log) ---------- */
 function viewReceipts() {
   const from = skRx.range === "all" ? "0000" : addDays(today(), -(+skRx.range - 1));
-  const rs = S.receipts.filter(r => r.day >= from && (!skRx.sup || r.supplier === skRx.sup) && (!skRx.kind || r.kind === skRx.kind)).sort((a, b) => a.day < b.day ? 1 : a.day > b.day ? -1 : 0);
+  const rs = S.receipts.filter(r => r.kind !== "other" && r.day >= from && (!skRx.sup || r.supplier === skRx.sup) && (!skRx.kind || r.kind === skRx.kind)).sort((a, b) => a.day < b.day ? 1 : a.day > b.day ? -1 : 0);
   const lineVal = l => l.price != null ? l.price * l.qty : null; const rVal = r => { const v = r.lines.map(lineVal).filter(x => x != null); return r.amount != null ? r.amount : v.length ? skSum(v) : null; };
   const nL = skSum(rs.map(r => r.lines.length)), nP = skSum(rs.map(r => r.lines.filter(l => l.price != null).length)); const val = skSum(rs.map(rVal).filter(x => x != null));
   const bySup = {}; rs.forEach(r => { const o = bySup[r.supplier] = bySup[r.supplier] || { n: 0, lines: 0, val: 0 }; o.n++; o.lines += r.lines.length; o.val += rVal(r) || 0; }); const sups = Object.entries(bySup).sort((a, b) => b[1].n - a[1].n); const mx = sups.length ? sups[0][1].n : 1;

@@ -58,20 +58,23 @@ function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split(
   if (ids.includes(seg)) return seg; const m = map[seg]; if (m && ids.includes(m)) return m; return "more"; }
 
 /* ---------- shell ---------- */
-function shell(title, sub, body, { back } = {}) {
-  const p = me(); const tabs = tabsFor(); const cur = tabOf(location.hash.slice(1) || "/today"); const side = sidebarFor(); const scur = tabOf(location.hash.slice(1) || "/today", side.map(t => t[0]));
+function shell(title, sub, body, { back } = {}) {   /* v0.16: areas + sub-tabs (nav-v2.js) */
+  const p = me(); const seg = (location.hash.slice(1) || "/today").split("/")[1] || "today"; const cur = areaOf(seg); const areas = areasFor();
   const openT = S.tickets.filter(t => t.status !== "done").length;
-  const tabHTML = tabs.map(([id, label, icon, href]) => `<button class="${cur === id ? "on" : ""}" onclick="go('${href}')" aria-label="${label}">${id === "report" && openT ? `<span class="bdg">${openT}</span>` : ""}${ic(ICON[icon])}${label}</button>`).join("");
+  const tabHTML = areas.map(a => `<button class="${cur === a.id ? "on" : ""}" onclick="go('${a.subs.find(s => canOpen(subHref(s)))[1]}')" aria-label="${a.label}">${a.id === "ops" && openT ? `<span class="bdg">${openT}</span>` : ""}${ic(ICON[a.icon])}${a.label}</button>`).join("");
+  const side = areas.map(a => `<button class="${cur === a.id ? "on" : ""}" onclick="go('${a.subs.find(s => canOpen(subHref(s)))[1]}')">${ic(ICON[a.icon], "sm")}<span class="sl">${a.label}</span></button>`).join("")
+    + `<button class="${cur === "settings" ? "on" : ""}" onclick="go('#/settings')">${ic(ICON.dots, "sm")}<span class="sl">Settings</span></button>`;
   return `
-  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Rocket OS</div>${side.map(([id, label, icon, href]) => `<button class="${scur === id ? "on" : ""}" onclick="go('${href}')">${ic(ICON[icon], "sm")}<span class="sl">${label}</span></button>`).join("")}</nav>
+  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Rocket OS</div>${side}</nav>
   <div class="page">
     <header class="top">${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
-      <button class="me" onclick="go('#/more')"><span class="av">${p ? esc(p.short[0]) : "?"}</span>${p ? esc(p.short) : "Sign in"}</button>
+      ${storeChip()}<button class="me" onclick="go('#/settings')" aria-label="Settings"><span class="av">${p ? esc(p.short[0]) : "?"}</span></button>
     </header>
+    ${subnavHTML(seg)}
     <main class="wrap">${body}</main>
   </div>
-  <nav class="tabbar">${tabHTML}</nav>`;
+  <nav class="tabbar">${tabHTML}</nav>${plusHTML()}${storeSheetHTML()}`;
 }
 const card = (inner, onclick, cls = "") => `<section class="card ${onclick ? "tap" : ""} ${cls}" ${onclick ? `onclick="${onclick}"` : ""}>${inner}</section>`;
 const kpi = (lab, val, trend, cls = "") => `<div class="kpi"><div class="lab">${lab}</div><div class="val num ${cls}">${val}</div>${trend ? `<div class="trend">${trend}</div>` : ""}</div>`;
@@ -389,10 +392,9 @@ function render() {
   const h = (location.hash || "#/today").slice(1); const seg = h.split("/").filter(Boolean);
   const qs = new URLSearchParams(location.search); if (qs.get("who") && !S.me) { const p = PEOPLE.find(x => x.id === qs.get("who") || x.role === qs.get("who")); if (p) { S.me = p.id; save(); } }
   let html;
-  { /* route guard: the screens mirror the database rules (the database refuses the data anyway) */
-    const r = role(), s0 = seg[0] || "", ownerOnly = ["sales", "finance"], walkOk = ["walk", "tasks", "task", "report", "more", "who", "password", "receive", "transfers", "transfer", ""]; /* the office also records deliveries at Head Office and releases stock to the stores */
-    const officeOnly = ["bills", "stores", "money"], leadOk = ["order", "sizes"]; /* v0.12–v0.14 */
-    if ((r !== "master" && ownerOnly.includes(s0)) || (r === "walk" && !walkOk.includes(s0)) || (officeOnly.includes(s0) && !["master", "admin"].includes(r)) || (leadOk.includes(s0) && !["master", "lead"].includes(r)) || (s0 === "approve" && r !== "master") || (["suppliers", "supplier"].includes(s0) && !["master", "admin", "lead"].includes(r))) { location.hash = r === "walk" ? "#/walk" : "#/today"; return; }
+  { /* route guard (v0.16): canOpen() in nav-v2.js mirrors the database rules (the database refuses the data anyway) */
+    const r = role(), s0 = seg[0] || "";
+    if (!canOpen(s0)) { location.hash = r === "walk" ? "#/walk" : "#/today"; return; }
   }
   if (/^#\/tasks?(\/|$)/.test(location.hash) && typeof viewTasks !== "function") { $("#app").innerHTML = `<div class="wrap"><section class="card"><b>A new version of Rocket OS is ready.</b><div class="small mut" style="margin:6px 0 12px">Part of the old version is still in this phone's cache.</div><button class="btn primary full" onclick="location.reload()">Reload</button></section></div>`; return; }
   /* signed in: the app is that person (v0.11.6, Stefan: "she should be named Cherry in the app"); entries carry their name.
@@ -427,6 +429,14 @@ function render() {
     case "transfer": html = seg[1] === "new" ? viewTransferNew() : viewTransfer(seg[1]); break;
     case "finance": html = viewFinance(seg[1], seg[2]); break;
     case "more": html = viewMore(); break;
+    case "settings": html = viewSettings(); break;          /* v0.16: Settings behind the name badge */
+    case "users": html = viewUsers(); break;
+    case "rules": html = viewRules(); break;
+    case "purchases": html = viewPurchases(); break;        /* v0.16: things bought that are not stock */
+    case "accounts": html = viewAccounts(); break;          /* v0.16: chart of accounts */
+    case "books": html = viewBooks(); break;                /* v0.16: opening balances, month close */
+    case "recipes": html = viewRecipes(); break;            /* v0.16: recipe editor */
+    case "recipe": html = viewRecipe(seg[1]); break;
     case "password": html = viewPassword(); break;
     default: html = role() === "walk" ? viewWalk() : viewToday();
   }

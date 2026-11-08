@@ -178,7 +178,7 @@ function viewTasks() {
   /* venue pills: everything for the owners and admin, otherwise only the venues this login has tasks in */
   const seen = new Set(all.map(tkStoreOf)); const venues = tkStores().filter(s => tkAllVenues() || seen.has(s.code));
   if (TK.venue !== "all" && !venues.some(v => v.code === TK.venue)) TK.venue = "all";
-  const inVenue = all.filter(t => TK.venue === "all" || tkStoreOf(t) === TK.venue);
+  const inVenue = all.filter(t => TK.venue === "all" ? (typeof storesOn !== "function" || storesOn().length < 2 || storesOn().includes(tkStoreOf(t)) || !(S.locations || []).some(l => l.code === tkStoreOf(t))) : tkStoreOf(t) === TK.venue);   /* v0.16: ticked stores, GROUP and other venues always */
   const act = inVenue.filter(tkActive), od = act.filter(t => tkOverdue(t, d)), wt = act.filter(t => t.status === "blocked"), dw = inVenue.filter(t => t.status === "done" && (t.done_at || "").slice(0, 10) >= wk);
   /* v0.10.2 (Stefan: "see more of the actual board"): no tiles, one toolbar — filters left, the add box right; its extra fields open in a small panel only while you type */
   const openIn = code => all.filter(t => tkActive(t) && tkStoreOf(t) === code).length;
@@ -215,6 +215,9 @@ function c2TSet(id, f, v) {
   if (["status", "owner", "due", "store", "area"].includes(f)) tkLog(t, f, v);
   save(); render();
 }
+/* v0.16: repeating tasks (permit renewals, monthly checks). The database makes the next one when this one is done. */
+const TK_REPEATS = [["", "Does not repeat"], ["week:1", "Every week"], ["month:1", "Every month"], ["month:3", "Every 3 months"], ["month:6", "Every 6 months"], ["year:1", "Every year"]];
+function tkRepeat(id, v) { const t = S.tasks.find(x => x.id === id); if (!t) return; const [u, n] = v ? v.split(":") : [null, null]; t.repeat_unit = u; t.repeat_every = u ? +n : null; tkLog(t, "note", u ? "repeats: " + (TK_REPEATS.find(x => x[0] === v) || [0, v])[1].toLowerCase() : "no longer repeats"); save(); render(); }
 function viewTask(id) {
   const d = today();
   const dueChips = (cur, fn) => `<div class="c2picks sm">${[["Today", d], ["Tomorrow", addDays(d, 1)], ["In a week", addDays(d, 7)], ["No date", ""]].map(([l, v]) => `<button class="${(cur || "") === v ? "on" : ""}" onclick="${fn}('${v}')">${l}</button>`).join("")}</div>`;
@@ -243,6 +246,8 @@ function viewTask(id) {
     <section class="card"><h3>Column</h3><div class="seg tkseg">${TK_COLS.map(([s, l]) => `<button class="btn ${t.status === s ? "on" : ""}" onclick="c2TSet('${t.id}','status','${s}')">${l}</button>`).join("")}</div></section>
     <section class="card"><div class="field"><label>Venue</label><select class="in" onchange="c2TSet('${t.id}','store',this.value)">${tkVenueOpts(tkStoreOf(t))}</select></div>
       <div class="field" style="margin-top:10px"><label>Area</label><input class="in" list="tkareas" value="${esc(t.area || "")}" onchange="c2TSet('${t.id}','area',this.value)" placeholder="e.g. Banking, Hiring">${tkAreaList()}</div></section>
-    <section class="card"><h3>Owner</h3><select class="in" onchange="c2TSet('${t.id}','owner',this.value||null)">${tkPersonOpts(t.owner, "No owner yet")}</select><h3 style="margin-top:14px">Due</h3>${dueChips(t.due, "_tDue")}<input class="in" type="date" value="${t.due || ""}" onchange="_tDue(this.value)"></section>
+    <section class="card"><h3>Owner</h3><select class="in" onchange="c2TSet('${t.id}','owner',this.value||null)">${tkPersonOpts(t.owner, "No owner yet")}</select><h3 style="margin-top:14px">Due</h3>${dueChips(t.due, "_tDue")}<input class="in" type="date" value="${t.due || ""}" onchange="_tDue(this.value)">
+      <h3 style="margin-top:14px">Repeats</h3><select class="in" onchange="tkRepeat('${t.id}',this.value)">${TK_REPEATS.map(([v, l]) => `<option value="${v}" ${(t.repeat_unit ? t.repeat_unit + ":" + (t.repeat_every || 1) : "") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
+      ${t.repeat_unit ? `<div class="tiny mut" style="margin-top:6px">When it is done, the next one appears with the due date moved on${t.due ? "" : " (set a due date)"}.</div>` : ""}</section>
     ${log.length || t.created ? `<section class="card"><h3>History</h3><ol class="c2log">${log.map(e => `<li><span class="tiny mut num">${esc(dayName(String(e.at).slice(0, 10)))} ${timeOf(e.at)}</span><div><b>${esc(fname(e.by) || "—")}</b> ${evT(e)}</div></li>`).join("")}${!log.some(e => e.ev === "created") && t.created ? `<li><span class="tiny mut num">${esc(dayName(t.created.slice(0, 10)))}</span><div>added</div></li>` : ""}</ol></section>` : ""}`, { back: "#/tasks" });
 }

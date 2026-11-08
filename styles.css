@@ -364,3 +364,14 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 /* v0.11.4 — sign-in code field */
 .who .sicode{font-size:24px; letter-spacing:.3em; text-align:center; font-variant-numeric:tabular-nums}
 .who .sicode::placeholder{letter-spacing:0; font-size:16px}
+
+/* v0.16 navigation: sub-tabs, store chip, "+" button */
+.subnav{display:flex; gap:6px; overflow-x:auto; padding:8px 16px; background:var(--surf); border-bottom:1px solid var(--line); scrollbar-width:none; position:sticky; top:0; z-index:5}
+.subnav::-webkit-scrollbar{display:none}
+.subnav button{flex:0 0 auto; border:1px solid var(--line); background:transparent; color:var(--mut); border-radius:999px; padding:6px 12px; font-size:13px; font-weight:600; white-space:nowrap}
+.subnav button.on{background:var(--p99); color:var(--on-accent); border-color:transparent}
+.storechip{border:1px solid var(--line); background:var(--surf); color:inherit; border-radius:999px; padding:6px 10px; font-weight:700; font-size:13px; margin-right:6px; white-space:nowrap}
+.storechip small{color:var(--mut); font-weight:600}
+.fab{position:fixed; right:16px; bottom:calc(var(--tab) + env(safe-area-inset-bottom) + 14px); width:52px; height:52px; border-radius:50%; border:0; background:var(--p99); color:var(--on-accent); font-size:28px; line-height:1; box-shadow:0 6px 18px rgba(0,0,0,.22); z-index:11}
+.sheet.stsheet .row{gap:8px}
+@media (min-width:900px){ .fab{bottom:24px; right:24px} }

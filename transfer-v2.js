@@ -44,6 +44,8 @@ function viewTransferNew() {
   const lockFrom = r === "walk" && tr.side === "release", lockTo = r !== "master" && r !== "walk" && tr.side === "receive";
   const usual = {}; S.transfers.filter(t => t.from === tr.from && t.to === tr.to).forEach(t => t.lines.forEach(l => usual[l.item] = (usual[l.item] || 0) + 1));
   const chips = Object.keys(usual).sort((a, b) => usual[b] - usual[a]).filter(id => Store.item(id) && !tr.lines.some(l => l.item === id)).slice(0, 8);
+  const lastT = S.transfers.filter(t => t.from === tr.from && t.to === tr.to && t.id !== tr.id).sort((a, b) => (a.day < b.day ? 1 : -1))[0];
+  window._trCopy = () => { if (!lastT) return; tr.lines = lastT.lines.map(l => ({ item: l.item, qty: l.released != null ? l.released : l.received, text: l.text || null })).filter(l => l.qty != null && Store.item(l.item)); render(); };   /* v0.16: daily supplies */
   const itemOpts = ITEMS.map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join("");
   const lines = tr.lines.map((l, i) => { const it = Store.item(l.item); return `<div class="rline"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">${esc(l.text || fmt(l.qty) + " " + it.unit)} = ${fmt(l.qty)} ${esc(it.unit)}</div></div><button class="btn ghost danger rx" onclick="tr.lines.splice(${i},1);render()" aria-label="Remove">${ic("x-close")}</button></div>`; }).join("");
   const need = []; if (!tr.from || !tr.to) need.push("from and to"); if (!tr.lines.length) need.push("at least one item");
@@ -53,6 +55,7 @@ function viewTransferNew() {
     <div class="alert info">${tr.side === "release" ? "You record what left. The store confirms what arrived; a difference is flagged." : "You record what arrived. The sender confirms what left; a difference is flagged."}</div>
     <section class="card"><div class="grid2">${sel("From", "from", fromOpts, lockFrom)}${sel("To", "to", toOpts, lockTo)}</div></section>
     <section class="card"><h2>Items <span class="tiny mut">${tr.lines.length} line${tr.lines.length === 1 ? "" : "s"}</span></h2>
+      ${lastT && !tr.lines.length ? `<button class="btn full" style="margin-bottom:10px" onclick="_trCopy()">Same as last time · ${esc(dayName(lastT.day))} (${lastT.lines.length} item${lastT.lines.length === 1 ? "" : "s"})</button>` : ""}
       ${chips.length ? `<div class="tiny mut" style="margin-bottom:6px">Usual between these two — tap to add</div><div class="chips">${chips.map(id => `<button class="chip" onclick="trPad('${id}')">+ ${esc(Store.item(id).name)}</button>`).join("")}</div>` : ""}
       <div class="field" style="margin-top:10px"><label>Any item</label><div style="display:flex;gap:8px"><select class="in" id="tritem">${itemOpts}</select><button class="btn primary" onclick="trPad(document.getElementById('tritem').value)">Qty</button></div></div>
       ${lines ? `<div class="list" style="margin-top:10px">${lines}</div>` : `<div class="mut small" style="margin-top:8px">No lines yet.</div>`}</section>

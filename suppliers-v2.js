@@ -3,8 +3,8 @@
    Who: the office and the owners add and edit suppliers and stores; the store and the morning run may add a new supplier from Receive
    (name, phone), which stays "to complete" until the office fills in terms and delivery days. Prices and money are for the office and owners. */
 
-const supMoney = () => ["master", "admin"].includes(role());
-const supOffice = () => ["master", "admin"].includes(role());
+const supMoney = () => moneyOK();
+const supOffice = () => moneyOK();
 const supEnc = s => encodeURIComponent(s);
 let supNew = null, supEdit = null, locNew = null;
 
@@ -52,7 +52,7 @@ const supPay = i => i && i.pay_mode === "terms" ? chip("info", "terms · bill") 
 
 /* ---------- SUPPLIERS ---------- */
 function viewSuppliers() {
-  if (!["master", "admin", "lead"].includes(role())) return shell("Suppliers", "", `<div class="alert info">For the store lead, the office and the owners.</div>`, { back: "#/more" });
+  if (!canOpen("suppliers")) return shell("Suppliers", "", `<div class="alert info">For the store lead, the office and the owners.</div>`, { back: "#/more" });
   const names = Object.keys(SUPPLIER_INFO).filter(n => n !== "Made here");
   const rows = names.map(n => ({ n, i: SUPPLIER_INFO[n], st: supStats(n) })).sort((a, b) => (b.st.last || "") < (a.st.last || "") ? -1 : (b.st.last || "") > (a.st.last || "") ? 1 : a.n.localeCompare(b.n));
   const todo = rows.filter(r => r.i && r.i.confirmed === false && supOffice());

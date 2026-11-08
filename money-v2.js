@@ -11,7 +11,7 @@ const mvPerson = k => ["stefan", "mike"].includes(k);
 
 function mvBalances() {   /* server balance + moves typed on this phone and not yet saved */
   const b = {}; PAY_SOURCES.forEach(([k]) => b[k] = { party: k, in: 0, out: 0, spent: 0, net: 0 });
-  MOVE_BAL.forEach(r => { if (b[r.party]) b[r.party] = { party: r.party, in: +r.in || 0, out: +r.out || 0, spent: +r.spent || 0, net: +r.net || 0 }; });
+  MOVE_BAL.forEach(r => { if (b[r.party]) b[r.party] = { party: r.party, in: +r.in || 0, out: +r.out || 0, spent: +r.spent || 0, net: +r.net || 0, opening: r.opening, as_of: r.as_of }; });
   (S.moves || []).filter(m => m.synced === false).forEach(m => { const a = +m.amount || 0;
     if (b[m.from]) { b[m.from].out += a; b[m.from].net -= a; } if (b[m.to]) { b[m.to].in += a; b[m.to].net += a; } });
   return PAY_SOURCES.map(([k]) => b[k]);
@@ -22,7 +22,7 @@ function mvCard(r) {
     ? (n < 0 ? `The company owes ${esc(name)} <b>${peso(-n)}</b>` : n > 0 ? `${esc(name)} holds <b>${peso(n)}</b> of company money` : `${esc(name)}: settled`)
     : `${esc(name)}: <b>${n >= 0 ? "+" : "−"}${peso(Math.abs(n))}</b> <span class="tiny mut">since the app started</span>`;
   const act = mvPerson(r.party) && n < 0 ? `<button class="btn small" onclick="mvStart('${r.party}',${-n})">Pay back</button>` : "";
-  return `<div class="row"><div class="main"><div class="name">${head}</div><div class="meta">in ${peso(r.in)} · out ${peso(r.out)} · paid for deliveries ${peso(r.spent)}</div></div>${act}</div>`;
+  return `<div class="row"><div class="main"><div class="name">${head}</div><div class="meta">${r.opening != null ? `opening ${peso(+r.opening)} on ${esc(dayName(r.as_of))} · ` : ""}in ${peso(r.in)} · out ${peso(r.out)} · paid for deliveries ${peso(r.spent)}</div></div>${act}</div>`;
 }
 function mvStart(to, amount) {
   mvForm = { from: to ? "office_fund" : "", to: to || "", amount: amount || "", method: "cash", day: today(), reason: to ? "Paid back for deliveries" : "", receipts: {} };
@@ -64,15 +64,15 @@ function mvSave() {
   mvForm = null; save(); toast("Money move saved."); render();
 }
 function viewMoney() {
-  if (!["master", "admin"].includes(role())) return shell("Money", "", `<div class="alert info">For the office and the owners only.</div>`, { back: "#/today" });
+  if (!moneyOK()) return shell("Money", "", `<div class="alert info">For the office and the owners only.</div>`, { back: "#/today" });
   const bal = mvBalances(), people = bal.filter(r => mvPerson(r.party)), funds = bal.filter(r => !mvPerson(r.party));
   const moves = (S.moves || []).slice().sort((a, b) => a.day < b.day ? 1 : a.day > b.day ? -1 : 0);
   const list = moves.slice(0, 60).map(m => `<div class="row"><div class="main"><div class="name">${esc(mvName(m.from))} → ${esc(mvName(m.to))} · ${peso(+m.amount)} ${chip("", esc((Object.fromEntries(MOVE_METHODS)[m.method]) || m.method))}${m.synced === false ? " " + chip("warn", "not saved yet") : ""}</div><div class="meta">${esc(dayName(m.day))}${m.reason ? " · " + esc(m.reason) : ""}${(m.receipts || []).length ? ` · pays back ${m.receipts.length} deliver${m.receipts.length === 1 ? "y" : "ies"}` : ""}</div></div></div>`).join("");
-  return shell("Money", "who holds it, who is owed", `
+  return shell("Banking", "who holds it, who is owed", `
     <div class="alert info">Every delivery paid now says who paid. Record here when money moves between people and funds, and the app keeps who is owed what. The Google Sheets stay the books.</div>
     <section class="card"><h2>People</h2><div class="list">${people.map(mvCard).join("")}</div></section>
     ${mvFormHtml()}
-    <section class="card"><h2>Funds</h2><div class="list">${funds.map(mvCard).join("")}</div><div class="tiny mut" style="margin-top:6px">No opening balances yet: a fund shows the change since the app started recording.</div></section>
+    <section class="card"><h2>Funds</h2><div class="list">${funds.map(mvCard).join("")}</div><div class="tiny mut" style="margin-top:6px">Without an opening balance a fund shows the change since the app started recording. Set them under Settings → Opening balances & month close.</div></section>
     <section class="card"><h2>Moves <span class="tiny mut">${moves.length}</span></h2><div class="list">${list || `<div class="mut small">No moves recorded yet.</div>`}</div>
       <div style="margin-top:10px"><button class="btn" onclick="mvExport()">Moves CSV</button></div></section>`, { back: "#/more" });
 }
