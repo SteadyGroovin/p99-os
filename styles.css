@@ -388,3 +388,7 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .hcard .val{font-size:24px; font-weight:700; margin-top:4px}
 .sidebar .sgroup{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--mut); padding:12px 12px 4px; font-weight:700}
 .tabbar button{white-space:nowrap; letter-spacing:-.01em}
+/* v0.17.4: the grouped menu is longer than a laptop screen — it scrolls on its own, rows stay full height and a little tighter */
+.sidebar{overflow-y:auto; overscroll-behavior:contain; gap:2px; padding-bottom:28px}
+.sidebar > *{flex-shrink:0}
+.sidebar button{padding:7px 12px; font-size:15px; line-height:22px}

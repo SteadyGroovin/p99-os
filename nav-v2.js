@@ -7,7 +7,8 @@ const STORE_KEY = "rocketos_stores";
 function storeCfg() { let c = null; try { c = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (e) { } return c && c.rec ? c : { on: ["P99"], rec: "P99" }; }
 const curStore = () => storeCfg().rec;
 const storesOn = () => storeCfg().on;
-const officeLogin = () => window.DB_ROLE === "admin";               /* role() maps admin to walk (the morning-run screens); money screens need the raw role */
+const officeLogin = () => ["admin", "finance"].includes(window.DB_ROLE);   /* role() maps admin and finance to walk (the morning-run screens); money screens need the raw role */
+const financeLogin = () => window.DB_ROLE === "finance";   /* v0.18 (migration 025): Cherry. The office screens plus ordering, receiving at any place and the cash count; no recipes, no month close */
 const moneyOK = () => role() === "master" || officeLogin();
 
 /* v0.17 (Stefan: "the way Zoho Inventory has its menu navigation is probably better"): Home + three pinned modules + More.
@@ -27,10 +28,10 @@ const moduleOf = seg => SEG_MODULE[seg] || seg;
 const modsFor = () => MODULES.filter(m => canOpen(m[0]));
 const SETUP = MODULES.filter(m => ["users", "stores", "suppliers", "recipes", "sizes", "accounts", "books", "rules"].includes(m[0])).map(m => [m[1], m[2], ({ users: "who has which login and what they see", stores: "where stock is sent and received", suppliers: "terms, delivery days, what we buy, prices", recipes: "what each pizza, slice and batch uses", sizes: "how much is inside a can, pack or box", accounts: "expense categories, as in the accounting book", books: "what each fund held, lock a finished month", rules: "₱ limit for Mike's approval, safety days" })[m[0]]]);
 const PIN_KEY = "rocketos_pins";
-const PIN_DEFAULT = { master: ["sales", "stock", "money"], admin: ["bills", "money", "tasks"], lead: ["receive", "count", "order"], walk: ["tasks", "report", "receive"], crew: ["count", "receive", "clean"] };
+const PIN_DEFAULT = { master: ["sales", "stock", "money"], finance: ["receive", "bills", "money"], admin: ["bills", "money", "tasks"], lead: ["receive", "count", "order"], walk: ["tasks", "report", "receive"], crew: ["count", "receive", "clean"] };
 function pins() {
   let p = null; try { p = JSON.parse(localStorage.getItem(PIN_KEY) || "null"); } catch (e) { }
-  const r = officeLogin() ? "admin" : role(); const ok = modsFor().map(m => m[0]);
+  const r = financeLogin() ? "finance" : officeLogin() ? "admin" : role(); const ok = modsFor().map(m => m[0]);
   const list = (Array.isArray(p) && p.length ? p : PIN_DEFAULT[r] || PIN_DEFAULT.crew).filter(id => ok.includes(id));
   for (const id of ok) { if (list.length >= 3) break; if (!list.includes(id)) list.push(id); }
   return list.slice(0, 3);
@@ -42,12 +43,15 @@ const modShort = id => modLabel(id);   /* Stefan: short names everywhere */
 
 /* the one place that says who may open what (the database refuses the data anyway) */
 function canOpen(s0) {
-  const r = role(), adm = officeLogin(), m = r === "master";
+  const r = role(), adm = officeLogin(), fin = financeLogin(), m = r === "master";
   if (["sales", "finance", "approve", "users", "rules"].includes(s0)) return m;
-  if (["bills", "money", "stores", "accounts", "books"].includes(s0)) return m || adm;
+  if (s0 === "books") return m || (adm && !fin);                 /* month close and opening balances: not Finance (Stefan, 2026-11-08) */
+  if (["bills", "money", "stores", "accounts"].includes(s0)) return m || adm;
   if (s0 === "purchases") return m || adm || r === "lead";
-  if (["order", "sizes"].includes(s0)) return m || r === "lead";
-  if (["recipes", "recipe", "suppliers", "supplier"].includes(s0)) return m || adm || r === "lead";
+  if (s0 === "order") return m || r === "lead" || fin;           /* Cherry and the store lead order; Mike approves above the limit */
+  if (s0 === "sizes") return m || r === "lead";
+  if (["recipes", "recipe"].includes(s0)) return m || (adm && !fin) || r === "lead";
+  if (["suppliers", "supplier"].includes(s0)) return m || adm || r === "lead";
   if (s0 === "walk") return m || r === "walk";               /* the morning run: Cherry, the office, the owners */
   if (r === "walk") return adm ? true : ["walk", "tasks", "task", "report", "more", "settings", "who", "password", "receive", "transfers", "transfer", "modules", ""].includes(s0);
   return true;
@@ -143,7 +147,7 @@ function viewSettings() {
 
 /* ---------- Users & roles (owners) ---------- */
 let MEMBERS = (window.OS_LOADED && window.OS_LOADED.members) || [];
-const ROLE_INFO = [["master", "Owner", "everything"], ["admin", "Office", "money, bills, stores, suppliers, recipes, tasks"], ["walk", "Morning run / HR", "the morning run, tasks, tickets, receiving at Head Office"],
+const ROLE_INFO = [["master", "Owner", "everything"], ["finance", "Finance", "morning run, receiving, purchases, bills, funds, ordering, suppliers, cash count"], ["admin", "Office", "money, bills, stores, suppliers, recipes, tasks"], ["walk", "Morning run / HR", "the morning run, tasks, tickets, receiving at Head Office"],
   ["lead", "Store lead", "stock, ordering, recipes, cash count, tasks"], ["crew", "Crew", "count, receive, clean, tickets"], ["maint", "Maintenance", "tickets"]];
 function viewUsers() {
   if (role() !== "master") return shell("Users & roles", "", `<div class="alert info">For the owners only.</div>`, { back: "#/settings" });

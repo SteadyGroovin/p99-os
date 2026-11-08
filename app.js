@@ -22,7 +22,7 @@ const me = () => Store.person(S.me);
 /* ROLES_ON = false (Stefan, 2026-10-17 via the plugin message): the app runs as a one-person show — whoever is signed in sees and encodes everything.
    The name is kept only for "who did it". Flip to true to restore crew / lead / walk / office views. */
 const ROLES_ON = false;
-const role = () => { const r = window.DB_ROLE ? window.DB_ROLE : (!me() ? "crew" : ROLES_ON ? me().role : "master"); return r === "admin" ? "walk" : r; }; /* signed in: the role comes from the database. admin (Chris) gets the office screens of walk; the to-do board shows her every venue (migration 019) */
+const role = () => { const r = window.DB_ROLE ? window.DB_ROLE : (!me() ? "crew" : ROLES_ON ? me().role : "master"); return r === "admin" || r === "finance" ? "walk" : r; }; /* signed in: the role comes from the database. admin (Chris) gets the office screens of walk; the to-do board shows her every venue (migration 019) */
 const isOffice = () => ["walk", "admin", "master"].includes(role());
 const canManage = () => role() !== "crew";
 
@@ -218,7 +218,8 @@ function rcSave() { const total = rc.total !== "" && rc.total != null ? parseFlo
     location: rc.location && rc.location !== "P99" ? rc.location : null, synced: false, lines: rc.lines.map(l => ({ item: l.item, qty: l.qty, text: l.text, price: l.price, size: l.size > 0 ? l.size : null })) });
   rc.lines.forEach(l => { const it = Store.item(l.item); if (it && it.sizeUnknown && l.size > 0) { it.per = l.size; it.sizeUnknown = false; } });   /* v0.13 */
   if (rc.po) { const o = (S.orders || []).find(x => x.id === rc.po); if (o) o.status = "received"; }
-  rc = null; save(); toast(role() === "walk" ? "Saved at Head Office." : "Saved — stock updated."); go(role() === "crew" ? "#/today" : role() === "walk" ? "#/transfers" : "#/stock"); }
+  const toHO = role() === "walk" && (!financeLogin() || rc.location === "HO");   /* v0.18: Finance receives anywhere; Head Office deliveries go on to the transfers */
+  rc = null; save(); toast(toHO ? "Saved at Head Office." : "Saved — stock updated."); go(role() === "crew" ? "#/today" : toHO ? "#/transfers" : "#/stock"); }
 
 /* ---------- ITEMS ---------- */
 let itemQ = "";

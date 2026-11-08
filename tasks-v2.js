@@ -21,7 +21,7 @@ const tkVenue = code => tkStores().find(s => s.code === code) || { code, name: c
 const tkStoreOf = t => t.store || "P99";                     /* records from before v0.10 carry no venue: they were Pizza 99's */
 const tkPeople = () => (S.people && S.people.length ? S.people : PEOPLE.filter(p => p.id !== "store"));
 const tkMe = () => window.DB_ME || S.me;
-const tkAllVenues = () => !window.DB_ROLE || ["master", "admin"].includes(window.DB_ROLE);
+const tkAllVenues = () => !window.DB_ROLE || ["master", "admin", "finance"].includes(window.DB_ROLE);
 const tkS = t => +(t && t.sort) || 0;
 const tkSortKey = t => [tkS(t), t.due || "9999", t.created || ""];
 const tkCmp = (a, b) => { const x = tkSortKey(a), y = tkSortKey(b); return x[0] - y[0] || (x[1] < y[1] ? -1 : x[1] > y[1] ? 1 : 0) || (x[2] < y[2] ? -1 : 1); };

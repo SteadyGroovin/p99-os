@@ -245,10 +245,10 @@ function skLoadOrder(id) { const o = (S.orders || []).find(x => x.id === id); if
 function skShort() { if (!rc.po) return []; const o = (S.orders || []).find(x => x.id === rc.po); if (!o) return [];
   return o.lines.map(l => { const it = Store.item(l.item); if (!it) return null; const want = skOrdToCount(it, l.qty, l.unit); if (want == null) return null; const got = rc.lines.filter(x => x.item === l.item).reduce((a, x) => a + x.qty, 0); return got < want ? { it, want, got } : null; }).filter(Boolean); }
 function viewReceive() {
-  if (!rc) rc = { kind: "delivery", supplier: "", lines: [], photo: null, amount: "", total: "", invoice: "", pay_mode: null, pay_source: "store_fund", po: null, location: role() === "walk" ? "HO" : "P99" };
+  if (!rc) rc = { kind: "delivery", supplier: "", lines: [], photo: null, amount: "", total: "", invoice: "", pay_mode: null, pay_source: "store_fund", po: null, location: role() === "walk" && !financeLogin() ? "HO" : "P99" };
   if (rc.kind === "pullout") return skPullout();   /* v0.13.1: a pull-out is a transfer (both sides record it, transfer-v2.js); Receive shows what waits and opens the form only on a tap */
   const srcs = SUPPLIERS;
-  const locRow = role() === "walk" ? `<div class="alert info">Delivered to <b>Head Office</b>. The store records its pull-out under Stock in / out; the office confirms the release.</div>`
+  const locRow = role() === "walk" && !financeLogin() ? `<div class="alert info">Delivered to <b>Head Office</b>. The store records its pull-out under Stock in / out; the office confirms the release.</div>`
     : `<section class="card"><div class="field"><label>Delivered to</label><div class="chips">${[["P99", "Pizza 99"], ["HO", "Head Office"], ["DC", "Dragon store (keeps P99 meat)"]].map(([c, l]) => `<button class="chip ${rc.location === c ? "info" : ""}" onclick="rc.location='${c}';render()">${l}</button>`).join("")}</div>${rc.location !== "P99" ? `<div class="tiny mut" style="margin-top:6px">Goods held at ${esc(locName(rc.location))} for Pizza 99; they reach the store's stock through a transfer.</div>` : ""}</div></section>`;
   const recent = [...new Set(S.receipts.filter(r => r.kind === rc.kind).sort((a, b) => a.day < b.day ? 1 : -1).map(r => r.supplier))].filter(s => srcs.includes(s)).slice(0, 6);
   const freq = {}; S.receipts.filter(r => r.supplier === rc.supplier).forEach(r => r.lines.forEach(l => freq[l.item] = (freq[l.item] || 0) + 1));
