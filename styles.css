@@ -411,6 +411,8 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .chip.ok .dot,.chip.bad .dot,.chip.warn .dot,.chip.info .dot{background:currentColor}
 .chip{font-weight:600}
 .rb-mark{width:22px; height:auto; display:block; flex:none}
-.rb-logo{display:block; margin:0 auto 6px; width:220px; max-width:80%}
+.sidebar .brand{padding:6px 12px 18px}   /* v0.19.1: the Rocket Boracay line lockup alone; the app shows no product name anywhere (Stefan: BROS is only our internal shorthand) */
+.rb-line{width:212px; max-width:100%; height:auto; flex:none}
+
+.rb-logo{display:block; margin:0 auto 10px; width:168px; max-width:60%}   /* v0.19.1: stacked lockup, symmetric, so it centres (the side lockup looked off-centre) */
 .rb-dark{display:none} :root[data-theme="dark"] .rb-light{display:none} :root[data-theme="dark"] .rb-dark{display:block}
-.rb-os{font-family:var(--fd); font-weight:600; font-size:13px; letter-spacing:.18em; color:var(--mut); text-transform:uppercase}

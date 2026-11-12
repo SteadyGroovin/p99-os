@@ -61,7 +61,7 @@ function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split(
 function shell(title, sub, body, { back } = {}) {   /* v0.17: Home + three pinned modules + More (nav-v2.js) */
   const p = me(); const seg = (location.hash.slice(1) || "/today").split("/")[1] || "today";
   return `
-  <nav class="sidebar"><div class="brand"><img class="rb-mark rb-light" src="brand/rb-icon-light.svg" alt=""><img class="rb-mark rb-dark" src="brand/rb-icon-dark.svg" alt="">Rocket OS</div>${sidebarHTML(seg)}</nav>
+  <nav class="sidebar"><div class="brand"><img class="rb-line rb-light" src="brand/rb-lockup-line-light.svg" alt="Rocket Boracay"><img class="rb-line rb-dark" src="brand/rb-lockup-line-dark.svg" alt="Rocket Boracay"></div>${sidebarHTML(seg)}</nav>
   <div class="page">
     <header class="top">${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
@@ -83,7 +83,7 @@ function viewWho() {
   const names = PEOPLE.filter(p => p.id !== "store").map(p => `<button class="btn ${pinWho === p.id ? "primary" : ""}" onclick="S.me='${p.id}';save();go('#/today')">${esc(p.short)}<span class="tiny" style="margin-left:6px;opacity:.7">${esc(p.position)}</span></button>`).join("");
   const pad = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"].map(k => k === "" ? "<span></span>" : `<button class="btn" onclick="pinKey('${k}')">${k}</button>`).join("");
   return `<div class="who"><div class="box">
-    <div style="text-align:center"><img class="rb-logo rb-light" src="brand/rb-lockup-light.svg" alt="Rocket Boracay"><img class="rb-logo rb-dark" src="brand/rb-lockup-dark.svg" alt="Rocket Boracay"><div class="rb-os">Rocket OS</div><div class="mut small" style="margin-top:8px">Optional: pick your name so entries say who did them</div></div>
+    <div style="text-align:center"><img class="rb-logo rb-light" src="brand/rb-lockup-stacked-light.svg" alt="Rocket Boracay"><img class="rb-logo rb-dark" src="brand/rb-lockup-stacked-dark.svg" alt="Rocket Boracay"><div class="mut small" style="margin-top:8px">Optional: pick your name so entries say who did them</div></div>
     <div class="names">${names}</div>
   </div></div>`;
 }
@@ -339,7 +339,7 @@ function viewCash_v1() {
 let walk = null;
 function viewWalk_v1() {
   const d = today(); const done = S.walks.find(w => w.day === d);
-  const others = ["MCC", "Dragoncrepe", "MCBC", "Burger Kong"].map(n => `<div class="row" style="opacity:.55"><div class="main"><div class="name">${n}</div><div class="meta">still in Rocket OS v1 (Store walk app)</div></div></div>`).join("");
+  const others = ["MCC", "Dragoncrepe", "MCBC", "Burger Kong"].map(n => `<div class="row" style="opacity:.55"><div class="main"><div class="name">${n}</div><div class="meta">still in the old Store walk app</div></div></div>`).join("");
   return shell("Store walk", dayLong(d), `<div class="list"><button class="row tap" onclick="walk=null;go('#/walk/p99')"><div class="main"><div class="name">Pizza 99</div><div class="meta">${done ? `done ${timeOf(done.at)} · fund ${peso(done.fund)} · sales ${peso(done.sales)}${done.hyg ? " · hygienics " + done.hyg.total + "/45 " + done.hyg.band : ""}` : "not yet"}</div></div>${done ? chip("ok", "done") : chip("", "not yet")}<span class="chev">${ic("chevron-right")}</span></button>${others}</div>
     ${S.walks.length ? `<section class="card"><h3>Earlier runs</h3><table class="t"><thead><tr><th>Day</th><th class="n">Drawer</th><th class="n">Sales</th><th class="n">Hygienics</th></tr></thead><tbody>${S.walks.slice().reverse().map(w => `<tr><td>${dayName(w.day)}</td><td class="n num">${peso(w.total)}</td><td class="n num">${peso(w.sales)}</td><td class="n">${w.hyg ? `${w.hyg.total}/45 ${chip(w.hyg.cls, w.hyg.band)}` : "—"}</td></tr>`).join("")}</tbody></table></section>` : ""}`);
 }
@@ -380,7 +380,7 @@ function viewMore_v1() {
     <button class="row tap" onclick="signOut()"><div class="main"><div class="name">Sign out</div><div class="meta">signed in as ${esc(window.DB_USER || "")}</div></div></button>
     <button class="row tap" onclick="go('#/who')"><div class="main"><div class="name">Put a name on my entries</div><div class="meta">optional — ${esc(me().name)} now</div></div></button>
     <button class="row tap" onclick="if(confirm('Reset everything typed on this device?')){Store.reset();location.hash='#/who';location.reload()}"><div class="main"><div class="name band-bad">Reset this device</div><div class="meta">prototype: counts, photos and tickets live only on this device until the database exists</div></div></button>
-  </div><div class="tiny mut">Pizza 99 OS v0.3 · sales from the database (UTAK history to ${dayName(LAST_DAY)}) · counts, receipts, tickets and photos still live on this device only. One-person mode: every name sees everything; roles come later.</div>`);
+  </div><div class="tiny mut">Sales from the database (UTAK history to ${dayName(LAST_DAY)}) · counts, receipts, tickets and photos still live on this device only. One-person mode: every name sees everything; roles come later.</div>`);
 }
 
 /* ---------- router ---------- */
@@ -393,7 +393,7 @@ function render() {
     const r = role(), s0 = seg[0] || "";
     if (!canOpen(s0)) { location.hash = r === "walk" ? "#/walk" : "#/today"; return; }
   }
-  if (/^#\/tasks?(\/|$)/.test(location.hash) && typeof viewTasks !== "function") { $("#app").innerHTML = `<div class="wrap"><section class="card"><b>A new version of Rocket OS is ready.</b><div class="small mut" style="margin:6px 0 12px">Part of the old version is still in this phone's cache.</div><button class="btn primary full" onclick="location.reload()">Reload</button></section></div>`; return; }
+  if (/^#\/tasks?(\/|$)/.test(location.hash) && typeof viewTasks !== "function") { $("#app").innerHTML = `<div class="wrap"><section class="card"><b>A new version is ready.</b><div class="small mut" style="margin:6px 0 12px">Part of the old version is still in this phone's cache.</div><button class="btn primary full" onclick="location.reload()">Reload</button></section></div>`; return; }
   /* signed in: the app is that person (v0.11.6, Stefan: "she should be named Cherry in the app"); entries carry their name.
      Without a login (dev page) the app still opens as the store, a name optional under More (2026-10-18). */
   if (window.DB_ME && Store.person(window.DB_ME)) { if (S.me !== window.DB_ME) { S.me = window.DB_ME; save(); } }

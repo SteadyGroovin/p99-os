@@ -30,7 +30,7 @@
 </style>
 </head>
 <body>
-<main id="app"><div class="brand">Rocket OS · Morning run</div><p class="mut">Loading…</p></main>
+<main id="app"><div class="brand">Rocket Boracay · Morning run</div><p class="mut">Loading…</p></main>
 <script>
 const DB_URL = "https://fuvtcwalsmgufbkozxul.supabase.co", DB_KEY = "sb_publishable_n_au6M6ZgAC38s85asticA_s5Ux-jkF";
 const TOK = new URLSearchParams(location.search).get("t") || "";
@@ -45,7 +45,7 @@ async function rpc(name, args) {
   if (!r.ok) throw new Error((j && (j.message || j.hint)) || `Error ${r.status}`);
   return j;
 }
-const head = `<div class="brand">Rocket OS · Morning run</div>`;
+const head = `<div class="brand">Rocket Boracay · Morning run</div>`;
 function stop(title, text) { app.innerHTML = `${head}<h1>${esc(title)}</h1><p class="mut">${esc(text)}</p>`; }
 let D = null;
 function draw(msg) {

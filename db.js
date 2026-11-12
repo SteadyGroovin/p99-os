@@ -9,13 +9,13 @@ const bootEl = document.getElementById("app");
 const bootEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /* every release loads as one matching set: GitHub Pages caches files for 10 minutes, and a stale db.js next to a new app.js left Tasks blank (v0.10.0, 2026-11-07) */
-const APP_V = "0.19.0";
+const APP_V = "0.19.1";
 function loadScript(src) {
   return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src + (src.includes("?") ? "&" : "?") + "v=" + APP_V; s.onload = ok; s.onerror = () => no(new Error("could not load " + src)); document.body.appendChild(s); });
 }
 function bootScreen(html) {
   bootEl.innerHTML = `<div class="who"><div class="box">
-    <div style="text-align:center;margin-bottom:20px"><img class="rb-logo rb-light" src="brand/rb-lockup-light.svg" alt="Rocket Boracay"><img class="rb-logo rb-dark" src="brand/rb-lockup-dark.svg" alt="Rocket Boracay"><div class="rb-os">Rocket OS</div></div>${html}</div></div>`;
+    <div style="text-align:center;margin-bottom:20px"><img class="rb-logo rb-light" src="brand/rb-lockup-stacked-light.svg" alt="Rocket Boracay"><img class="rb-logo rb-dark" src="brand/rb-lockup-stacked-dark.svg" alt="Rocket Boracay"></div>${html}</div></div>`;
 }
 /* Sign-in (v0.11.4, Stefan 2026-11-08: "make login easier"). Default: e-mail → a code by mail → type it. No password to remember,
    and a virus scanner opening the mail cannot use up a code the way it used up the one-time links ("Email link is invalid or has expired").
@@ -67,7 +67,7 @@ async function siSend() {
   if (SI.busy) return; SI.busy = true;
   const { error } = await sb.auth.signInWithOtp({ email: SI.email, options: { emailRedirectTo: location.origin + location.pathname, shouldCreateUser: false } });
   SI.busy = false;
-  if (error) { SI.step = "email"; return signInForm(`<span class="band-bad">${/signups not allowed|not found|not allowed/i.test(error.message) ? "This e-mail has no Rocket OS login. Ask Stefan to add it." : /rate|seconds/i.test(error.message) ? "Please wait a minute before asking for another code." : bootEsc(error.message)}</span>`); }
+  if (error) { SI.step = "email"; return signInForm(`<span class="band-bad">${/signups not allowed|not found|not allowed/i.test(error.message) ? "This e-mail has no login yet. Ask Stefan to add it." : /rate|seconds/i.test(error.message) ? "Please wait a minute before asking for another code." : bootEsc(error.message)}</span>`); }
   SI.step = "code"; signInForm();
 }
 async function signOut() { await sb.auth.signOut(); location.hash = ""; location.reload(); }
@@ -90,7 +90,7 @@ async function start() {
   bootScreen(`<div class="mut" style="text-align:center">Loading sales from the database…</div>`);
   const { data: member, error: mErr } = await sb.from("os_member").select("role").maybeSingle();
   if (mErr || !member) return bootScreen(`<div><b>Signed in as ${bootEsc(session.user.email)}</b></div>
-    <div class="small mut" style="margin:8px 0 16px">This account is not on the Rocket OS member list yet. Ask Stefan to add it.</div>
+    <div class="small mut" style="margin:8px 0 16px">This account is not on the member list yet. Ask Stefan to add it.</div>
     <button class="btn full" onclick="signOut()">Sign out</button>`);
   window.DB_ROLE = member.role; /* master | lead | walk | crew — the database enforces it too (migration 011); this only shapes the screens */
   let data = { source: "", days: {} };

@@ -166,7 +166,7 @@ function tkQuickAdd() {
   const el = $("#qat"); const title = (el ? el.value : TK.qa.title).trim(); if (!title) { toast("Type the task first."); if (el) el.focus(); return; }
   const store = TK.qa.store || (TK.venue !== "all" ? TK.venue : "GROUP");
   const first = (S.tasks || []).filter(x => x.status === "open").sort(tkCmp)[0];
-  const at = nowISO(); S.tasks.unshift({ id: "k-" + Date.now(), title, detail: "", owner: TK.qa.owner || null, due: TK.qa.due || null, status: "open", store, area: (TK.qa.area || "").trim() || null, sort: first ? tkS(first) - 10 : 0, source: fname(tkMe()) || "Rocket OS", created: at, log: [{ at, by: tkMe(), ev: "created" }] });
+  const at = nowISO(); S.tasks.unshift({ id: "k-" + Date.now(), title, detail: "", owner: TK.qa.owner || null, due: TK.qa.due || null, status: "open", store, area: (TK.qa.area || "").trim() || null, sort: first ? tkS(first) - 10 : 0, source: fname(tkMe()) || "App", created: at, log: [{ at, by: tkMe(), ev: "created" }] });
   TK.qa.title = ""; save(); toast(`Task added to ${tkShort(store)}.`); render();
 }
 const tkPersonOpts = (cur, blank) => (blank ? `<option value="">${blank}</option>` : "") + tkPeople().map(p => `<option value="${p.id}" ${cur === p.id ? "selected" : ""}>${esc(p.short || p.name)}</option>`).join("");
@@ -225,7 +225,7 @@ function viewTask(id) {
     if (!ntask) ntask = { title: "", detail: "", owner: "", due: "", store: TK.venue !== "all" ? TK.venue : "GROUP", area: "", status: "open" };
     window._ntDue = v => { ntask.due = v; render(); };
     window._ntAdd = () => { if (!ntask.title.trim()) { toast("Type the task first."); return; } const at = nowISO(); const first = (S.tasks || []).filter(x => x.status === ntask.status).sort(tkCmp)[0];
-      S.tasks.unshift({ id: "k-" + Date.now(), title: ntask.title.trim(), detail: ntask.detail, owner: ntask.owner || null, due: ntask.due || null, status: ntask.status, store: ntask.store || "GROUP", area: (ntask.area || "").trim() || null, sort: first ? tkS(first) - 10 : 0, source: fname(tkMe()) || "Rocket OS", created: at, log: [{ at, by: tkMe(), ev: "created" }] });
+      S.tasks.unshift({ id: "k-" + Date.now(), title: ntask.title.trim(), detail: ntask.detail, owner: ntask.owner || null, due: ntask.due || null, status: ntask.status, store: ntask.store || "GROUP", area: (ntask.area || "").trim() || null, sort: first ? tkS(first) - 10 : 0, source: fname(tkMe()) || "App", created: at, log: [{ at, by: tkMe(), ev: "created" }] });
       ntask = null; TK.qa.title = ""; save(); toast("Task added."); go("#/tasks"); };
     return shell("New task", "what · where · who · by when", `<section class="card"><div class="field"><label for="ntt2">Task</label><input class="in" id="ntt2" value="${esc(ntask.title)}" oninput="ntask.title=this.value"></div><div class="field" style="margin-top:10px"><label>Detail</label><textarea class="in" oninput="ntask.detail=this.value">${esc(ntask.detail)}</textarea></div></section>
       <section class="card"><div class="field"><label>Venue</label><select class="in" onchange="ntask.store=this.value">${tkVenueOpts(ntask.store)}</select></div>
