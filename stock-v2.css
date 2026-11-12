@@ -138,3 +138,10 @@
 @media (max-width:1520px){ .itbl .h4{display:none} }
 @media (max-width:700px){ .itwrap.flat .sub2{max-width:38vw} .itwrap.flat{margin:0} }
 @media (max-width:700px){ .itwrap.flat .itbl td.nm{min-width:0} .itwrap.flat .sub2{max-width:30vw} .itwrap.flat .itbl td, .itwrap.flat .itbl th{padding-left:4px; padding-right:4px} }
+
+/* v0.19.4: the table on Chef sheet, Suppliers, Deliveries log, Bills, Purchases */
+.itbl td.wrapc, .itbl td.nm.wrapc{white-space:normal; min-width:180px; max-width:520px}
+.itbl .sub2.wrap{white-space:normal; max-width:none; overflow:visible}
+.itbl td .thumb, .itbl td img{width:28px; height:28px; border-radius:4px; object-fit:cover; display:block}
+.itbl tr.gh td a.sl{color:var(--ink2)} .itbl tr.gh td b{color:var(--ink)}
+.itbl tr.gh td{white-space:normal}

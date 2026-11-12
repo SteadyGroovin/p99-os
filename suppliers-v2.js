@@ -51,17 +51,23 @@ function supStats(name) {
 const supPay = i => i && i.pay_mode === "terms" ? chip("info", "terms · bill") : i && i.pay_mode === "paid_now" ? chip("", "paid now") : chip("warn", "terms not set");
 
 /* ---------- SUPPLIERS ---------- */
+let supSort = "last", supDir = 1;   /* v0.19.4: one line per supplier, every column sorts */
+function supSortBy(k) { if (supSort === k) supDir = -supDir; else { supSort = k; supDir = 1; } render(); }
 function viewSuppliers() {
   if (!canOpen("suppliers")) return shell("Suppliers", "", `<div class="alert info">For the store lead, the office and the owners.</div>`, { back: "#/more" });
   const names = Object.keys(SUPPLIER_INFO).filter(n => n !== "Made here");
-  const rows = names.map(n => ({ n, i: SUPPLIER_INFO[n], st: supStats(n) })).sort((a, b) => (b.st.last || "") < (a.st.last || "") ? -1 : (b.st.last || "") > (a.st.last || "") ? 1 : a.n.localeCompare(b.n));
+  const rows = names.map(n => ({ n, i: SUPPLIER_INFO[n], st: supStats(n) }));
   const todo = rows.filter(r => r.i && r.i.confirmed === false && supOffice());
-  const list = rows.map(({ n, i, st }) => `<button class="row tap" onclick="go('#/supplier/${supEnc(n)}')"><div class="main"><div class="name">${esc(n)} ${supPay(i)}${i && i.confirmed === false ? ` <span class="chip warn"><i class="dot"></i>to complete</span>` : ""}</div>
-    <div class="meta">${i && i.lead != null ? `${fmt(i.lead)} day${+i.lead === 1 ? "" : "s"} to arrive · ` : ""}${st.last ? `last delivery ${esc(dayName(st.last))} · ${st.n90} in 90 days` : "no delivery in the app yet"}${supMoney() && st.spend30 ? ` · ${peso(st.spend30)} in 30 days` : ""}${supMoney() && st.open.length ? ` · ${st.open.length} open bill${st.open.length === 1 ? "" : "s"}` : ""}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("");
+  const key = { name: r => r.n.toLowerCase(), terms: r => (r.i && r.i.pay_mode) || "~", lead: r => r.i && r.i.lead != null ? +r.i.lead : 1e9, items: r => -Object.keys(r.st.items).length, last: r => r.st.last ? -Date.parse(r.st.last) : 1e15, n90: r => -r.st.n90, spend: r => -r.st.spend30, open: r => -r.st.open.reduce((a, m) => a + (+m.total || 0), 0) }[supSort] || (r => r.n.toLowerCase());
+  rows.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * supDir || a.n.localeCompare(b.n); });
+  const cols = [["name", "Supplier", ""], ["terms", "Terms", "h1"], ["lead", "Days to arrive", "n h2"], ["items", "Items", "n h1"], ["last", "Last delivery", "n"], ["n90", "In 90 days", "n h1"]].concat(supMoney() ? [["spend", "Spend 30 d", "n h1"], ["open", "Open bills", "n"]] : []);
+  const head = `<tr>${cols.map(([k, l, c]) => `<th class="${c}"><button class="${supSort === k ? "on" : ""}" onclick="supSortBy('${k}')">${l}${supSort === k ? ((["name", "terms", "lead"].includes(k) ? supDir : -supDir) > 0 ? " ▲" : " ▼") : ""}</button></th>`).join("")}</tr>`;
+  const list = rows.map(({ n, i, st }) => { const op = st.open.reduce((a, m) => a + (+m.total || 0), 0);
+    return `<tr onclick="go('#/supplier/${supEnc(n)}')" tabindex="0" onkeydown="if(event.key==='Enter')go('#/supplier/${supEnc(n)}')"><td class="nm">${esc(n)}${i && i.confirmed === false ? `<span class="tag" style="color:var(--warn)">to complete</span>` : ""}<div class="sub2">${i && i.pay_mode === "terms" ? "terms · bill" : i && i.pay_mode === "paid_now" ? "paid now" : "terms not set"}${st.n90 ? ` · ${st.n90} in 90 days` : ""}</div></td><td class="h1 st">${supPay(i)}</td><td class="n h2 num">${i && i.lead != null ? fmt(i.lead) : "—"}</td><td class="n h1 num">${Object.keys(st.items).length || "—"}</td><td class="n mut">${st.last ? esc(dayName(st.last)) : "—"}</td><td class="n h1 num">${st.n90 || "—"}</td>${supMoney() ? `<td class="n h1 num">${st.spend30 ? peso(st.spend30) : "—"}</td><td class="n num">${st.open.length ? `<b>${peso(op)}</b> <small>${st.open.length}</small>` : "—"}</td>` : ""}</tr>`; }).join("");
   return shell("Suppliers", `${names.length} suppliers`, `
     ${todo.length ? `<div class="alert warn">${todo.length} supplier${todo.length === 1 ? " was" : "s were"} added at Receive and need${todo.length === 1 ? "s" : ""} terms and delivery days: ${todo.map(r => esc(r.n)).join(", ")}.</div>` : ""}
     ${supNew ? supNewForm(false) : `<button class="btn" onclick="supNew={};render()">+ New supplier</button>`}
-    <section class="card"><div class="list">${list}</div></section>`, { back: "#/more" });
+    <div class="itwrap"><table class="itbl"><thead>${head}</thead><tbody>${list}</tbody></table></div>`, { back: "#/more" });
 }
 
 function viewSupplier(enc) {
