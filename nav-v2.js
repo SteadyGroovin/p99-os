@@ -69,7 +69,7 @@ function sidebarHTML(seg) {   /* tablet and laptop: the whole menu, like Zoho's 
   return `<button class="${seg === "today" || !seg ? "on" : ""}" onclick="go('${homeHref()}')">${ic(ICON.home, "sm")}<span class="sl">Home</span></button>` +
     GROUPS.map(g => { const ms = mods.filter(x => x[4] === g); if (!ms.length) return ""; return `<div class="sgroup">${esc(g)}</div>` + ms.map(x => `<button class="${m === x[0] ? "on" : ""}" onclick="go('${x[2]}')">${ic(ICON[x[3]] || ICON.dots, "sm")}<span class="sl">${esc(x[1])}</span></button>`).join(""); }).join("");
 }
-function subnavHTML(seg) {   /* sibling shortcuts inside a group (Stefan agreed: Receive one tap from Count) */
+function subnavHTML(seg) {   /* sibling shortcuts inside a group. Not shown since v0.19.2 (Stefan, 2026-11-13: "remove the top part completely"); kept in case it comes back */
   const m = moduleOf(seg), me1 = MODULES.find(x => x[0] === m); if (!me1) return "";
   const sibs = modsFor().filter(x => x[4] === me1[4]); if (sibs.length < 2) return "";
   return `<nav class="subnav" aria-label="${esc(me1[4])}">${sibs.map(x => `<button class="${x[0] === m ? "on" : ""}" onclick="go('${x[2]}')">${esc(modShort(x[0]))}</button>`).join("")}</nav>`;

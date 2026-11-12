@@ -67,7 +67,6 @@ function shell(title, sub, body, { back } = {}) {   /* v0.17: Home + three pinne
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
       ${storeChip()}<button class="me" onclick="go('#/settings')" aria-label="Settings"><span class="av">${p ? esc(p.short[0]) : "?"}</span></button>
     </header>
-    ${subnavHTML(seg)}
     <main class="wrap">${body}</main>
   </div>
   <nav class="tabbar">${tabbarHTML(seg)}</nav>${storeSheetHTML()}`;
