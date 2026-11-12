@@ -54,7 +54,7 @@
 .mr-sc{display:grid; grid-template-columns:repeat(5,1fr); gap:6px}
 .mr-sc button{min-height:48px; border-radius:var(--r-ctl); border:1px solid var(--line2); background:var(--surf); color:var(--ink); font-size:18px; font-weight:600; box-shadow:var(--shadow-xs)}
 .mr-sc button.on{color:#fff; border-color:transparent}
-.mr-sc button.on.s1,.mr-sc button.on.s2{background:var(--r500)} .mr-sc button.on.s3{background:var(--y700)} .mr-sc button.on.s4,.mr-sc button.on.s5{background:var(--g700)}
+.mr-sc button.on.s1,.mr-sc button.on.s2{background:var(--r500); color:var(--n900)} .mr-sc button.on.s3{background:var(--y700)} .mr-sc button.on.s4,.mr-sc button.on.s5{background:var(--g700)}
 .mr-low{color:var(--warn); margin-top:6px} .mr-low[hidden],#mr-hlow[hidden],.mr-gap[hidden]{display:none}
 .mr-kv{display:grid; grid-template-columns:1fr; gap:0; margin:0 0 12px}
 .mr-kv > div{display:grid; grid-template-columns:150px 1fr; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); align-items:center}

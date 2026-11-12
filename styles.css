@@ -1,38 +1,47 @@
-/* Pizza 99 OS — styles on Untitled UI v2 (free Figma kit, file VaEcYtoGqboijxuttiJYsr), read through the Figma connector 2026-10-17.
-   Tokens as in the kit: Inter; Neutral 50–900; Brand = P99 store blue #2A78D6 from Rocket OS (Stefan 2026-10-17; replaced the kit's placeholder purple #7F56D9; swap again for the Pizza 99 logo colour once it arrives; 50–300 and 700 shades derived);
-   Green/Red/Yellow 50·500·700 for success/error/warning; controls radius 8, cards radius 12, border 1px Neutral/200–300,
-   Shadow/xs 0 1px 2px rgba(0,0,0,.05), focus ring 4px brand-100 (#D6E6FA). Sizes = the kit's defaults (Stefan 2026-10-17: v0.1 was too big): body 16/24, names 16/24 semibold, h1 20/30, rows 48, buttons 44, keypad 26, nothing under 12. */
+/* Rocket OS — v0.19.0 (2026-11-13): Rocket Boracay corporate design v1.1 (skill rocket-boracay-corporate-design).
+   Layout, sizes and components unchanged from the Untitled UI v2 base (2026-10-17); only the theme moved:
+   Ink/Paper neutrals, Signal Orange #FF4A1C as the brand fill (Ink text on it, never white), pop status colours
+   (Mint, Hot Red, Electric, Amber) as solid chips and dots, deeper text versions for status words on light pages
+   (all >= 4.5:1). Type: Space Grotesk (text, tabular figures) and Unbounded (titles, big numbers), self-hosted in fonts/.
+   Previous theme: Inter, Untitled neutrals, P99 blue #2A78D6. */
+@font-face{font-family:"Space Grotesk"; font-weight:400; font-display:swap; src:url("fonts/SpaceGrotesk-Regular.woff") format("woff")}
+@font-face{font-family:"Space Grotesk"; font-weight:500; font-display:swap; src:url("fonts/SpaceGrotesk-Medium.woff") format("woff")}
+@font-face{font-family:"Space Grotesk"; font-weight:600 700; font-display:swap; src:url("fonts/SpaceGrotesk-Bold.woff") format("woff")}
+@font-face{font-family:"Unbounded"; font-weight:600; font-display:swap; src:url("fonts/Unbounded-SemiBold.woff") format("woff")}
+@font-face{font-family:"Unbounded"; font-weight:700; font-display:swap; src:url("fonts/Unbounded-Bold.woff") format("woff")}
 :root{
-  --white:#FFFFFF; --n50:#FAFAFA; --n100:#F5F5F5; --n200:#E5E5E5; --n300:#D4D4D4; --n400:#A3A3A3; --n500:#737373; --n600:#525252; --n700:#404040; --n800:#262626; --n900:#171717; --n950:#0A0A0A;
-  --brand50:#EAF2FC; --brand100:#D6E6FA; --brand300:#9CC3F0; --brand500:#3987E5; --brand600:#2A78D6; --brand700:#1F5FAF;
-  --g50:#F0FDF4; --g500:#22C55E; --g700:#15803D; --r50:#FEF2F2; --r300:#FCA5A5; --r500:#EF4444; --r700:#B91C1C; --y50:#FEFCE8; --y500:#EAB308; --y700:#A16207; --b50:#EFF6FF; --b500:#3B82F6; --b700:#1D4ED8;
+  --white:#FFFFFF; --n50:#F4F3EF; --n100:#EBEAE5; --n200:#D5D7DC; --n300:#BEC1C8; --n400:#A9ACB4; --n500:#6B6F79; --n600:#5B5F69; --n700:#3A3D45; --n800:#262931; --n900:#121318; --n950:#0B0C10;
+  --brand50:#FFF1EC; --brand100:#FFDCCF; --brand300:#FF9A7A; --brand500:#FF4A1C; --brand600:#FF4A1C; --brand700:#B32E0B;
+  --mint:#00D68F; --hot:#FF2E63; --electric:#2E6BFF; --amber:#FFB020; --violet:#8B5CFF;
+  --g50:#DDFBEF; --g500:var(--mint); --g700:#007A4D; --r50:#FFE3EA; --r300:#FF8FAB; --r500:var(--hot); --r700:#C4103D; --y50:#FFF3D6; --y500:var(--amber); --y700:#875400; --b50:#E6EDFF; --b500:var(--electric); --b700:#1F4FD6;
   /* semantic */
   --bg:var(--n50); --surf:var(--white); --surf2:var(--n100); --line:var(--n200); --line2:var(--n300);
   --ink:var(--n900); --ink2:var(--n700); --mut:var(--n500); --ph:var(--n500);
-  --p99:var(--brand600); --p99-deep:var(--brand700); --p99-soft:var(--brand50); --on-accent:var(--white);
+  --p99:var(--brand600); --p99-deep:#E63B10; --p99-soft:var(--brand50); --p99-text:var(--brand700); --on-accent:var(--n900);
   --ok:var(--g700); --ok-dot:var(--g500); --ok-bg:var(--g50); --warn:var(--y700); --warn-dot:var(--y500); --warn-bg:var(--y50);
   --bad:var(--r700); --bad-dot:var(--r500); --bad-bg:var(--r50); --info:var(--b700); --info-dot:var(--b500); --info-bg:var(--b50);
-  --shadow-xs:0 1px 2px rgba(0,0,0,.05); --ring:0 0 0 4px var(--brand100); --ring-bad:0 0 0 4px #FEE2E2;
+  --shadow-xs:0 1px 2px rgba(18,19,24,.06); --ring:0 0 0 4px var(--brand100); --ring-bad:0 0 0 4px var(--r50);
   --r-ctl:8px; --r-card:12px; --row:48px; --tab:64px;
-  --f: Inter, -apple-system, "SF Pro Text", Roboto, "Segoe UI", system-ui, sans-serif;
+  --f: "Space Grotesk", -apple-system, "SF Pro Text", Roboto, "Segoe UI", system-ui, sans-serif;
+  --fd: "Unbounded", "Space Grotesk", -apple-system, system-ui, sans-serif;
 }
 :root[data-theme="dark"]{
-  --bg:var(--n950); --surf:var(--n900); --surf2:var(--n800); --line:var(--n800); --line2:var(--n700);
+  --bg:var(--n900); --surf:#1C1E25; --surf2:var(--n800); --line:#2B2E36; --line2:var(--n700);
   --ink:var(--n50); --ink2:var(--n300); --mut:var(--n400); --ph:var(--n500);
-  --p99:var(--brand500); --p99-deep:var(--brand600); --p99-soft:rgba(57,135,229,.16);
-  --ok:#4ADE80; --ok-bg:rgba(34,197,94,.14); --warn:#FACC15; --warn-bg:rgba(234,179,8,.16); --bad:#F87171; --bad-bg:rgba(239,68,68,.16); --info:#93C5FD; --info-bg:rgba(59,130,246,.16);
-  --shadow-xs:0 1px 2px rgba(0,0,0,.4); --ring:0 0 0 4px rgba(42,120,214,.35);
+  --p99:var(--brand500); --p99-deep:#FF6A42; --p99-soft:rgba(255,74,28,.16); --p99-text:var(--brand500);
+  --ok:var(--mint); --ok-bg:rgba(0,214,143,.14); --warn:var(--amber); --warn-bg:rgba(255,176,32,.16); --bad:#FF5C85; --bad-bg:rgba(255,46,99,.16); --info:#7FA2FF; --info-bg:rgba(46,107,255,.18);
+  --shadow-xs:0 1px 2px rgba(0,0,0,.4); --ring:0 0 0 4px rgba(255,74,28,.35);
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--f); font-size:16px; line-height:24px; -webkit-font-smoothing:antialiased}
 body{min-height:100dvh; padding-bottom:calc(var(--tab) + env(safe-area-inset-bottom))}
 button,input,select,textarea{font:inherit; color:inherit}
 button{cursor:pointer}
-a{color:var(--p99); font-weight:600; text-decoration:none}
+a{color:var(--p99-text); font-weight:600; text-decoration:none}
 .num{font-variant-numeric:tabular-nums}
 .mut{color:var(--mut)} .ink2{color:var(--ink2)}
 .small{font-size:14px; line-height:20px} .tiny{font-size:13px; line-height:18px}
-h1{font-size:20px; line-height:30px; font-weight:600; margin:0; letter-spacing:-.01em}
+h1{font-family:var(--fd); font-size:19px; line-height:28px; font-weight:600; margin:0; letter-spacing:-.01em}
 h2{font-size:16px; line-height:24px; font-weight:600; margin:0 0 10px}
 h3{font-size:14px; line-height:20px; margin:0 0 8px; color:var(--mut); font-weight:600; text-transform:uppercase; letter-spacing:.04em}
 
@@ -53,9 +62,9 @@ h3{font-size:14px; line-height:20px; margin:0 0 8px; color:var(--mut); font-weig
 .card.tap:active{background:var(--surf2)}
 .grid2{display:grid; grid-template-columns:1fr 1fr; gap:12px}
 @media (min-width:900px){ .wrap{max-width:1040px; margin:0 auto; padding:24px 32px} .grid2{grid-template-columns:repeat(4,1fr)} }
-.hero{font-size:36px; line-height:44px; font-weight:600; letter-spacing:-.02em; margin-top:4px}
+.hero{font-family:var(--fd); font-size:32px; line-height:42px; font-weight:600; letter-spacing:-.02em; margin-top:4px}
 .kpi .lab{font-size:13px; line-height:18px; color:var(--mut); font-weight:500}
-.kpi .val{font-size:24px; line-height:32px; font-weight:600; letter-spacing:-.02em; margin-top:4px}
+.kpi .val{font-family:var(--fd); font-size:21px; line-height:30px; font-weight:600; letter-spacing:-.02em; margin-top:4px}
 .kpi .trend{font-size:13px; line-height:18px; color:var(--ink2); margin-top:4px}
 
 /* rows */
@@ -149,13 +158,13 @@ textarea.in{padding:10px 12px; min-height:80px; resize:vertical; line-height:24p
 .ic.xs{width:16px; height:16px; vertical-align:-3px}
 .ic.ok{color:var(--ok)}
 .btn .ic,.photo .ic{margin-right:4px}
-.tabbar button.on{color:var(--p99)}
-.tabbar button .bdg{position:absolute; margin-left:28px; margin-top:-8px; background:var(--r500); color:#fff; border-radius:999px; font-size:12px; line-height:18px; min-width:20px; height:20px; display:grid; place-items:center; padding:0 5px; font-weight:600}
+.tabbar button.on{color:var(--p99-text)}
+.tabbar button .bdg{position:absolute; margin-left:28px; margin-top:-8px; background:var(--r500); color:var(--n900); border-radius:999px; font-size:12px; line-height:18px; min-width:20px; height:20px; display:grid; place-items:center; padding:0 5px; font-weight:600}
 .sidebar{display:none; position:fixed; left:0; top:0; bottom:0; width:240px; background:var(--surf); border-right:1px solid var(--line); flex-direction:column; padding:20px 12px; gap:4px}
 .sidebar button{display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:var(--r-ctl); border:0; background:transparent; color:var(--ink2); font-size:16px; line-height:24px; font-weight:600; text-align:left}
 .sidebar button.on{background:var(--n100); color:var(--ink)}
 :root[data-theme="dark"] .sidebar button.on{background:var(--n800)}
-.sidebar .brand{font-size:18px; font-weight:600; padding:4px 12px 16px; display:flex; align-items:center}
+.sidebar .brand{font-family:var(--fd); font-size:17px; font-weight:600; padding:4px 12px 16px; display:flex; align-items:center; gap:10px}
 @media (min-width:900px){ .tabbar{display:none} body{padding-bottom:24px} .sidebar{display:flex} } /* after .sidebar{display:none} so the wide-screen rule wins */
 @media (min-width:900px){ .page{margin-left:240px} }
 
@@ -200,7 +209,7 @@ svg.chart .vb{fill:var(--p99); opacity:.9}
 .thumb{width:44px; height:44px; object-fit:cover; border-radius:8px; border:1px solid var(--line); flex:none; cursor:zoom-in}
 .thumb.big{width:100%; height:auto; max-height:260px; object-fit:contain; margin-top:8px; background:var(--n100)}
 .photo{padding:8px 14px; font-size:14px; display:inline-flex; width:auto; min-width:160px} .photo svg{width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; margin-right:6px}
-.btn.score{flex:1; min-height:40px; padding:0} .btn.score.on{background:var(--p99); border-color:var(--p99); color:#fff}
+.btn.score{flex:1; min-height:40px; padding:0} .btn.score.on{background:var(--p99); border-color:var(--p99); color:var(--on-accent)}
 table.t tr.hi td{background:var(--p99-soft)} table.t tr.tap{cursor:pointer}
 svg.chart .vb.hi{fill:var(--brand700)} :root[data-theme="dark"] svg.chart .vb.hi{fill:var(--brand300)}
 .ic{width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; vertical-align:middle} .ic.sm{width:18px; height:18px}
@@ -208,8 +217,8 @@ svg.chart .vb.hi{fill:var(--brand700)} :root[data-theme="dark"] svg.chart .vb.hi
 .grid2 .card{padding:14px 16px}
 
 /* ---------- Sales v2 (2026-10-28): chart tokens, validated with the dataviz palette script ---------- */
-:root{ --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --sother:#898781; --sgrid:var(--line) }
-:root[data-theme="dark"]{ --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --sother:#898781 }
+:root{ --s1:var(--electric); --s2:var(--brand500); --s3:var(--mint); --s4:var(--amber); --sother:var(--n400); --sgrid:var(--line) }
+:root[data-theme="dark"]{ --s1:#4F84FF; --s2:var(--brand500); --s3:var(--mint); --s4:var(--amber); --sother:var(--n500) }
 .rng{display:flex; gap:6px; overflow-x:auto; padding:2px 0 4px; scrollbar-width:none} .rng::-webkit-scrollbar{display:none}
 .rng button{flex:none; height:36px; padding:0 14px; border-radius:999px; border:1px solid var(--line2); background:var(--surf); color:var(--ink2); font-size:14px; font-weight:600}
 .rng button.on{background:var(--p99); border-color:var(--p99); color:var(--on-accent)}
@@ -231,7 +240,7 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .legend{display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:10px; font-size:13px; line-height:18px; color:var(--ink2)}
 .legend b{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px} .legend b.dash{height:0; width:16px; border-top:2px dashed var(--mut); border-radius:0}
 .stack{display:flex; gap:2px; height:22px; border-radius:6px; overflow:hidden} .stack i{display:block; min-width:3px; cursor:default}
-.tbl{margin-top:10px} .tbl summary{cursor:pointer; font-size:14px; font-weight:600; color:var(--p99); padding:6px 0}
+.tbl{margin-top:10px} .tbl summary{cursor:pointer; font-size:14px; font-weight:600; color:var(--p99-text); padding:6px 0}
 .tbl .t{margin-top:6px} .tbl[open]{max-height:none}
 .heat{display:grid; grid-template-columns:34px repeat(var(--cols),minmax(0,1fr)); gap:2px; align-items:stretch}
 .heat .hr{font-size:12px; line-height:26px; color:var(--mut)} .heat .ha{font-size:11px; color:var(--mut); text-align:center; line-height:18px; white-space:nowrap}
@@ -381,7 +390,7 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .qa-row{display:flex; gap:10px; overflow-x:auto; scrollbar-width:none}
 .qa-row::-webkit-scrollbar{display:none}
 .qa-row button{flex:0 0 auto; width:76px; border:0; background:transparent; display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; font-weight:600; color:inherit; text-align:center; line-height:1.2}
-.qa-ic{width:48px; height:48px; border-radius:50%; background:var(--p99-soft); color:var(--p99); display:grid; place-items:center}
+.qa-ic{width:48px; height:48px; border-radius:50%; background:var(--p99-soft); color:var(--p99-text); display:grid; place-items:center}
 .hcards{margin-bottom:12px}
 .hcard{text-align:left; border:1px solid var(--line); background:var(--surf); color:inherit}
 .hcard .lab{font-size:12px; color:var(--mut); font-weight:600}
@@ -392,3 +401,16 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .sidebar{overflow-y:auto; overscroll-behavior:contain; gap:2px; padding-bottom:28px}
 .sidebar > *{flex-shrink:0}
 .sidebar button{padding:7px 12px; font-size:15px; line-height:22px}
+
+/* v0.19.0 — Rocket Boracay CI: status chips are solid pop pills with Ink text (Electric takes white);
+   status words outside chips keep the deeper --ok/--bad/--warn/--info text colours. Brand mark in the sidebar and sign-in. */
+.chip.ok,:root[data-theme="dark"] .chip.ok{background:var(--mint); color:var(--n900)}
+.chip.bad,:root[data-theme="dark"] .chip.bad{background:var(--hot); color:var(--n900)}
+.chip.warn,:root[data-theme="dark"] .chip.warn{background:var(--amber); color:var(--n900)}
+.chip.info,:root[data-theme="dark"] .chip.info{background:var(--electric); color:var(--white)}
+.chip.ok .dot,.chip.bad .dot,.chip.warn .dot,.chip.info .dot{background:currentColor}
+.chip{font-weight:600}
+.rb-mark{width:22px; height:auto; display:block; flex:none}
+.rb-logo{display:block; margin:0 auto 6px; width:220px; max-width:80%}
+.rb-dark{display:none} :root[data-theme="dark"] .rb-light{display:none} :root[data-theme="dark"] .rb-dark{display:block}
+.rb-os{font-family:var(--fd); font-weight:600; font-size:13px; letter-spacing:.18em; color:var(--mut); text-transform:uppercase}

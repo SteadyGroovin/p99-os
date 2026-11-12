@@ -9,13 +9,13 @@ const bootEl = document.getElementById("app");
 const bootEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /* every release loads as one matching set: GitHub Pages caches files for 10 minutes, and a stale db.js next to a new app.js left Tasks blank (v0.10.0, 2026-11-07) */
-const APP_V = "0.18.0";
+const APP_V = "0.19.0";
 function loadScript(src) {
   return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src + (src.includes("?") ? "&" : "?") + "v=" + APP_V; s.onload = ok; s.onerror = () => no(new Error("could not load " + src)); document.body.appendChild(s); });
 }
 function bootScreen(html) {
   bootEl.innerHTML = `<div class="who"><div class="box">
-    <div style="text-align:center;margin-bottom:16px"><span class="store-dot"></span><b>Rocket OS</b></div>${html}</div></div>`;
+    <div style="text-align:center;margin-bottom:20px"><img class="rb-logo rb-light" src="brand/rb-lockup-light.svg" alt="Rocket Boracay"><img class="rb-logo rb-dark" src="brand/rb-lockup-dark.svg" alt="Rocket Boracay"><div class="rb-os">Rocket OS</div></div>${html}</div></div>`;
 }
 /* Sign-in (v0.11.4, Stefan 2026-11-08: "make login easier"). Default: e-mail → a code by mail → type it. No password to remember,
    and a virus scanner opening the mail cannot use up a code the way it used up the one-time links ("Email link is invalid or has expired").

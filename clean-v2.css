@@ -68,8 +68,8 @@ svg.c2ch .grid.zero{stroke:var(--line2); stroke-width:1.5}
 .c2task .main{flex:1; min-width:0} .c2task .name{font-size:17px; line-height:24px; font-weight:600} .c2task .meta{font-size:14px; line-height:20px; color:var(--mut); margin-top:2px} .c2task .meta b{color:var(--ink)}
 .c2task.done{background:var(--surf2)} .c2task.done .name{color:var(--ink2)}
 .c2tick{flex:none; width:52px; height:52px; border-radius:50%; border:2px solid var(--line2); background:var(--surf); color:transparent; display:grid; place-items:center; padding:0}
-.c2tick .ic{width:26px; height:26px} .c2tick:not(:disabled):hover{border-color:var(--p99); color:var(--p99)}
-.c2tick.on{background:var(--ok-dot); border-color:var(--ok-dot); color:#fff}
+.c2tick .ic{width:26px; height:26px} .c2tick:not(:disabled):hover{border-color:var(--p99); color:var(--p99-text)}
+.c2tick.on{background:var(--ok-dot); border-color:var(--ok-dot); color:var(--n900)}
 .c2tick:disabled{opacity:.45; border-style:dashed; cursor:not-allowed}
 .c2prob{flex:none; width:44px; height:44px; border:0; background:transparent; color:var(--mut); border-radius:var(--r-ctl); display:grid; place-items:center} .c2prob:hover{color:var(--bad); background:var(--bad-bg)}
 .c2val{display:grid; gap:4px; flex:1; min-width:120px} .c2val span{font-size:13px; color:var(--ink2); font-weight:500} .c2val .in{font-size:20px; min-height:48px}
@@ -102,7 +102,7 @@ svg.c2ch .grid.zero{stroke:var(--line2); stroke-width:1.5}
 .c2ts .m{display:flex; flex-wrap:wrap; gap:6px; align-items:center} .c2ts .b:hover{background:var(--surf2)}
 .c2chk{flex:none; width:56px; border:0; background:transparent; display:grid; place-items:center; padding:0; color:transparent}
 .c2chk .ic{width:22px; height:22px; box-sizing:content-box; padding:6px; border-radius:50%; border:2px solid var(--line2)}
-.c2chk:hover .ic{border-color:var(--ok-dot); color:var(--ok-dot)} .c2chk.on .ic{background:var(--ok-dot); border-color:var(--ok-dot); color:#fff}
+.c2chk:hover .ic{border-color:var(--ok-dot); color:var(--ok-dot)} .c2chk.on .ic{background:var(--ok-dot); border-color:var(--ok-dot); color:var(--n900)}
 .c2own{display:inline-flex; align-items:center; gap:6px; font-size:14px; font-weight:500; color:var(--ink2)} .c2own i{font-style:normal; width:22px; height:22px; border-radius:50%; display:grid; place-items:center; background:var(--brand100); color:var(--brand700); font-size:12px; font-weight:600}
 :root[data-theme="dark"] .c2own i{background:var(--p99-soft); color:var(--brand300)} .c2own.none{color:var(--mut)} .c2own.none i{background:var(--surf2); color:var(--mut)}
 

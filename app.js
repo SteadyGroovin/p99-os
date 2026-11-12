@@ -61,7 +61,7 @@ function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split(
 function shell(title, sub, body, { back } = {}) {   /* v0.17: Home + three pinned modules + More (nav-v2.js) */
   const p = me(); const seg = (location.hash.slice(1) || "/today").split("/")[1] || "today";
   return `
-  <nav class="sidebar"><div class="brand"><span class="store-dot"></span>Rocket OS</div>${sidebarHTML(seg)}</nav>
+  <nav class="sidebar"><div class="brand"><img class="rb-mark rb-light" src="brand/rb-icon-light.svg" alt=""><img class="rb-mark rb-dark" src="brand/rb-icon-dark.svg" alt="">Rocket OS</div>${sidebarHTML(seg)}</nav>
   <div class="page">
     <header class="top">${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
@@ -83,7 +83,7 @@ function viewWho() {
   const names = PEOPLE.filter(p => p.id !== "store").map(p => `<button class="btn ${pinWho === p.id ? "primary" : ""}" onclick="S.me='${p.id}';save();go('#/today')">${esc(p.short)}<span class="tiny" style="margin-left:6px;opacity:.7">${esc(p.position)}</span></button>`).join("");
   const pad = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"].map(k => k === "" ? "<span></span>" : `<button class="btn" onclick="pinKey('${k}')">${k}</button>`).join("");
   return `<div class="who"><div class="box">
-    <div style="text-align:center"><span class="store-dot"></span><b>Rocket OS</b><div class="mut small">Optional: pick your name so entries say who did them</div></div>
+    <div style="text-align:center"><img class="rb-logo rb-light" src="brand/rb-lockup-light.svg" alt="Rocket Boracay"><img class="rb-logo rb-dark" src="brand/rb-lockup-dark.svg" alt="Rocket Boracay"><div class="rb-os">Rocket OS</div><div class="mut small" style="margin-top:8px">Optional: pick your name so entries say who did them</div></div>
     <div class="names">${names}</div>
   </div></div>`;
 }
