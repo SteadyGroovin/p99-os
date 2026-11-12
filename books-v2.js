@@ -54,7 +54,7 @@ function viewAccounts() {
     <section class="card">${acNew ? `<h2>New category</h2><div class="field"><label>Name</label><input class="in" value="${esc(acNew.name)}" oninput="acNew.name=this.value" placeholder="e.g. Uniforms"></div>
       <div class="field"><label>Group</label><div class="chips">${["Cost of goods", "Supplies", "Operating", "Staff", "Tax", "Other"].map(g => `<button class="chip ${acNew.grp === g ? "info" : ""}" onclick="acNew.grp='${g}';render()">${g}</button>`).join("")}</div></div>
       <div style="display:flex;gap:8px"><button class="btn primary" style="flex:1" onclick="acSave()">Add category</button><button class="btn ghost" onclick="acNew=null;render()">Cancel</button></div>`
-      : `<button class="btn full" onclick="acNew={name:'',grp:'Operating'};render()">+ New category</button>`}</section>`, { back: "#/settings" });
+      : `<button class="btn full" onclick="acNew={name:'',grp:'Operating'};render()">+ New category</button>`}</section>`, { back: "#/money" });
 }
 function acToggle(code) { const a = ACCOUNTS.find(x => x.code === code); if (!a) return; a.active = a.active === false; supQueue("account", { code: a.code, name: a.name, grp: a.grp, active: a.active }); render(); }
 function acSave() {
@@ -79,7 +79,7 @@ function viewBooks() {
       ${m ? "" : `<div class="tiny mut" style="margin-top:6px">Only an owner sets opening balances.</div>`}</section>
     <section class="card"><h2>Month close</h2><div class="tiny mut" style="margin-bottom:8px">A closed month takes no new or changed deliveries, purchases, money moves or cash counts. An owner can reopen it.</div>
       <div class="list">${months.map(mo => { const c = CLOSED.includes(mo); return `<div class="row"><div class="main"><div class="name">${esc(new Date(mo + "-01T00:00").toLocaleDateString("en-PH", { month: "long", year: "numeric" }))}</div><div class="meta">${c ? "closed" : "open"}</div></div>
-        ${m ? `<button class="btn small ${c ? "" : "primary"}" onclick="bkClose('${mo}',${c})">${c ? "Reopen" : "Close"}</button>` : chip(c ? "ok" : "", c ? "closed" : "open")}</div>`; }).join("")}</div></section>`, { back: "#/settings" });
+        ${m ? `<button class="btn small ${c ? "" : "primary"}" onclick="bkClose('${mo}',${c})">${c ? "Reopen" : "Close"}</button>` : chip(c ? "ok" : "", c ? "closed" : "open")}</div>`; }).join("")}</div></section>`, { back: "#/money" });
 }
 function bkSave(k) {
   const e = bkOpen[k]; const a = parseFloat(e.amount); if (isNaN(a)) return toast("Type the amount (minus if the company owed it).");
@@ -103,7 +103,8 @@ let rcSort = "cat", rcDir = 1, rcFlt = "", rcKind = "";
 function rcSortBy(k) { if (rcSort === k) rcDir = -rcDir; else { rcSort = k; rcDir = 1; } render(); }
 function rcCost(r) {   /* ₱ per whole item from the last delivery prices; null when a line has no price or no pack size yet */
   if (!r.lines.length || r.portion_of) return null; let t = 0;
-  for (const l of r.lines) { if (l.part) return null; const it = rcItem(l.item); const lp = it && typeof Store !== "undefined" ? Store.lastPrice(it.id) : null; if (!it || !lp || !it.per) return null; t += (+l.qty || 0) / it.per * lp.price; }
+  for (const l of r.lines) { if (l.part) return null; const it = rcItem(l.item); if (!it) return null; const b = typeof skBasePrice === "function" ? skBasePrice(it) : null; const lp = b == null && typeof Store !== "undefined" ? Store.lastPrice(it.id) : null;
+    if (b != null) t += (+l.qty || 0) * b; else if (lp && it.per) t += (+l.qty || 0) / it.per * lp.price; else return null; }
   return t;
 }
 function viewRecipes() {
@@ -123,7 +124,7 @@ function viewRecipes() {
       <select class="in" onchange="rcKind=this.value;render()" aria-label="Kind"><option value="">All kinds</option>${kinds.map(k => `<option ${rcKind === k ? "selected" : ""}>${esc(k)}</option>`).join("")}</select>
       <select class="in" onchange="rcFlt=this.value;render()" aria-label="Status">${[["", "All statuses"], ["0", `No ingredients (${empty})`], ["1", `Not confirmed (${open})`], ["2", "Confirmed"]].map(([k, l]) => `<option value="${k}" ${rcFlt === k ? "selected" : ""}>${l}</option>`).join("")}</select>
       <button class="btn primary sm" onclick="rcEdit={id:null,pos:'',cat:'Pizza',rkind:'menu',lines:[],notes:'',confirmed:false};go('#/recipe/new')">+ New recipe</button></div>
-    ${list.length ? `<div class="itwrap"><table class="itbl"><thead>${head}</thead><tbody>${body}</tbody></table></div><div class="itfoot tiny mut">Cost = ingredients at the last delivery price, per whole item; "—" where a price or pack size is still missing · tap a column to sort</div>` : `<section class="card"><div class="mut">No recipe found.</div></section>`}`, { back: "#/settings" });
+    ${list.length ? `<div class="itwrap"><table class="itbl"><thead>${head}</thead><tbody>${body}</tbody></table></div><div class="itfoot tiny mut">Cost = ingredients at the last delivery price, per whole item; "—" where a price or pack size is still missing · tap a column to sort</div>` : `<section class="card"><div class="mut">No recipe found.</div></section>`}`, { back: "#/items" });
 }
 function viewRecipe(id) {
   const r = RECIPES.find(x => x.id === id);

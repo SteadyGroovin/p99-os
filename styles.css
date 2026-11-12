@@ -428,3 +428,13 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
   .sidebar .brand{padding:2px 8px 10px}
   .rb-line{width:124px}
 }
+
+/* v0.19.6 (desktop): the page header on one line */
+@media (min-width:900px){
+  .top{padding:6px 24px; min-height:48px}
+  .top .ttl{display:flex; align-items:baseline; gap:12px; min-width:0}
+  .top .ttl h1{font-size:20px; line-height:28px; margin:0; white-space:nowrap}
+  .top .ttl .sub{margin-top:0; font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+  .top .back{width:32px; height:32px}
+  .top .storechip, .top .me{transform:scale(.85); transform-origin:right center}
+}

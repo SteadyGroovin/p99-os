@@ -145,3 +145,7 @@
 .itbl td .thumb, .itbl td img{width:28px; height:28px; border-radius:4px; object-fit:cover; display:block}
 .itbl tr.gh td a.sl{color:var(--ink2)} .itbl tr.gh td b{color:var(--ink)}
 .itbl tr.gh td{white-space:normal}
+
+/* v0.19.6 */
+.itbl td.sk-neg b{color:var(--bad)}
+@media (max-width:1320px){ .itbl .h5{display:none} }

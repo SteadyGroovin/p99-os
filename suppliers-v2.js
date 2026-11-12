@@ -67,7 +67,7 @@ function viewSuppliers() {
   return shell("Suppliers", `${names.length} suppliers`, `
     ${todo.length ? `<div class="alert warn">${todo.length} supplier${todo.length === 1 ? " was" : "s were"} added at Receive and need${todo.length === 1 ? "s" : ""} terms and delivery days: ${todo.map(r => esc(r.n)).join(", ")}.</div>` : ""}
     ${supNew ? supNewForm(false) : `<button class="btn" onclick="supNew={};render()">+ New supplier</button>`}
-    <div class="itwrap"><table class="itbl"><thead>${head}</thead><tbody>${list}</tbody></table></div>`, { back: "#/more" });
+    <div class="itwrap"><table class="itbl"><thead>${head}</thead><tbody>${list}</tbody></table></div>`, { back: "#/order" });
 }
 
 function viewSupplier(enc) {
@@ -124,7 +124,7 @@ function viewStores() {
     <div class="seg">${[["store", "Store"], ["office", "Office"], ["other", "Other place"]].map(([k, l]) => `<button class="btn ${(f.kind || "store") === k ? "on" : ""}" onclick="locNew.kind='${k}';render()">${l}</button>`).join("")}</div>
     <div style="display:flex;gap:8px"><button class="btn primary" style="flex:1" onclick="locSave()">Save</button><button class="btn ghost" onclick="locNew=null;render()">Cancel</button></div></section>` : `<button class="btn" onclick="locNew={kind:'store'};render()">+ New store or place</button>`;
   return shell("Stores & places", `${locs.length} places`, `<div class="alert info">Places that send or receive stock: stores, the office, a freezer kept somewhere else.</div>${form}
-    <section class="card"><div class="list">${locs.map(l => `<div class="row"><div class="main"><div class="name">${esc(l.name)}</div><div class="meta">${esc(l.code)} · ${esc(l.kind)}</div></div></div>`).join("")}</div></section>`, { back: "#/more" });
+    <section class="card"><div class="list">${locs.map(l => `<div class="row"><div class="main"><div class="name">${esc(l.name)}</div><div class="meta">${esc(l.code)} · ${esc(l.kind)}</div></div></div>`).join("")}</div></section>`, { back: "#/settings" });
 }
 function locSave() {
   const c = (locNew.code || "").trim().toUpperCase(), n = (locNew.name || "").trim();

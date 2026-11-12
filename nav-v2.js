@@ -13,20 +13,23 @@ const moneyOK = () => role() === "master" || officeLogin();
 
 /* v0.17 (Stefan: "the way Zoho Inventory has its menu navigation is probably better"): Home + three pinned modules + More.
    More lists every module in groups (like Zoho's More Modules); "Customize" picks the three on the bottom bar. Inside a group a row of sibling shortcuts stays. */
+/* v0.19.6 (Stefan: "consider improving the list order"): groups follow the day and the flow of money — what comes in (Till), what is on the shelf,
+   what is bought (order → approve → bills), the money, the team; the catalogue is set up once and sits last. Settings are behind the account button only. */
 const MODULES = [
-  ["items", "Items", "#/items", "box", "Items"], ["recipes", "Recipes", "#/recipes", "list", "Items"], ["sizes", "Pack sizes", "#/sizes", "box", "Items"],
+  ["sales", "Sales", "#/sales", "cash", "Till"], ["cash", "Cash count", "#/cash", "cash", "Till"], ["walk", "Morning run", "#/walk", "sun", "Till"],
   ["stock", "Stock", "#/stock", "grid", "Inventory"], ["count", "Count", "#/count", "grid", "Inventory"], ["receive", "Receive", "#/receive", "box", "Inventory"], ["transfers", "Transfers", "#/transfers", "box", "Inventory"], ["variance", "Variance", "#/variance", "grid", "Inventory"],
-  ["suppliers", "Suppliers", "#/suppliers", "coins", "Purchases"], ["order", "Order", "#/order", "coins", "Purchases"], ["approve", "Approve", "#/approve", "check", "Purchases"], ["bills", "Bills", "#/bills", "coins", "Purchases"], ["purchases", "Purchases", "#/purchases", "coins", "Purchases"],
-  ["sales", "Sales", "#/sales", "cash", "Sales"], ["cash", "Cash count", "#/cash", "cash", "Sales"], ["walk", "Morning run", "#/walk", "sun", "Sales"],
-  ["money", "Funds", "#/money", "finance", "Money"], ["finance", "P&L", "#/finance", "finance", "Money"], ["accounts", "Accounts", "#/accounts", "finance", "Money"], ["books", "Month close", "#/books", "finance", "Money"],
-  ["tasks", "Tasks", "#/tasks", "list", "Operations"], ["report", "Tickets", "#/report", "alert", "Operations"], ["clean", "Clean", "#/clean", "check", "Operations"],
+  ["order", "Order", "#/order", "coins", "Buying"], ["approve", "Approve", "#/approve", "check", "Buying"], ["bills", "Bills", "#/bills", "coins", "Buying"], ["purchases", "Purchases", "#/purchases", "coins", "Buying"], ["suppliers", "Suppliers", "#/suppliers", "coins", "Buying"],
+  ["money", "Funds", "#/money", "finance", "Money"], ["finance", "P&L", "#/finance", "finance", "Money"], ["books", "Month close", "#/books", "finance", "Money"], ["accounts", "Accounts", "#/accounts", "finance", "Money"],
+  ["tasks", "Tasks", "#/tasks", "list", "Team"], ["report", "Tickets", "#/report", "alert", "Team"], ["clean", "Clean", "#/clean", "check", "Team"],
+  ["items", "Items", "#/items", "box", "Catalogue"], ["recipes", "Recipes", "#/recipes", "list", "Catalogue"], ["sizes", "Pack sizes", "#/sizes", "box", "Catalogue"],
   ["users", "Users", "#/users", "dots", "Settings"], ["stores", "Stores", "#/stores", "dots", "Settings"], ["rules", "Rules", "#/rules", "dots", "Settings"], ["more", "Device", "#/more", "dots", "Settings"],
 ];
 const GROUPS = [...new Set(MODULES.map(m => m[4]))];
+const MENU_GROUPS = GROUPS.filter(g => g !== "Settings");   /* the menu and More; Settings open from the account button (top right) */
 const SEG_MODULE = { item: "items", recipe: "recipes", receipts: "receive", transfer: "transfers", task: "tasks", supplier: "suppliers" };
 const moduleOf = seg => SEG_MODULE[seg] || seg;
 const modsFor = () => MODULES.filter(m => canOpen(m[0]));
-const SETUP = MODULES.filter(m => ["users", "stores", "suppliers", "recipes", "sizes", "accounts", "books", "rules"].includes(m[0])).map(m => [m[1], m[2], ({ users: "who has which login and what they see", stores: "where stock is sent and received", suppliers: "terms, delivery days, what we buy, prices", recipes: "what each pizza, slice and batch uses", sizes: "how much is inside a can, pack or box", accounts: "expense categories, as in the accounting book", books: "what each fund held, lock a finished month", rules: "₱ limit for Mike's approval, safety days" })[m[0]]]);
+const SETUP = MODULES.filter(m => ["users", "stores", "rules"].includes(m[0]))   /* v0.19.6: nothing that is already in the menu (Stefan: "that also shouldn't be double") */.map(m => [m[1], m[2], ({ users: "who has which login and what they see", stores: "where stock is sent and received", suppliers: "terms, delivery days, what we buy, prices", recipes: "what each pizza, slice and batch uses", sizes: "how much is inside a can, pack or box", accounts: "expense categories, as in the accounting book", books: "what each fund held, lock a finished month", rules: "₱ limit for Mike's approval, safety days" })[m[0]]]);
 const PIN_KEY = "rocketos_pins";
 const PIN_DEFAULT = { master: ["sales", "stock", "money"], finance: ["receive", "bills", "money"], admin: ["bills", "money", "tasks"], lead: ["receive", "count", "order"], walk: ["tasks", "report", "receive"], crew: ["count", "receive", "clean"] };
 function pins() {
@@ -67,7 +70,7 @@ function tabbarHTML(seg) {
 function sidebarHTML(seg) {   /* tablet and laptop: the whole menu, like Zoho's left navigation */
   const m = moduleOf(seg), mods = modsFor();
   return `<button class="${seg === "today" || !seg ? "on" : ""}" onclick="go('${homeHref()}')">${ic(ICON.home, "sm")}<span class="sl">Home</span></button>` +
-    GROUPS.map(g => { const ms = mods.filter(x => x[4] === g); if (!ms.length) return ""; return `<div class="sgroup">${esc(g)}</div>` + ms.map(x => `<button class="${m === x[0] ? "on" : ""}" onclick="go('${x[2]}')">${ic(ICON[x[3]] || ICON.dots, "sm")}<span class="sl">${esc(x[1])}</span></button>`).join(""); }).join("");
+    MENU_GROUPS.map(g => { const ms = mods.filter(x => x[4] === g); if (!ms.length) return ""; return `<div class="sgroup">${esc(g)}</div>` + ms.map(x => `<button class="${m === x[0] ? "on" : ""}" onclick="go('${x[2]}')">${ic(ICON[x[3]] || ICON.dots, "sm")}<span class="sl">${esc(x[1])}</span></button>`).join(""); }).join("");
 }
 function subnavHTML(seg) {   /* sibling shortcuts inside a group. Not shown since v0.19.2 (Stefan, 2026-11-13: "remove the top part completely"); kept in case it comes back */
   const m = moduleOf(seg), me1 = MODULES.find(x => x[0] === m); if (!me1) return "";
@@ -77,7 +80,7 @@ function subnavHTML(seg) {   /* sibling shortcuts inside a group. Not shown sinc
 let modCustom = false;
 function viewModules() {
   const ps = pins(), mods = modsFor();
-  const groups = GROUPS.map(g => { const ms = mods.filter(x => x[4] === g); if (!ms.length) return "";
+  const groups = MENU_GROUPS.map(g => { const ms = mods.filter(x => x[4] === g); if (!ms.length) return "";
     return `<section class="card mg"><h3>${esc(g)}</h3><div class="list">${ms.map(x => modCustom
       ? `<button class="row tap" onclick="pinToggle('${x[0]}')"><div class="main"><div class="name">${esc(x[1])}</div></div>${ps.includes(x[0]) ? chip("info", "on the bar") : `<span class="tiny mut">add</span>`}</button>`
       : `<button class="row tap" onclick="go('${x[2]}')"><div class="main"><div class="name">${esc(x[1])}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("")}</div></section>`; }).join("");
@@ -134,15 +137,10 @@ function plusActions() {
     ["Cash count", "cash", "go('#/cash')"], ["Ticket", "report", "go('#/report/new')"], ["Task", "tasks", "go('#/task/new')"]].filter(a => canOpen(a[1]));
 }
 /* ---------- Settings (behind the name badge) ---------- */
-function viewSettings() {
-  const rows = SETUP.filter(s => canOpen(subHref(s))).map(s => `<button class="row tap" onclick="go('${s[1]}')"><div class="main"><div class="name">${esc(s[0])}</div><div class="meta">${esc(s[2])}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("");
-  const p = me();
-  return shell("Settings", p ? esc(p.name || p.short) : "", `
-    ${rows ? `<section class="card mg"><h3>Setup</h3><div class="list">${rows}</div></section>` : ""}
-    <section class="card mg"><h3>This device</h3><div class="list">
-      <button class="row tap" onclick="go('#/more')"><div class="main"><div class="name">Device, alerts & data health</div><div class="meta">theme, order alerts, sync state, sign out</div></div><span class="chev">${ic("chevron-right")}</span></button>
-      <button class="row tap" onclick="stSheet=JSON.parse(JSON.stringify(storeCfg()));render()"><div class="main"><div class="name">Stores</div><div class="meta">${esc(storesOn().join(", "))} · recording into ${esc(curStore())}</div></div><span class="chev">${ic("chevron-right")}</span></button>
-    </div></section>`, { back: "#/today" });
+function viewSettings() {   /* v0.19.6: the whole settings section, reached from the account button; one line per entry */
+  const p = me(); const rows = SETUP.filter(s => canOpen(subHref(s))).map(s => [s[0], s[2], `go('${s[1]}')`])
+    .concat([["Stores shown", `${storesOn().join(", ")} · recording into ${curStore()}`, "stSheet=JSON.parse(JSON.stringify(storeCfg()));render()"], ["Device", "theme, order alerts, sync state, sign out", "go('#/more')"], ["Password", "change the password of this login", "go('#/password')"]]);
+  return shell("Settings", p ? esc(p.name || p.short) : "", `<div class="itwrap"><table class="itbl"><tbody>${rows.map(([n, m, h]) => `<tr onclick="${h}" tabindex="0" onkeydown="if(event.key==='Enter'){${h}}"><td class="nm">${esc(n)}<div class="sub2 wrap">${esc(m)}</div></td><td class="h1 mut wrapc">${esc(m)}</td><td class="n mut" style="width:28px">›</td></tr>`).join("")}</tbody></table></div>`, { back: "#/today" });
 }
 
 /* ---------- Users & roles (owners) ---------- */
