@@ -98,15 +98,32 @@ function bkClose(mo, reopen) {
 let rcQ = "", rcEdit = null;
 const rcItem = code => (typeof Store !== "undefined" && Store.item(code)) || ITEMS.find(i => i.id === code) || null;
 function rcFlag(r) { if (!r.lines.length) return chip("bad", "no ingredients"); if (!r.confirmed) return chip("warn", "not confirmed"); return chip("ok", "confirmed"); }
+/* v0.19.3 (Stefan: same compact table as Items): one line per recipe, sortable, grouped by till category */
+let rcSort = "cat", rcDir = 1, rcFlt = "", rcKind = "";
+function rcSortBy(k) { if (rcSort === k) rcDir = -rcDir; else { rcSort = k; rcDir = 1; } render(); }
+function rcCost(r) {   /* ₱ per whole item from the last delivery prices; null when a line has no price or no pack size yet */
+  if (!r.lines.length || r.portion_of) return null; let t = 0;
+  for (const l of r.lines) { if (l.part) return null; const it = rcItem(l.item); const lp = it && typeof Store !== "undefined" ? Store.lastPrice(it.id) : null; if (!it || !lp || !it.per) return null; t += (+l.qty || 0) / it.per * lp.price; }
+  return t;
+}
 function viewRecipes() {
-  const q = rcQ.trim().toLowerCase();
-  const list = RECIPES.filter(r => !q || (r.pos + " " + r.cat).toLowerCase().includes(q));
-  const cats = [...new Set(list.map(r => r.cat))];
-  const empty = RECIPES.filter(r => !r.lines.length).length, open = RECIPES.filter(r => r.lines.length && !r.confirmed).length;
-  return shell("Recipes", `${RECIPES.length} recipes · ${empty} without ingredients · ${open} not confirmed`, `
-    <div class="field"><input class="in" placeholder="Search a pizza, drink or batch" value="${esc(rcQ)}" oninput="rcQ=this.value;clearTimeout(window._rcT);window._rcT=setTimeout(render,250)"></div>
-    ${cats.map(c => `<section class="card"><h2>${esc(c)}</h2><div class="list">${list.filter(r => r.cat === c).map(r => `<button class="row tap" onclick="rcEdit=null;go('#/recipe/${r.id}')"><div class="main"><div class="name">${esc(r.pos)} ${rcFlag(r)}</div><div class="meta">${r.portion_of ? "a portion of " + esc((RECIPES.find(x => x.id === r.portion_of) || {}).pos || "another recipe") : r.lines.length + " ingredient" + (r.lines.length === 1 ? "" : "s")}${r.kind !== "menu" ? " · " + esc(r.kind) : ""}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("")}</div></section>`).join("") || `<section class="card"><div class="mut">No recipe found.</div></section>`}
-    <section class="card"><button class="btn full" onclick="rcEdit={id:null,pos:'',cat:'Pizza',rkind:'menu',lines:[],notes:'',confirmed:false};go('#/recipe/new')">+ New recipe</button></section>`, { back: "#/settings" });
+  const q = rcQ.trim().toLowerCase(); const stOf = r => !r.lines.length && !r.portion_of ? 0 : !r.confirmed ? 1 : 2;
+  let list = RECIPES.map(r => ({ r, n: r.lines.length, st: stOf(r), cost: rcCost(r) })).filter(x => (!q || (x.r.pos + " " + x.r.cat).toLowerCase().includes(q)) && (rcFlt === "" || x.st === +rcFlt) && (!rcKind || x.r.kind === rcKind));
+  const key = { cat: x => (x.r.cat || "").toLowerCase(), name: x => x.r.pos.toLowerCase(), kind: x => x.r.kind || "", n: x => x.n, cost: x => x.cost == null ? -1 : x.cost, st: x => x.st }[rcSort];
+  const desc = ["n", "cost"].includes(rcSort) ? -1 : 1;
+  list = list.sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * rcDir * desc || a.r.pos.localeCompare(b.r.pos); });
+  const empty = RECIPES.filter(r => stOf(r) === 0).length, open = RECIPES.filter(r => stOf(r) === 1).length; const kinds = [...new Set(RECIPES.map(r => r.kind).filter(Boolean))].sort();
+  const cols = [["name", "Recipe", ""], ["cat", "Category", "h1"], ["kind", "Kind", "h1"], ["n", "Ingredients", "n"], ["cost", "Cost", "n h1"], ["st", "Status", "st"]];
+  const head = `<tr>${cols.map(([k, l, c]) => `<th class="${c}"><button onclick="rcSortBy('${k}')" class="${rcSort === k ? "on" : ""}">${l}${rcSort === k ? (rcDir * (["n", "cost"].includes(k) ? -1 : 1) > 0 ? " ▲" : " ▼") : ""}</button></th>`).join("")}</tr>`;
+  const row = ({ r, n, cost }) => { const of = r.portion_of ? (RECIPES.find(x => x.id === r.portion_of) || {}).pos || "another recipe" : null;
+    return `<tr onclick="rcEdit=null;go('#/recipe/${r.id}')" tabindex="0" onkeydown="if(event.key==='Enter'){rcEdit=null;go('#/recipe/${r.id}')}"><td class="nm">${esc(r.pos)}<div class="sub2">${esc(r.cat)}${r.kind !== "menu" ? " · " + esc(r.kind) : ""}</div></td><td class="h1 mut">${esc(r.cat)}</td><td class="h1 mut">${esc(r.kind || "")}</td><td class="n num">${of ? `<span class="mut">portion of ${esc(of)}</span>` : n}</td><td class="n h1 num">${cost != null ? skP(Math.round(cost * 100) / 100) : "—"}</td><td class="st">${r.portion_of && !r.lines.length ? chip("", "portion") : rcFlag(r)}</td></tr>`; };
+  const body = rcSort === "cat" ? [...new Set(list.map(x => x.r.cat))].map(c => { const rs = list.filter(x => x.r.cat === c); return `<tr class="gh"><td colspan="${cols.length}">${esc(c)} <span>· ${rs.length}</span></td></tr>${rs.map(row).join("")}`; }).join("") : list.map(row).join("");
+  return shell("Recipes", `${list.length} of ${RECIPES.length} recipes · ${empty} without ingredients · ${open} not confirmed`, `
+    <div class="ittool rc"><input class="in" type="search" id="rcq" placeholder="Search a pizza, drink or batch" value="${esc(rcQ)}" oninput="rcQ=this.value;clearTimeout(window._rcT);window._rcT=setTimeout(()=>{render();const i=document.getElementById('rcq');if(i){i.focus();i.setSelectionRange(99,99)}},250)">
+      <select class="in" onchange="rcKind=this.value;render()" aria-label="Kind"><option value="">All kinds</option>${kinds.map(k => `<option ${rcKind === k ? "selected" : ""}>${esc(k)}</option>`).join("")}</select>
+      <select class="in" onchange="rcFlt=this.value;render()" aria-label="Status">${[["", "All statuses"], ["0", `No ingredients (${empty})`], ["1", `Not confirmed (${open})`], ["2", "Confirmed"]].map(([k, l]) => `<option value="${k}" ${rcFlt === k ? "selected" : ""}>${l}</option>`).join("")}</select>
+      <button class="btn primary sm" onclick="rcEdit={id:null,pos:'',cat:'Pizza',rkind:'menu',lines:[],notes:'',confirmed:false};go('#/recipe/new')">+ New recipe</button></div>
+    ${list.length ? `<div class="itwrap"><table class="itbl"><thead>${head}</thead><tbody>${body}</tbody></table></div><div class="itfoot tiny mut">Cost = ingredients at the last delivery price, per whole item; "—" where a price or pack size is still missing · tap a column to sort</div>` : `<section class="card"><div class="mut">No recipe found.</div></section>`}`, { back: "#/settings" });
 }
 function viewRecipe(id) {
   const r = RECIPES.find(x => x.id === id);

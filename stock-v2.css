@@ -95,7 +95,7 @@
 @media (min-width:900px){ .list.soon{display:grid; grid-template-columns:1fr 1fr} .skact .btn{min-height:56px} }
 
 /* v0.19.2 items table: one line per item, built for 500–600 rows (Stefan, 2026-11-13) */
-.wrap:has(.itbl){max-width:none}
+.wrap:has(.itbl.wide){max-width:none}
 .ittool{display:grid; grid-template-columns:1fr 1fr; gap:6px}
 .ittool .in{min-height:36px; height:36px; padding:0 10px; font-size:14px; min-width:0; width:100%}
 .ittool input[type=search]{grid-column:1/-1}
@@ -119,3 +119,22 @@
 .itfoot{padding:2px 2px 0}
 @media (max-width:1100px){ .itbl .h2{display:none} }
 @media (max-width:700px){ .itbl .h1, .itbl .st, .itbl .tag{display:none} .itbl td.nm .sample{font-size:10px; padding:0 4px; margin-left:4px} .itbl .sub2{display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:52vw} .itbl td.sk-low b{color:var(--warn)} .itbl td.sk-out b{color:var(--bad)} .itbl td,.itbl th{padding-left:6px; padding-right:6px} .itwrap{max-height:none} }
+
+/* v0.19.3: the same table on Stock (Order soon), Recipes and Pack sizes; compact action rows */
+.itwrap.flat{border:0; border-radius:0; max-height:none; margin:0 -4px}
+.itbl td.nm a.sl, .itbl td a.sl{color:inherit; text-decoration:underline; text-decoration-color:var(--line2); text-underline-offset:3px} .itbl td a.sl:hover{color:var(--ink); text-decoration-color:var(--ink)}
+.itbl .sub2 a.sl{font-weight:400}
+.skact{display:flex; flex-wrap:wrap; gap:6px} .skact .btn{flex:1 1 150px; min-height:40px; font-size:14px; padding:0 12px}
+.skact.lite .btn{min-height:34px; font-size:13px; font-weight:500; color:var(--ink2)}
+.ittool.rc .btn{min-height:36px; height:36px; white-space:nowrap}
+@media (min-width:900px){ .ittool:has(> :nth-child(6)){grid-template-columns:minmax(180px,2fr) repeat(5,minmax(0,1fr))} .ittool.rc{grid-template-columns:minmax(200px,2fr) repeat(2,minmax(0,1fr)) auto} .skact .btn{flex:0 1 auto; min-height:36px} }
+.itbl.sz tbody tr{cursor:default} .itbl .szin{width:84px; min-height:30px; height:30px; padding:0 8px; text-align:right; font-size:13px}
+.itbl td.szc{white-space:nowrap}
+@media (min-width:701px){ .itbl td.nm{white-space:nowrap} }
+.itbl td.nm .sample{font-size:10px; line-height:15px; padding:0 5px; vertical-align:1px}
+.itbl td, .itbl th{padding-left:6px; padding-right:6px}
+@media (max-width:1700px){ .itbl .h3{display:none} }
+@media (max-width:1100px){ .itbl .h3{display:none} }
+@media (max-width:1520px){ .itbl .h4{display:none} }
+@media (max-width:700px){ .itwrap.flat .sub2{max-width:38vw} .itwrap.flat{margin:0} }
+@media (max-width:700px){ .itwrap.flat .itbl td.nm{min-width:0} .itwrap.flat .sub2{max-width:30vw} .itwrap.flat .itbl td, .itwrap.flat .itbl th{padding-left:4px; padding-right:4px} }

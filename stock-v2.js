@@ -7,7 +7,7 @@
    Adds to the data shape only: S.draft.skip = { itemId: true } (kept on the sent count as .skip). */
 
 const SK_PRICE_TOL = 0.02;                 // flag a price change of 2 % or more on receiving
-let skBoard = "all", skItemQ = "", skItemPlace = "", skItemSup = "", skItemFlt = "", skItemSort = "place", skItemSrc = "store";
+let skBoard = "all", skItemQ = "", skItemPlace = "", skItemSup = "", skItemFlt = "", skItemSort = "cat", skItemSrc = "store", skItemCat = "";
 let skCountFlt = "todo", skVarSel = 0, skRx = { range: "90", sup: "", kind: "" };
 
 /* ---------- numbers ---------- */
@@ -123,23 +123,15 @@ function viewStock() {
   </div>`;
 
   const rank = L => L.st.k === "out" ? -1 : L.cover != null && L.cover < 4 ? L.cover / 4 : 1 + L.s / (L.par || 1);   // out, then under 4 days, then lowest vs par
-  const soonAll = counted.filter(L => L.st.k !== "ok" || (L.cover != null && L.cover < 4)).sort((a, b) => rank(a) - rank(b)); const soon = soonAll.slice(0, 6);
-  const soonHTML = soon.length ? `<div class="list soon">${soon.map(L => { const tp = skToPar(L); return `<button class="row tap skrow" onclick="go('#/item/${L.it.id}')"><div class="main"><div class="name">${esc(L.it.name)}${skSeed(L.seed)}</div><div class="meta">${esc(L.it.supplier || "no supplier")}${tp ? ` · order <b class="ink2">${esc(tp.txt)}</b> to reach par` : ""}</div>${skLvl(L)}</div><div class="right"><div class="v num">${fmt(L.s)}</div><div class="l">${esc(L.it.unit)} · par ${fmt(L.par)}</div><div style="margin-top:4px">${L.cover != null ? skCoverChip(L) : chip(L.st.cls, L.st.label)}</div></div></button>`; }).join("")}</div>${soonAll.length > soon.length ? `<button class="btn ghost full" onclick="skBoard='low';render();document.getElementById('sklv').scrollIntoView({behavior:'smooth'})">All ${soonAll.length} to reorder ›</button>` : ""}`
+  const soonAll = counted.filter(L => L.st.k !== "ok" || (L.cover != null && L.cover < 4)).sort((a, b) => rank(a) - rank(b)); const soon = soonAll.slice(0, 15);
+  /* v0.19.3: the Levels board listed every item a second time; Items is the one list now. Stock keeps what needs a decision: one line per item to reorder. */
+  const soonHTML = soon.length ? `<div class="itwrap flat"><table class="itbl"><thead><tr><th>Item</th><th class="h1">Category</th><th class="h1">Supplier</th><th class="n">Stock</th><th class="h2 lv"></th><th class="n h2">Par</th><th class="n">Days left</th><th class="n">Order</th><th class="st">Status</th></tr></thead><tbody>${soon.map(L => { const tp = skToPar(L); const it = L.it;
+      return `<tr onclick="go('#/item/${it.id}')"><td class="nm"><a href="#/item/${it.id}" onclick="event.stopPropagation()">${esc(it.name)}</a>${skSeed(L.seed)}<div class="sub2">${skSupLink(it.supplier) || "no supplier"}</div></td><td class="h1 mut">${esc(skGrp(it))}</td><td class="h1 mut">${skSupLink(it.supplier) || "—"}</td><td class="n num sk-${L.st.k}"><b>${fmt(L.s)}</b> <small>${esc(it.unit)}</small></td><td class="h2 lv">${skLvl(L)}</td><td class="n h2 num">${L.par ? fmt(L.par) : "—"}</td><td class="n num">${L.cover == null ? "—" : L.cover >= 30 ? "30+" : L.cover.toFixed(1)}</td><td class="n num">${tp ? `<b>${esc(tp.txt)}</b>` : "—"}</td><td class="st">${chip(L.st.cls, L.st.label)}</td></tr>`; }).join("")}</tbody></table></div>${soonAll.length > soon.length ? `<button class="btn ghost full sm" onclick="skItemFlt='low';skItemSort='stock';skItemDir=1;go('#/items')">All ${soonAll.length} to reorder ›</button>` : ""}`
     : `<div class="mut small">${counted.length ? "Every counted item is at or above par, with more than four days of sales in stock." : "Nothing counted yet — the first closing count fills this list."}</div>`;
-
-  const flt = [["all", "All"], ["low", "Below par"], ["none", "Not counted"], ["nightly", "Short list"]];
-  const pick = L => skBoard === "all" ? true : skBoard === "low" ? (L.st.k === "low" || L.st.k === "out") : skBoard === "none" ? L.st.k === "none" : L.it.nightly;
-  const groups = PLACES.map(pl => { const rows = Ls.filter(L => L.it.place === pl.id && pick(L)); if (!rows.length) return "";
-    return `<div class="txday">${esc(pl.name)} <span class="mut">· ${rows.length}</span></div>${rows.map(L => `<button class="lvr" onclick="go('#/item/${L.it.id}')"><span class="nm">${esc(L.it.name)}<span class="st">${L.s == null ? `<span class="mut tiny">not counted</span>` : chip(L.st.cls, L.st.label)}${L.seed ? `<span class="tiny mut" data-tt="Seed count|14 Oct placeholder, not real">seed</span>` : ""}</span></span>${skLvl(L)}<span class="vl num">${L.s != null ? fmt(L.s) : "—"}<small>${esc(L.it.unit)}${L.par ? " · par " + fmt(L.par) : ""}</small></span></button>`).join("")}`; }).join("");
-  const tbl = skTable(["Item", "Stock", "Par", "Days left", "Status"], Ls.filter(pick).map(L => [esc(L.it.name) + (L.seed ? " (seed)" : ""), L.s != null ? fmt(L.s) + " " + esc(L.it.unit) : "—", fmt(L.par), L.cover != null ? L.cover.toFixed(1) : "—", esc(L.st.label)]));
-  const board = `<section class="card" id="sklv"><div class="split"><h2>Levels <span class="tiny mut">stock now vs par</span></h2></div>
-    <div class="rng">${flt.map(([k, l]) => `<button class="${skBoard === k ? "on" : ""}" onclick="skBoard='${k}';render()">${l}</button>`).join("")}</div>
-    <div class="legend"><span><b style="background:var(--s1)"></b>Stock now</span><span><b class="tick"></b>Par (middle of the bar)</span></div>
-    <div class="lvls">${groups || `<div class="mut small" style="padding:12px 0">Nothing in this filter.</div>`}</div>${tbl}</section>`;
-
-  const links = `<div class="list">${[["Items", `${ITEMS.length} items · search, filter, par and price`, "#/items"], ["Variance", lv ? `last count ${dayName(lv.day)}` : "counted vs expected", "#/variance"], ["Deliveries log", `${S.receipts.length} receipts`, "#/receipts"]].map(([n, m, h]) => `<button class="row tap" onclick="go('${h}')"><div class="main"><div class="name">${n}</div><div class="meta">${m}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("")}</div>`;
+  const notC = Ls.length - counted.length;
+  const links = `<div class="skact lite">${[[`All items · ${ITEMS.length}`, "skItemFlt='';go('#/items')"], notC ? [`Not counted · ${notC}`, "skItemFlt='none';go('#/items')"] : null, ["Variance", "go('#/variance')"], [`Deliveries log · ${S.receipts.length}`, "go('#/receipts')"]].filter(Boolean).map(([n, h]) => `<button class="btn" onclick="${h}">${n} ›</button>`).join("")}</div>`;
   const how = `<div class="tiny mut">Stock now = last count + received since − sold since (UTAK, only items sold 1:1 such as drinks; food items show the last count until recipes are weighed). Days left = stock ÷ average sold per day over the last 4 weeks to ${esc(dayName(LAST_DAY))}. <b>seed</b> = the 14 Oct placeholder count, not real.</div>`;
-  return shell("Stock", `Pizza 99 · sales to ${dayName(LAST_DAY)}`, actions + tiles + `<section class="card"><h2>Order soon <span class="tiny mut">fewest days left first</span></h2>${soonHTML}</section>` + board + links + how);
+  return shell("Stock", `Pizza 99 · sales to ${dayName(LAST_DAY)}`, actions + tiles + `<section class="card" id="sklv"><h2>Order soon <span class="tiny mut">${soonAll.length} to reorder · fewest days left first</span></h2>${soonHTML}</section>` + links + how);
 }
 
 /* ---------- COUNT ---------- */
@@ -328,6 +320,15 @@ function viewReceipts() {
 /* ---------- ITEMS ---------- */
 /* v0.19.2 (Stefan, 2026-11-13: "more data, overall more compact … something around 500-600 items"): one dense table, one line per item,
    every column sortable from its header, filters in one toolbar row. Phone keeps Item · Stock · Days left · Status, the rest folds into a second line. */
+/* Categories (Stefan, 2026-11-13: "close to the categories Mike has in his accounting sheets, but better"): the group is the purchase
+   category of the accounting book, so stock and purchases add up under the same headings; the chef sheet's finer category is the sub-category. */
+const SK_BOOK = [["Beverages & Liquor", ["drink"]], ["Vegetables & Fruit", ["vegetable & fruit"]], ["Chilled", ["cheese", "meat & fish"]], ["Dry Food", ["dry & baking", "canned & jar", "sauce & oil"]],
+  ["Consumables", ["packaging"]], ["Cleaning Supplies", ["cleaning"]], ["Gas", ["gas"]], ["Made here", ["prep (made here)"]]];
+const skGrpIx = it => { const i = SK_BOOK.findIndex(g => g[1].includes(it.cat || "")); return i < 0 ? SK_BOOK.length : i; };
+const skGrp = it => (SK_BOOK[skGrpIx(it)] || ["Other"])[0];
+const skSub = it => it.cat ? it.cat[0].toUpperCase() + it.cat.slice(1) : "—";
+const skCatKey = it => { const g = skGrpIx(it); const j = g < SK_BOOK.length ? SK_BOOK[g][1].indexOf(it.cat) : 0; return g * 100 + j; };
+const skSupLink = n => !n ? "" : typeof SUPPLIER_INFO !== "undefined" && SUPPLIER_INFO[n] && canOpen("suppliers") ? `<a class="sl" href="#/supplier/${encodeURIComponent(n)}" onclick="event.stopPropagation()">${esc(n)}</a>` : esc(n);
 let skItemDir = 1;
 function skItemSortBy(k) { if (skItemSort === k) skItemDir = -skItemDir; else { skItemSort = k; skItemDir = 1; } render(); }
 function viewItems() {
@@ -336,34 +337,36 @@ function viewItems() {
   const search = `<input class="in" type="search" id="skq" placeholder="Search items or suppliers" value="${esc(skItemQ)}" oninput="skItemQ=this.value;render();const i=document.getElementById('skq');i.focus();i.setSelectionRange(99,99)">`;
   if (skItemSrc === "db") return shell("Items", "ingredients list from the chef sheet (read only)", `<div class="ittool">${search}${srcSel}</div>` + skDbList(q), { back: "#/stock" });
   let Ls = ITEMS.map(L0 => { const L = skLevel(L0); const lp = Store.lastPrice(L0.id); const lc = Store.lastCount(L0.id); L.price = lp ? lp.price : null; L.lcDay = lc ? lc.day : null; L.val = L.price != null && L.s != null ? Math.max(0, L.s) * L.price : null; return L; })
-    .filter(L => (!q || (L.it.name + " " + (L.it.supplier || "")).toLowerCase().includes(q)) && (!skItemPlace || L.it.place === skItemPlace) && (!skItemSup || L.it.supplier === skItemSup)
+    .filter(L => (!q || (L.it.name + " " + (L.it.supplier || "")).toLowerCase().includes(q)) && (!skItemPlace || L.it.place === skItemPlace) && (!skItemCat || skGrp(L.it) === skItemCat) && (!skItemSup || L.it.supplier === skItemSup)
     && (skItemFlt === "" ? true : skItemFlt === "low" ? (L.st.k === "low" || L.st.k === "out") : skItemFlt === "none" ? L.st.k === "none" : skItemFlt === "nightly" ? L.it.nightly : skItemFlt === "verify" ? L.it.verify : true));
   const pIx = id => PLACES.findIndex(p => p.id === id); const nl = (v, big) => v == null ? big : v;   // empty values sort last both ways
-  const key = { place: L => pIx(L.it.place), name: L => L.it.name.toLowerCase(), sup: L => (L.it.supplier || "~").toLowerCase(), par: L => nl(L.par, 1e12), stock: L => L.s == null ? 1e12 : L.par ? L.s / L.par : 1e6 + L.s,
-    use: L => nl(L.perDay, -1), cover: L => nl(L.cover, 1e12), price: L => nl(L.price, -1), val: L => nl(L.val, -1), counted: L => L.lcDay || "0000" }[skItemSort] || (L => pIx(L.it.place));
+  const key = { cat: L => skCatKey(L.it), place: L => pIx(L.it.place), name: L => L.it.name.toLowerCase(), sup: L => (L.it.supplier || "~").toLowerCase(), par: L => nl(L.par, 1e12), stock: L => L.s == null ? 1e12 : L.par ? L.s / L.par : 1e6 + L.s,
+    use: L => nl(L.perDay, -1), cover: L => nl(L.cover, 1e12), price: L => nl(L.price, -1), val: L => nl(L.val, -1), counted: L => L.lcDay || "0000" }[skItemSort] || (L => skCatKey(L.it));
   const desc = ["use", "price", "val", "counted"].includes(skItemSort) ? -1 : 1;   // bigger / newer first on the first click
-  Ls = Ls.slice().sort((a, b) => { const x = key(a), y = key(b); const c = x < y ? -1 : x > y ? 1 : 0; return c * skItemDir * desc || pIx(a.it.place) - pIx(b.it.place) || a.it.name.localeCompare(b.it.name); });
+  Ls = Ls.slice().sort((a, b) => { const x = key(a), y = key(b); const c = x < y ? -1 : x > y ? 1 : 0; return c * skItemDir * desc || skCatKey(a.it) - skCatKey(b.it) || a.it.name.localeCompare(b.it.name); });
   const sups = [...new Set(ITEMS.map(i => i.supplier).filter(Boolean))].sort();
   const flts = [["", "All statuses"], ["low", "Below par"], ["none", "Not counted"], ["nightly", "Short list"], ["verify", "Pack to verify"]];
   const tool = `<div class="ittool">${search}
+    <select class="in" onchange="skItemCat=this.value;render()" aria-label="Category"><option value="">All categories</option>${SK_BOOK.map(g => g[0]).concat("Other").filter(g => ITEMS.some(i => skGrp(i) === g)).map(g => `<option ${skItemCat === g ? "selected" : ""}>${esc(g)}</option>`).join("")}</select>
     <select class="in" onchange="skItemPlace=this.value;render()" aria-label="Place"><option value="">All places</option>${PLACES.map(p => `<option value="${p.id}" ${skItemPlace === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select>
     <select class="in" onchange="skItemSup=this.value;render()" aria-label="Supplier"><option value="">All suppliers</option>${sups.map(s => `<option ${skItemSup === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>
     <select class="in" onchange="skItemFlt=this.value;render()" aria-label="Status">${flts.map(([k, l]) => `<option value="${k}" ${skItemFlt === k ? "selected" : ""}>${l}${k ? ` (${ITEMS.map(skLevel).filter(L => k === "low" ? (L.st.k === "low" || L.st.k === "out") : k === "none" ? L.st.k === "none" : k === "nightly" ? L.it.nightly : L.it.verify).length})` : ""}</option>`).join("")}</select>${srcSel}</div>`;
-  const cols = [["name", "Item", ""], ["sup", "Supplier", "h1"], ["pack", "Pack", "h1 ns"], ["par", "Par", "n h2"], ["stock", "Stock", "n"], ["lvl", "", "h2 ns lv"], ["use", "Used/day", "n h2"], ["cover", "Days left", "n"], ["price", "Last price", "n h1"], ["val", "Value", "n h1"], ["counted", "Counted", "n h1"], ["st", "Status", "st"]];
+  const cols = [["name", "Item", ""], ["cat", "Category", "h1"], ["place", "Place", "h3"], ["sup", "Supplier", "h1"], ["pack", "Pack", "h4 ns"], ["par", "Par", "n h2"], ["stock", "Stock", "n"], ["lvl", "", "h2 ns lv"], ["use", "Used/day", "n h2"], ["cover", "Days left", "n"], ["price", "Last price", "n h1"], ["val", "Value", "n h1"], ["counted", "Counted", "n h1"], ["st", "Status", "st"]];
   const head = `<tr>${cols.map(([k, l, c]) => c.includes("ns") || k === "st" ? `<th class="${c}">${l}</th>` : `<th class="${c}"><button onclick="skItemSortBy('${k}')" class="${skItemSort === k ? "on" : ""}">${l}${skItemSort === k ? (skItemDir * desc > 0 ? " ▲" : " ▼") : ""}</button></th>`).join("")}</tr>`;
   const cnt = d => { if (!d) return "—"; const a = ageDays(d); return a <= 0 ? "today" : a === 1 ? "1 d ago" : a + " d ago"; };
   const stTxt = L => L.s == null ? `<span class="mut">no count</span>` : L.st.k !== "ok" ? chip(L.st.cls, L.st.label) : L.cover != null && L.cover < 4 ? chip(L.cover < 2 ? "bad" : "warn", "low cover") : chip("ok", "ok");
   const row = L => { const it = L.it; return `<tr onclick="go('#/item/${it.id}')" tabindex="0" onkeydown="if(event.key==='Enter')go('#/item/${it.id}')">
-    <td class="nm"><a href="#/item/${it.id}" onclick="event.stopPropagation()">${esc(it.name)}</a>${skSeed(L.seed)}${skVerify(it)}${it.nightly ? `<span class="tag" data-tt="Short list|counted every night">N</span>` : ""}<div class="sub2">${esc(it.supplier || "no supplier")}${L.par ? " · par " + fmt(L.par) : ""}${L.price != null ? " · " + skP(L.price) : ""}</div></td>
-    <td class="h1 mut">${esc(it.supplier || "—")}</td><td class="h1 mut">${it.pack ? `${fmt(it.pack)} ${esc(it.unit)}/${esc(it.packUnit)}` : esc(it.unit)}</td>
+    <td class="nm"><a href="#/item/${it.id}" onclick="event.stopPropagation()">${esc(it.name)}</a>${skSeed(L.seed)}${skVerify(it)}${it.nightly ? `<span class="tag" data-tt="Short list|counted every night">N</span>` : ""}<div class="sub2">${skSupLink(it.supplier) || "no supplier"}${L.par ? " · par " + fmt(L.par) : ""}${L.price != null ? " · " + skP(L.price) : ""}</div></td>
+    <td class="h1 mut">${esc(skSub(it))}</td><td class="h3 mut">${esc(skPlace(it.place))}</td><td class="h1 mut">${skSupLink(it.supplier) || "—"}</td><td class="h4 mut">${it.pack ? `${fmt(it.pack)} ${esc(it.unit)}/${esc(it.packUnit)}` : esc(it.unit)}</td>
     <td class="n h2 num">${L.par ? fmt(L.par) : "—"}</td><td class="n num sk-${L.st.k}"><b>${L.s != null ? fmt(L.s) : "—"}</b> <small>${esc(it.unit)}</small></td><td class="h2 lv">${skLvl(L)}</td>
     <td class="n h2 num">${L.perDay != null ? fmt(Math.round(L.perDay * 10) / 10) : "—"}</td><td class="n num">${L.cover == null ? "—" : L.cover >= 30 ? "30+" : L.cover.toFixed(1)}</td>
     <td class="n h1 num">${L.price != null ? skP(L.price) : "—"}</td><td class="n h1 num">${L.val != null ? peso(L.val) : "—"}</td><td class="n h1 mut">${cnt(L.lcDay)}</td><td class="st">${stTxt(L)}</td></tr>`; };
-  const grp = skItemSort === "place" && !skItemPlace;
-  const body = grp ? PLACES.map(pl => { const r = Ls.filter(L => L.it.place === pl.id); return r.length ? `<tr class="gh"><td colspan="${cols.length}">${esc(pl.name)} <span>· ${r.length}</span></td></tr>${r.map(row).join("")}` : ""; }).join("") : Ls.map(row).join("");
+  const gOf = skItemSort === "cat" ? L => skGrp(L.it) : skItemSort === "place" ? L => skPlace(L.it.place) : null;   // group rows follow the sort: book category (default) or shelf place
+  const gVal = g => { const v = Ls.filter(L => gOf(L) === g && L.val != null); return v.length ? " · " + peso(skSum(v.map(L => L.val))) : ""; };
+  const body = gOf ? [...new Set(Ls.map(gOf))].map(g => { const r = Ls.filter(L => gOf(L) === g); return `<tr class="gh"><td colspan="${cols.length}">${esc(g)} <span>· ${r.length}${gVal(g)}</span></td></tr>${r.map(row).join("")}`; }).join("") : Ls.map(row).join("");
   const vals = Ls.filter(L => L.val != null); const low = Ls.filter(L => L.st.k === "low" || L.st.k === "out").length;
   const foot = `<div class="itfoot tiny mut">${Ls.length} of ${ITEMS.length} items · ${low} below par · stock value ${peso(skSum(vals.map(L => L.val)))} (${vals.length} with a price) · Used/day = UTAK, last 4 weeks, items sold 1:1 · tap a column to sort</div>`;
-  return shell("Items", `${Ls.length} of ${ITEMS.length} items`, tool + (Ls.length ? `<div class="itwrap"><table class="itbl"><thead>${head}</thead><tbody>${body}</tbody></table></div>` + foot : `<div class="card mut small">No item matches.</div>`), { back: "#/stock" });
+  return shell("Items", `${Ls.length} of ${ITEMS.length} items`, tool + (Ls.length ? `<div class="itwrap"><table class="itbl wide"><thead>${head}</thead><tbody>${body}</tbody></table></div>` + foot : `<div class="card mut small">No item matches.</div>`), { back: "#/stock" });
 }
 function skDbList(q) {
   if (SKDB.state === "loading" || SKDB.state === "idle") return `<div class="card mut small">Loading the ingredients list…</div>`;

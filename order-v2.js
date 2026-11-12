@@ -144,12 +144,22 @@ function pushState() { try { return localStorage.getItem("p99os_push") === "on";
 let szEdit = {};
 function viewSizes() {
   if (!["lead", "master"].includes(role())) return shell("Pack sizes", "", `<div class="alert info">For the store lead and the owners.</div>`, { back: "#/stock" });
-  const unknown = ITEMS.filter(i => i.sizeUnknown);
-  const rows = unknown.map(it => `<div class="row"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">counted per ${esc(it.unit)}${it.supplier ? " · " + esc(it.supplier) : ""}</div></div>
-    <div class="right" style="display:flex;gap:6px;align-items:center"><input class="in num" inputmode="decimal" style="width:90px" placeholder="${esc(it.base)}" aria-label="${esc(it.base)} in one ${esc(it.unit)}" value="${szEdit[it.id] != null ? szEdit[it.id] : ""}" oninput="szEdit['${it.id}']=this.value===''?null:parseFloat(this.value)"><span class="l">${esc(it.base)}</span><button class="btn primary" onclick="szSave('${it.id}')">Save</button></div></div>`).join("");
+  const unknown = ITEMS.filter(i => i.sizeUnknown).sort((a, b) => (typeof skCatKey === "function" ? skCatKey(a) - skCatKey(b) : 0) || a.name.localeCompare(b.name));
+  /* v0.19.3: a fill-in table, one line per item, Tab or Enter moves down, one button saves everything typed */
+  const rows = unknown.map((it, i) => `<tr><td class="nm">${esc(it.name)}<div class="sub2">${esc(it.supplier || "no supplier")}</div></td><td class="h1 mut">${typeof skGrp === "function" ? esc(skGrp(it)) : ""}</td><td class="h1 mut">${typeof skSupLink === "function" ? skSupLink(it.supplier) || "—" : esc(it.supplier || "—")}</td><td class="mut">1 ${esc(it.unit)} =</td>
+    <td class="n szc"><input class="in num szin" inputmode="decimal" data-i="${i}" placeholder="${esc(it.base)}" aria-label="${esc(it.base)} in one ${esc(it.unit)} of ${esc(it.name)}" value="${szEdit[it.id] != null ? szEdit[it.id] : ""}" oninput="szEdit['${it.id}']=this.value===''?null:parseFloat(this.value);szCount()" onkeydown="if(event.key==='Enter'){const n=document.querySelector('.szin[data-i=&quot;${i + 1}&quot;]');if(n)n.focus();else szSaveAll()}"> <small>${esc(it.base)}</small></td></tr>`).join("");
+  const n = Object.values(szEdit).filter(v => v > 0).length;
   return shell("Pack sizes", `${unknown.length} without a size`, `
-    <div class="alert info">Write how much ONE counted unit holds, as printed on the label (one can of tuna = ? g). Receive also asks for it when one of these arrives. Weigh it once if the label does not say.</div>
-    <section class="card"><div class="list">${rows || `<div class="mut">Every item has a size.</div>`}</div></section>`, { back: "#/stock" });
+    <div class="tiny mut">Write how much ONE counted unit holds, as printed on the label (one can of tuna = ? g). Receive also asks for it when one of these arrives. Weigh it once if the label does not say. Enter jumps to the next line.</div>
+    ${unknown.length ? `<div class="itwrap"><table class="itbl sz"><thead><tr><th>Item</th><th class="h1">Category</th><th class="h1">Supplier</th><th>Counted as</th><th class="n">Holds</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="bottom-act"><button class="btn primary full" id="szall" onclick="szSaveAll()" ${n ? "" : "disabled"}>Save ${n || ""} size${n === 1 ? "" : "s"}</button></div>` : `<section class="card"><div class="mut">Every item has a size.</div></section>`}`, { back: "#/stock" });
+}
+function szCount() { const n = Object.values(szEdit).filter(v => v > 0).length; const b = document.getElementById("szall"); if (b) { b.disabled = !n; b.textContent = `Save ${n || ""} size${n === 1 ? "" : "s"}`; } }
+function szSaveAll() {
+  const ids = Object.keys(szEdit).filter(k => szEdit[k] > 0); if (!ids.length) return toast("Type a size first.");
+  S.sizeDecisions = S.sizeDecisions || [];
+  ids.forEach(code => { S.sizeDecisions.push({ id: "sz-" + code + "-" + Date.now(), item: code, qty: szEdit[code], synced: false }); const it = Store.item(code); if (it) { it.per = szEdit[code]; it.sizeUnknown = false; } delete szEdit[code]; });
+  save(); toast(ids.length + (ids.length === 1 ? " size saved." : " sizes saved.")); render();
 }
 function szSave(code) {
   const qty = szEdit[code]; if (!(qty > 0)) return toast("Type the size first.");
