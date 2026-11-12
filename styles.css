@@ -416,3 +416,15 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 
 .rb-logo{display:block; margin:0 auto 10px; width:168px; max-width:60%}   /* v0.19.1: stacked lockup, symmetric, so it centres (the side lockup looked off-centre) */
 .rb-dark{display:none} :root[data-theme="dark"] .rb-light{display:none} :root[data-theme="dark"] .rb-dark{display:block}
+
+/* v0.19.5 (Stefan, 2026-11-13: "the navigation takes too much from the screen"): the left menu at 156 px instead of 240, tighter rows */
+@media (min-width:900px){
+  .sidebar{width:156px; padding:12px 8px 24px; gap:1px}
+  .page{margin-left:156px}
+  .sidebar button{padding:5px 8px; gap:8px; font-size:13px; line-height:20px; font-weight:500}
+  .sidebar button.on{font-weight:600}
+  .sidebar button .ic{width:16px; height:16px; flex:none}
+  .sidebar .sgroup{font-size:10px; padding:10px 8px 2px}
+  .sidebar .brand{padding:2px 8px 10px}
+  .rb-line{width:124px}
+}
