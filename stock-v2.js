@@ -394,6 +394,24 @@ function skDbList(q) {
 }
 
 /* ---------- ITEM card ---------- */
+/* v0.19.9 — product facts and price per liter / kilo (migration 029: brand, net content per unit, container) */
+function skPerLK(it) {   /* latest price per base unit -> per L or kg; null when the size is unknown */
+  if (typeof supPrices !== "function") return null; const ps = supPrices(it.id); const l = ps[ps.length - 1]; if (!l) return null;
+  if (it.base === "g" || it.base === "ml") return { v: l.p * 1000, u: it.base === "g" ? "kg" : "L", day: l.day, sup: l.sup };
+  if ((it.netUnit === "g" || it.netUnit === "ml") && it.net > 0) return { v: l.p / it.net * 1000, u: it.netUnit === "g" ? "kg" : "L", day: l.day, sup: l.sup };
+  return null;
+}
+function skProductCard(it) {
+  if (!it.brand && !it.net && !it.container) return "";
+  const size = it.net ? `${fmt(it.net >= 1000 && it.netUnit ? it.net / 1000 : it.net)} ${esc(it.net >= 1000 ? (it.netUnit === "g" ? "kg" : "L") : (it.netUnit || ""))} per ${esc(it.unit)}` : `<span class="mut">not known</span>`;
+  const pk = typeof supMoney === "function" && supMoney() ? skPerLK(it) : null;
+  return `<section class="card"><h2>Product ${it.specOk ? chip("ok", "size checked") : chip("warn", "check the label")}</h2><table class="t"><tbody>
+    ${it.brand ? `<tr><td>Brand</td><td class="n">${esc(it.brand)}</td></tr>` : ""}
+    <tr><td>Size</td><td class="n">${size}</td></tr>
+    ${it.container ? `<tr><td>Container</td><td class="n">${esc(it.container)}</td></tr>` : ""}
+    ${pk ? `<tr><td>Price per ${esc(pk.u)}</td><td class="n num"><b>${skP(pk.v)}</b> <span class="tiny mut">${esc(dayName(pk.day))}${pk.sup ? " · " + esc(pk.sup) : ""}</span></td></tr>` : ""}
+    ${it.specNote ? `<tr><td>Note</td><td class="n">${esc(it.specNote)}</td></tr>` : ""}</tbody></table></section>`;
+}
 function viewItem(id) {
   const it = Store.item(id); if (!it) return viewItems(); skLoadDB(); const L = skLevel(it); const ex = L.ex; const prices = Store.prices(id); const lp = prices[prices.length - 1], pp = prices[prices.length - 2];
   const weeks = skWeeks(it, 8); const RI = skRecipeInfo(it);
@@ -431,7 +449,7 @@ function viewItem(id) {
     <tr><td>Counted as</td><td class="n">${it.pack ? `${esc(it.packUnit)} of ${it.pack} ${esc(it.unit)}${it.verify ? " " + chip("warn", "verify") : ""}` : esc(it.unit)}</td></tr>
     <tr><td>Nightly short list</td><td class="n">${it.nightly ? "yes" : "no"}</td></tr><tr><td>Sold as-is on UTAK</td><td class="n">${it.pos ? esc(it.pos) : "via recipes"}</td></tr>
     ${db ? `<tr><td>Chef sheet</td><td class="n">${db.confirmed ? chip("ok", "confirmed") : `<span class="sample">to check</span>`} · ${esc(db.base_unit)}${db.pack_unit ? " · " + esc(db.pack_unit) + (db.pack_qty ? " = " + fmt(db.pack_qty) + " " + esc(db.base_unit) : "") : ""}</td></tr>` : ""}</tbody></table></section>`;
-  return shell(it.name, `${esc(skPlace(it.place))}${it.supplier ? " · " + esc(it.supplier) : ""}`, `${tiles}<div class="skact"><button class="btn" onclick="startDraft();go('#/count/${it.place}');setTimeout(()=>openPad('${id}'),0)">${ic("grid-01", "sm")}Count it</button><button class="btn" onclick="rc=rc||{kind:'delivery',supplier:${esc(JSON.stringify(it.supplier || ""))},lines:[],photo:null,amount:''};go('#/receive');setTimeout(()=>skRcPad('${id}'),0)">${ic("package", "sm")}Receive it</button></div>${math}${usage}${typeof skPriceUnitSection === "function" && typeof supMoney === "function" && supMoney() ? skPriceUnitSection(it) : price}${recipe}${countsHTML}${recHTML}${settings}`, { back: "#/items" });
+  return shell(it.name, `${esc(skPlace(it.place))}${it.supplier ? " · " + esc(it.supplier) : ""}`, `${tiles}<div class="skact"><button class="btn" onclick="startDraft();go('#/count/${it.place}');setTimeout(()=>openPad('${id}'),0)">${ic("grid-01", "sm")}Count it</button><button class="btn" onclick="rc=rc||{kind:'delivery',supplier:${esc(JSON.stringify(it.supplier || ""))},lines:[],photo:null,amount:''};go('#/receive');setTimeout(()=>skRcPad('${id}'),0)">${ic("package", "sm")}Receive it</button></div>${math}${usage}${typeof skPriceUnitSection === "function" && typeof supMoney === "function" && supMoney() ? skPriceUnitSection(it) : price}${skProductCard(it)}${recipe}${countsHTML}${recHTML}${settings}`, { back: "#/items" });
 }
 
 /* ---------- VARIANCE ---------- */

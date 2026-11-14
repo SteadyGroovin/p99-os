@@ -107,7 +107,8 @@ function dbCatalogue(L) {
     const per = d.packUnit ? n(d.pack) : 1;                                   /* base units in one count unit; null = not known yet */
     const it = { id: d.id, name: d.name, place: d.place || "", cat: String(d.cat || "").toLowerCase(), unit: d.packUnit || d.unit, base: d.unit, per,
       par: d.par == null ? null : (d.packUnit && per ? n(d.par) / per : n(d.par)), nightly: !!d.nightly, supplier: d.supplier || undefined, buys: d.buys || [],
-      verify: !d.confirmed || (!!d.packUnit && per == null), sizeUnknown: !!d.packUnit && per == null };   /* v0.13: Receive asks the crew to write the size off the label */
+      verify: !d.confirmed || (!!d.packUnit && per == null), sizeUnknown: !!d.packUnit && per == null,
+      brand: d.brand || null, net: n(d.net), netUnit: d.netUnit || null, container: d.container || null, specOk: !!d.specOk, specNote: d.specNote || null };   /* v0.19.9: product facts (migration 029/030) */   /* v0.13: Receive asks the crew to write the size off the label */
     if (d.caseUnit && n(d.case)) { it.packUnit = d.caseUnit; it.pack = n(d.case); }
     if (d.pos) it.pos = d.pos;
     return it; }));

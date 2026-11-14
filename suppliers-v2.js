@@ -53,6 +53,7 @@ const supPay = i => i && i.pay_mode === "terms" ? chip("info", "terms · bill") 
 /* ---------- SUPPLIERS ---------- */
 let supSort = "last", supDir = 1;   /* v0.19.4: one line per supplier, every column sorts */
 function supSortBy(k) { if (supSort === k) supDir = -supDir; else { supSort = k; supDir = 1; } render(); }
+function supKind(k) { return { market: "market", in_house: "made here", office: "office stock", logistics: "transport only", online: "online shop" }[k] || k; }   /* v0.19.9 (migration 029) */
 function viewSuppliers() {
   if (!canOpen("suppliers")) return shell("Suppliers", "", `<div class="alert info">For the store lead, the office and the owners.</div>`, { back: "#/more" });
   const names = Object.keys(SUPPLIER_INFO).filter(n => n !== "Made here");
@@ -63,7 +64,7 @@ function viewSuppliers() {
   const cols = [["name", "Supplier", ""], ["terms", "Terms", "h1"], ["lead", "Days to arrive", "n h2"], ["items", "Items", "n h1"], ["last", "Last delivery", "n"], ["n90", "In 90 days", "n h1"]].concat(supMoney() ? [["spend", "Spend 30 d", "n h1"], ["open", "Open bills", "n"]] : []);
   const head = `<tr>${cols.map(([k, l, c]) => `<th class="${c}"><button class="${supSort === k ? "on" : ""}" onclick="supSortBy('${k}')">${l}${supSort === k ? ((["name", "terms", "lead"].includes(k) ? supDir : -supDir) > 0 ? " ▲" : " ▼") : ""}</button></th>`).join("")}</tr>`;
   const list = rows.map(({ n, i, st }) => { const op = st.open.reduce((a, m) => a + (+m.total || 0), 0);
-    return `<tr onclick="go('#/supplier/${supEnc(n)}')" tabindex="0" onkeydown="if(event.key==='Enter')go('#/supplier/${supEnc(n)}')"><td class="nm">${esc(n)}${i && i.confirmed === false ? `<span class="tag" style="color:var(--warn)">to complete</span>` : ""}<div class="sub2">${i && i.pay_mode === "terms" ? "terms · bill" : i && i.pay_mode === "paid_now" ? "paid now" : "terms not set"}${st.n90 ? ` · ${st.n90} in 90 days` : ""}</div></td><td class="h1 st">${supPay(i)}</td><td class="n h2 num">${i && i.lead != null ? fmt(i.lead) : "—"}</td><td class="n h1 num">${Object.keys(st.items).length || "—"}</td><td class="n mut">${st.last ? esc(dayName(st.last)) : "—"}</td><td class="n h1 num">${st.n90 || "—"}</td>${supMoney() ? `<td class="n h1 num">${st.spend30 ? peso(st.spend30) : "—"}</td><td class="n num">${st.open.length ? `<b>${peso(op)}</b> <small>${st.open.length}</small>` : "—"}</td>` : ""}</tr>`; }).join("");
+    return `<tr onclick="go('#/supplier/${supEnc(n)}')" tabindex="0" onkeydown="if(event.key==='Enter')go('#/supplier/${supEnc(n)}')"><td class="nm">${esc(n)}${i && i.kind && i.kind !== "supplier" ? `<span class="tag">${esc(supKind(i.kind))}</span>` : ""}${i && i.confirmed === false ? `<span class="tag" style="color:var(--warn)">to complete</span>` : ""}<div class="sub2">${i && ["in_house", "office", "logistics"].includes(i.kind) ? "not a supplier of goods" : i && i.pay_mode === "terms" ? "terms · bill" : i && i.pay_mode === "paid_now" ? "paid now" : "terms not set"}${st.n90 ? ` · ${st.n90} in 90 days` : ""}</div></td><td class="h1 st">${supPay(i)}</td><td class="n h2 num">${i && i.lead != null ? fmt(i.lead) : "—"}</td><td class="n h1 num">${Object.keys(st.items).length || "—"}</td><td class="n mut">${st.last ? esc(dayName(st.last)) : "—"}</td><td class="n h1 num">${st.n90 || "—"}</td>${supMoney() ? `<td class="n h1 num">${st.spend30 ? peso(st.spend30) : "—"}</td><td class="n num">${st.open.length ? `<b>${peso(op)}</b> <small>${st.open.length}</small>` : "—"}</td>` : ""}</tr>`; }).join("");
   return shell("Suppliers", `${names.length} suppliers`, `
     ${todo.length ? `<div class="alert warn">${todo.length} supplier${todo.length === 1 ? " was" : "s were"} added at Receive and need${todo.length === 1 ? "s" : ""} terms and delivery days: ${todo.map(r => esc(r.n)).join(", ")}.</div>` : ""}
     ${supNew ? supNewForm(false) : `<button class="btn" onclick="supNew={};render()">+ New supplier</button>`}
@@ -79,10 +80,17 @@ function viewSupplier(enc) {
     <tr><td>Days from order to delivery</td><td class="n">${i.lead != null ? fmt(i.lead) : "—"}</td></tr>
     <tr><td>Order days</td><td class="n">${esc(i.order_days || "—")}</td></tr>
     <tr><td>Owner approves every order</td><td class="n">${i.needs_approval ? "yes" : "no"}</td></tr>
+    ${i.legal_name ? `<tr><td>Legal name</td><td class="n">${esc(i.legal_name)}</td></tr>` : ""}
+    ${i.kind && i.kind !== "supplier" ? `<tr><td>Type</td><td class="n">${esc(supKind(i.kind))}</td></tr>` : ""}
+    ${i.terms ? `<tr><td>Terms</td><td class="n">${esc(i.terms)}</td></tr>` : ""}
     <tr><td>Phone</td><td class="n">${i.phone ? `<span class="num">${esc(i.phone)}</span>` : "—"}</td></tr>
-    <tr><td>Sells</td><td class="n">${esc(i.offers || "—")}</td></tr>
+    ${i.email ? `<tr><td>Email</td><td class="n">${esc(i.email)}</td></tr>` : ""}
+    ${i.website ? `<tr><td>Website</td><td class="n">${esc(i.website)}</td></tr>` : ""}
+    <tr><td>Address</td><td class="n">${esc(i.address || "—")}</td></tr>
+    <tr><td>What we buy</td><td class="n">${esc(i.offers || "—")}</td></tr>
     ${i.notes ? `<tr><td>Notes</td><td class="n">${esc(i.notes)}</td></tr>` : ""}
-    ${i.added_by ? `<tr><td>Added by</td><td class="n">${esc(i.added_by)}</td></tr>` : ""}</tbody></table>
+    ${i.added_by ? `<tr><td>Added by</td><td class="n">${esc(i.added_by)}</td></tr>` : ""}
+    ${i.sources ? `<tr><td>Sources</td><td class="n tiny mut">${esc(i.sources)}</td></tr>` : ""}</tbody></table>
     ${supOffice() && !edit ? `<button class="btn" style="margin-top:10px" onclick="supEdit=Object.assign({old_name:${esc(JSON.stringify(name))}},{name:${esc(JSON.stringify(name))},phone:${esc(JSON.stringify(i.phone || ""))},offers:${esc(JSON.stringify(i.offers || ""))},notes:${esc(JSON.stringify(i.notes || ""))},pay_mode:${esc(JSON.stringify(i.pay_mode || ""))},lead:${i.lead == null ? "''" : +i.lead},order_days:${esc(JSON.stringify(i.order_days || ""))},needs_approval:${!!i.needs_approval},confirmed:true});render()">Edit details</button>` : ""}</section>`;
   const form = edit ? `<section class="card" style="display:grid;gap:8px"><h2>Edit ${esc(name)}</h2>
     <label class="field"><span>Name</span><input class="in" id="supe-name" value="${esc(supEdit.name)}" oninput="supEdit.name=this.value"></label>
