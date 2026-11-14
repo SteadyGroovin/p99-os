@@ -40,7 +40,7 @@ const Sync = {
       /* v0.10.0: no more re-seeding the HR list into an empty table — a store login that sees no tasks would have re-created them */
       this.snapAll(); this.lastLoad = new Date(); Store.save();
       this.fetchPhotos();
-    } else { const st = Store.load(); st.transfers = st.transfers || []; st.locations = st.locations || [{ code: "P99", name: "Pizza 99", kind: "store" }, { code: "HO", name: "Head Office", kind: "office" }, { code: "DC", name: "Dragon Crepe", kind: "store" }, { code: "MCC", name: "My Crepes Cafe", kind: "store" }, { code: "MCBC", name: "My Crepes Beach Club", kind: "store" }, { code: "BK", name: "Burger Kong", kind: "store" }]; st.held = st.held || []; }
+    } else { const st = Store.load(); st.transfers = st.transfers || []; st.locations = st.locations || [{ code: "P99", name: "Pizza 99", kind: "store" }, { code: "HO", name: "Head Office", kind: "office" }, { code: "STO", name: "Storage room", kind: "storage" }, { code: "DC", name: "Dragon Crepe", kind: "store" }, { code: "MCC", name: "My Crepes Cafe", kind: "store" }, { code: "MCBC", name: "My Crepes Beach Club", kind: "store" }, { code: "BK", name: "Burger Kong", kind: "store" }]; st.held = st.held || []; }
     const orig = Store.save.bind(Store); Store.save = () => { orig(); if (Sync.on) Sync.collect(); };
     window.addEventListener("online", () => this.flush());
     setInterval(() => { if (this.outbox.length && !this.busy) this.flush(); }, 45000);

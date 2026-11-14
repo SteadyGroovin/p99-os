@@ -4,10 +4,11 @@
    Chats it replaces: "pull out items at the office 2 boxes aluminum foil…" (store side) and "Delivered here in the office, 12 boxes of Aluminum Foils" (office side) — two posts in two groups, never reconciled. */
 
 let tr = null;                                              /* the form in progress */
-const LOC_FALLBACK = [{ code: "P99", name: "Pizza 99", kind: "store" }, { code: "HO", name: "Head Office", kind: "office" }, { code: "DC", name: "Dragon Crepe", kind: "store" }, { code: "MCC", name: "My Crepes Cafe", kind: "store" }, { code: "MCBC", name: "My Crepes Beach Club", kind: "store" }, { code: "BK", name: "Burger Kong", kind: "store" }];
+const LOC_FALLBACK = [{ code: "P99", name: "Pizza 99", kind: "store" }, { code: "HO", name: "Head Office", kind: "office" }, { code: "STO", name: "Storage room", kind: "storage" }, { code: "DC", name: "Dragon Crepe", kind: "store" }, { code: "MCC", name: "My Crepes Cafe", kind: "store" }, { code: "MCBC", name: "My Crepes Beach Club", kind: "store" }, { code: "BK", name: "Burger Kong", kind: "store" }];
 const locs = () => (S.locations && S.locations.length) ? S.locations : LOC_FALLBACK;
 const locName = c => { const l = locs().find(x => x.code === c); return l ? l.name : c; };
-const myLoc = () => role() === "walk" ? "HO" : "P99";      /* where this login stands: the office records the Head Office side, the store its own */
+const myLoc = () => role() === "walk" ? "HO" : (typeof curStore === "function" && curStore()) || "P99";   /* where this login stands: the office the Head Office side, a store login its own store (v0.21.0: every store, not only Pizza 99) */
+const isStorage = c => { const l = locs().find(x => x.code === c); return !!(l && l.kind === "storage"); };   /* v0.21.0: the storage room has no keeper; a pull-out from it closes itself (migration 033) */
 const trSideOpen = t => t.status === "released" ? "receive" : t.status === "received" ? "release" : null; /* which side is still missing */
 /* may this login post that side of this transfer? owners both; the office the Head Office side; the store its own side */
 function trCan(t, side) { const r = role(); if (r === "master") return true; const loc = side === "release" ? t.from : t.to; return loc === myLoc() && (r === "lead" || r === "walk" || r === "crew"); }
@@ -26,8 +27,8 @@ function viewTransfers() {
   const byLoc = {}; (S.held || []).forEach(h => (byLoc[h.location] = byLoc[h.location] || []).push(h));
   const held = Object.keys(byLoc).length ? `<section class="card"><h2>Held for Pizza 99 elsewhere <span class="tiny mut">from deliveries and transfers recorded here</span></h2>${Object.keys(byLoc).map(code => `<div class="txday">${esc(locName(code))}</div><div class="list">${byLoc[code].sort((a, b) => b.on_hand - a.on_hand).map(h => { const it = Store.item(h.item); const q = h.count_units != null ? h.count_units : h.on_hand; return `<div class="row"><div class="main"><div class="name">${esc(it ? it.name : h.item)}</div></div><div class="right"><div class="v num ${q < 0 ? "band-bad" : ""}">${fmt(q)}</div><div class="l">${esc(it ? it.unit : "")}${q < 0 ? " · more released than delivered" : ""}</div></div></div>`; }).join("")}</div>`).join("")}</section>` : "";
   const r = role();
-  const acts = `<div class="skact">${r === "walk" || r === "master" ? `<button class="btn primary" onclick="trStart('release','HO','P99')">${ic("package", "sm")}Release from Head Office</button>` : ""}${r !== "walk" ? `<button class="btn ${r === "master" ? "" : "primary"}" onclick="trStart('receive','HO','P99')">${ic("package", "sm")}Pull-out arrived</button>` : ""}</div>`;
-  return shell("Stock in / out", "between Head Office, the stores and Pizza 99", acts
+  const acts = `<div class="skact">${r === "walk" || r === "master" ? `<button class="btn primary" onclick="trStart('release','HO','P99')">${ic("package", "sm")}Release from Head Office</button>` : ""}${r !== "walk" ? `<button class="btn primary" onclick="trStart('receive','STO',myLoc() === 'HO' ? 'P99' : myLoc())">${ic("package", "sm")}Take from storage room</button><button class="btn" onclick="trStart('receive','HO',myLoc() === 'HO' ? 'P99' : myLoc())">${ic("package", "sm")}Pull-out arrived</button>` : ""}</div>`;
+  return shell("Stock in / out", "storage room, Head Office and the stores", acts
     + sec("Waiting for you", mine, "Nothing to confirm.")
     + sec("Waiting for the other side", other, "Nothing open.")
     + (diff.length ? sec("Differences", diff, "") : "")
@@ -49,10 +50,10 @@ function viewTransferNew() {
   const itemOpts = ITEMS.map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join("");
   const lines = tr.lines.map((l, i) => { const it = Store.item(l.item); return `<div class="rline"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">${esc(l.text || fmt(l.qty) + " " + it.unit)} = ${fmt(l.qty)} ${esc(it.unit)}</div></div><button class="btn ghost danger rx" onclick="tr.lines.splice(${i},1);render()" aria-label="Remove">${ic("x-close")}</button></div>`; }).join("");
   const need = []; if (!tr.from || !tr.to) need.push("from and to"); if (!tr.lines.length) need.push("at least one item");
-  const title = tr.side === "release" ? "Release stock" : "Pull-out arrived";
+  const title = isStorage(tr.from) && tr.side === "receive" ? "Take from storage room" : tr.side === "release" ? "Release stock" : "Pull-out arrived";
   const sel = (lab, key, opts, lock) => `<div class="field"><label>${lab}</label>${lock ? `<div class="in" style="display:flex;align-items:center">${esc(locName(tr[key]))}</div>` : `<select class="in" onchange="tr.${key}=this.value;render()">${opts.map(l => `<option value="${l.code}" ${tr[key] === l.code ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select>`}</div>`;
   return shell(title, dayLong(today()), `
-    <div class="alert info">${tr.side === "release" ? "You record what left. The store confirms what arrived; a difference is flagged." : "You record what arrived. The sender confirms what left; a difference is flagged."}</div>
+    <div class="alert info">${isStorage(tr.from) && tr.side === "receive" ? "Write down everything you take from the storage room. Nobody confirms it there: what you record here is what left the room." : tr.side === "release" ? "You record what left. The store confirms what arrived; a difference is flagged." : "You record what arrived. The sender confirms what left; a difference is flagged."}</div>
     <section class="card"><div class="grid2">${sel("From", "from", fromOpts, lockFrom)}${sel("To", "to", toOpts, lockTo)}</div></section>
     <section class="card"><h2>Items <span class="tiny mut">${tr.lines.length} line${tr.lines.length === 1 ? "" : "s"}</span></h2>
       ${lastT && !tr.lines.length ? `<button class="btn full" style="margin-bottom:10px" onclick="_trCopy()">Same as last time · ${esc(dayName(lastT.day))} (${lastT.lines.length} item${lastT.lines.length === 1 ? "" : "s"})</button>` : ""}
@@ -61,15 +62,17 @@ function viewTransferNew() {
       ${lines ? `<div class="list" style="margin-top:10px">${lines}</div>` : `<div class="mut small" style="margin-top:8px">No lines yet.</div>`}</section>
     <section class="card"><div class="field"><label>Note <span class="tiny mut">optional — who picked it up, which van</span></label><input class="in" value="${esc(tr.note)}" oninput="tr.note=this.value"></div>
       <div style="margin-top:8px">${photoBtn("Photo of the goods (optional)", "tr.photo=id;render()", tr.photo)}${thumb(tr.photo, "big")}</div></section>
-    <div class="bottom-act"><button class="btn primary full" ${need.length ? "disabled" : ""} onclick="trSave()">${tr.side === "release" ? "Record the release" : "Record what arrived"} · ${tr.lines.length} line${tr.lines.length === 1 ? "" : "s"}</button></div>
+    <div class="bottom-act"><button class="btn primary full" ${need.length ? "disabled" : ""} onclick="trSave()">${isStorage(tr.from) && tr.side === "receive" ? "Record what I took" : tr.side === "release" ? "Record the release" : "Record what arrived"} · ${tr.lines.length} line${tr.lines.length === 1 ? "" : "s"}</button></div>
     ${need.length ? `<div class="tiny mut" style="text-align:center">Needed: ${need.join(", ")}.</div>` : ""}${padHTML()}`, { back: "#/transfers" });
 }
 function trSave() {
   const at = nowISO(), rel = tr.side === "release";
-  const rec = { id: "tr-" + Date.now(), from: tr.from, to: tr.to, day: today(), status: rel ? "released" : "received", photo: tr.photo, _side: tr.side, synced: false,
-    lines: tr.lines.map(l => ({ item: l.item, text: l.text, released: rel ? l.qty : null, received: rel ? null : l.qty })),
+  const sto = !rel && isStorage(tr.from);   /* taken from the storage room: released = taken, closed at once (the server does the same, 033) */
+  const rec = { id: "tr-" + Date.now(), from: tr.from, to: tr.to, day: today(), status: sto ? "matched" : rel ? "released" : "received", photo: tr.photo, _side: tr.side, synced: false,
+    lines: tr.lines.map(l => ({ item: l.item, text: l.text, released: rel || sto ? l.qty : null, received: rel ? null : l.qty })),
     released_at: rel ? at : null, released_by: rel ? S.me : null, released_note: rel ? tr.note : null, received_at: rel ? null : at, received_by: rel ? null : S.me, received_note: rel ? null : tr.note };
-  S.transfers.unshift(rec); tr = null; save(); toast(rel ? "Release recorded." : "Pull-out recorded."); go("#/transfers");
+  if (sto) { rec.released_at = at; rec.released_by = S.me; }
+  S.transfers.unshift(rec); tr = null; save(); toast(sto ? "Recorded — taken from the storage room." : rel ? "Release recorded." : "Pull-out recorded."); go("#/transfers");
 }
 
 /* ---------- one transfer: the other side confirms ---------- */

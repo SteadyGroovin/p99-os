@@ -16,8 +16,8 @@ async function grpLoad() {
   } catch (e) { GRP.state = "fail"; }
   if (/^#\/(item\/|supplier\/|stock-all)/.test(location.hash) && typeof render === "function") render();
 }
-const grpStoreName = c => c === "HO" ? "Head Office" : (typeof locName === "function" ? locName(c) : c) || c;
-const grpStoreOrder = ["P99", "MCC", "DC", "MCBC", "BK", "DH", "OK", "SP", "HO"];
+const grpStoreName = c => c === "HO" ? "Head Office" : c === "STO" ? "Storage room" : (typeof locName === "function" ? locName(c) : c) || c;
+const grpStoreOrder = ["STO", "P99", "MCC", "DC", "MCBC", "BK", "DH", "OK", "SP", "HO"];
 const grpSortStores = (a, b) => (grpStoreOrder.indexOf(a.store) + 99) % 99 - (grpStoreOrder.indexOf(b.store) + 99) % 99;
 function grpQty(r) {   /* in the item's own unit: grams as kg, ml as L, pieces as they are */
   if (r.on_hand == null) return null; const v = +r.on_hand;
@@ -71,7 +71,7 @@ function viewStockAll() {
   const nm = c => (by[c].find(r => r.store === skStore()) || by[c][0]).name || c;
   codes.sort((a, b) => by[b].length - by[a].length || nm(a).localeCompare(nm(b)));
   const counted = codes.filter(c => by[c].some(r => r.on_hand != null)).length;
-  const head = `<tr><th>Item</th>${stores.map(s => `<th class="n h1">${esc(s)}</th>`).join("")}<th class="n">All stores</th></tr>`;
+  const head = `<tr><th>Item</th>${stores.map(s => `<th class="n h1">${esc(s === "STO" ? "Storage" : s)}</th>`).join("")}<th class="n">All stores</th></tr>`;
   const body = codes.map(c => { const rs = by[c]; const tot = grpTotal(rs); const mine = rs.find(r => r.store === skStore());
     const cells = stores.map(s => { const r = rs.find(x => x.store === s); if (!r) return `<td class="n h1 mut">·</td>`; const qq = grpQty(r); return `<td class="n h1 num">${qq ? fmt(Math.round(qq.v * 100) / 100) : `<span class="mut">–</span>`}</td>`; }).join("");
     const sub = rs.map(r => { const qq = grpQty(r); return `${esc(r.store)} ${qq ? fmt(Math.round(qq.v * 100) / 100) : "–"}`; }).join(" · ");
