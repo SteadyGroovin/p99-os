@@ -110,7 +110,7 @@ function viewSupplier(enc) {
   const deliveries = `<section class="card"><h2>Deliveries <span class="tiny mut">${st.recs.length} in the app</span></h2>
     <div class="small">${st.received.length} order${st.received.length === 1 ? "" : "s"} received${st.received.length ? `, ${st.short.length} came short` : ""}.</div>
     ${st.recs.length ? `<div class="list" style="margin-top:8px">${st.recs.slice(0, 8).map(r => `<div class="row"><div class="main"><div class="name">${esc(dayName(r.day))}${r.invoice ? ` · ${esc(r.invoice)}` : ""}</div><div class="meta">${r.lines.map(l => `${fmt(l.qty)} ${esc((Store.item(l.item) || {}).unit || "")} ${esc((Store.item(l.item) || { name: l.item }).name)}`).join(" · ")}</div></div></div>`).join("")}</div>` : ""}</section>`;
-  return shell(name, i.offers || "supplier", `${facts}${form}${money}<section class="card"><h2>What we buy <span class="tiny mut">${Object.keys(st.items).length}</span></h2>${itemRows ? `<div class="list">${itemRows}</div>` : `<div class="mut small">No items linked yet.</div>`}</section>${deliveries}`, { back: "#/suppliers" });
+  return shell(name, i.offers || "supplier", `${facts}${form}${typeof grpDeliversCard === "function" ? grpDeliversCard(name) : ""}${money}<section class="card"><h2>What we buy <span class="tiny mut">${Object.keys(st.items).length}</span></h2>${itemRows ? `<div class="list">${itemRows}</div>` : `<div class="mut small">No items linked yet.</div>`}</section>${deliveries}`, { back: "#/suppliers" });
 }
 function supSaveEdit() {
   const e = supEdit; if (!e || (e.name || "").trim().length < 2) return toast("Name required.");

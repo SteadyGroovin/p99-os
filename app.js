@@ -402,6 +402,7 @@ function render() {
     case "sales": html = viewSales(); break;
     case "count": html = seg[1] === "summary" ? viewCountSummary() : seg[1] ? viewCountPlace(seg[1]) : viewCount(); break;
     case "stock": html = viewStock(); break;
+    case "stock-all": html = viewStockAll(); break;   /* v0.20.0: every store per item code (group-v2.js) */
     case "receipts": html = viewReceipts(); break;
     case "receive": html = viewReceive(); break;
     case "items": html = viewItems(); break;
