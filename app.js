@@ -385,7 +385,7 @@ function viewMore_v1() {
 /* ---------- router ---------- */
 function render() {
   applyTheme();
-  const h = (location.hash || "#/today").slice(1); const seg = h.split("/").filter(Boolean);
+  const h = (location.hash || "#/today").slice(1); const seg = h.split("/").filter(Boolean).map(x => { try { return decodeURIComponent(x); } catch (e) { return x; } });   /* v0.19.8: the browser writes a space as %20, so "#/count/Drinks chiller" never found its place and Count stayed on the overview (Stefan, 2026-11-14) */
   const qs = new URLSearchParams(location.search); if (qs.get("who") && !S.me) { const p = PEOPLE.find(x => x.id === qs.get("who") || x.role === qs.get("who")); if (p) { S.me = p.id; save(); } }
   let html;
   { /* route guard (v0.16): canOpen() in nav-v2.js mirrors the database rules (the database refuses the data anyway) */
