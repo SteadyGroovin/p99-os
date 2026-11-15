@@ -12,7 +12,7 @@ function attnItem(icon, tone, title, detail, onclick) {
 }
 
 /* ---------- Store team (lead, crew): two sales numbers and their own work. No tickets, items, payment split, history, cash or expenses. ---------- */
-async function loadGlance() { try { const { data } = await sb.rpc("store_sales_glance", { p_store: "P99" }); window.GLANCE = data || null; } catch (e) { /* keep the last numbers */ } }
+async function loadGlance() { try { const { data } = await sb.rpc("store_sales_glance", { p_store: typeof OS_STORE !== "undefined" ? OS_STORE : "P99" }); window.GLANCE = data || null; } catch (e) { /* keep the last numbers */ } }
 function viewTodayStore() {
   const d = today(), p = me(), g = window.GLANCE, hour = new Date().getHours();
   const at = g && g.last_ticket_at ? new Date(g.last_ticket_at).toLocaleString("en-PH", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" }) : null;
@@ -33,7 +33,24 @@ function viewTodayStore() {
   return shell(`${greet()}${p && p.short && p.id !== "store" ? ", " + esc(p.short) : ""}`, dayLong(d), sales + tiles + `<section class="card"><h2>Checklists</h2><div class="list">${cls}</div></section>`);
 }
 
+/* v0.22 (Stefan, 15 Nov): the store lead's home — her store's open tasks, tonight's count and what to order. No sales, no cash. */
+function viewTodayLead() {
+  const d = today(), p = me(), st = typeof curStore === "function" ? curStore() : "";
+  const sName = ((S.stores || []).find(s => s.code === st) || {}).name || st;
+  const open = (S.tasks || []).filter(t => t.status !== "done" && t.store === st);
+  const mine = open.filter(t => p && t.owner === p.id), over = open.filter(t => t.due && t.due < d);
+  const toOrder = typeof REORDER !== "undefined" ? REORDER.filter(r => r.order_now).length : 0;
+  const draft = S.draft, counted = draft ? Object.keys(draft.lines || {}).length : 0;
+  const tiles = `<div class="grid2">${tile("Tasks open", `${open.length}`, over.length ? `${over.length} overdue` : "none overdue", "")}${tile("Mine", `${mine.length}`, "assigned to you", "")}${tile("Count tonight", counted ? `${counted} counted` : "not started", "at closing", "")}${tile("To order", `${toOrder}`, toOrder ? "items due" : "nothing due", "")}</div>`;
+  const rank = { in_progress: 0, next: 1, blocked: 2, open: 3 };
+  const list = mine.concat(open.filter(t => !mine.includes(t))).sort((a, b) => (rank[a.status] ?? 9) - (rank[b.status] ?? 9) || String(a.due || "9").localeCompare(String(b.due || "9"))).slice(0, 8)
+    .map(t => `<button class="row tap" onclick="go('#/task/${encodeURIComponent(t.id)}')"><div class="main"><div class="name">${esc(t.title)}</div><div class="meta">${esc(({ in_progress: "Doing", next: "Next", blocked: "Waiting", open: "Backlog" })[t.status] || t.status)}${t.due ? " · due " + esc(t.due) : ""}</div></div></button>`).join("");
+  const go2 = (l, h) => `<button class="btn" onclick="go('${h}')">${l}</button>`;
+  return shell(`${greet()}${p && p.short ? ", " + esc(p.short) : ""}`, `${esc(sName)} · ${dayLong(d)}`, tiles
+    + `<section class="card"><h2>Tasks</h2><div class="list">${list || '<div class="mut small">No open tasks.</div>'}</div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${go2("All tasks", "#/tasks")}${go2("Count", "#/count")}${go2("Receive", "#/receive")}${go2("Order", "#/order")}</div></section>`);
+}
 function viewToday() {
+  if (role() === "lead" && typeof sb !== "undefined") return viewTodayLead();
   if (role() !== "master" && typeof sb !== "undefined") return viewTodayStore();
   if (role() === "crew") return viewToday_v1();
   const d = today(), yd = bizYesterday(), y = SD[yd], p = me();

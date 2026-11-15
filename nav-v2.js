@@ -31,7 +31,7 @@ const moduleOf = seg => SEG_MODULE[seg] || seg;
 const modsFor = () => MODULES.filter(m => canOpen(m[0]));
 const SETUP = MODULES.filter(m => ["users", "stores", "rules"].includes(m[0]))   /* v0.19.6: nothing that is already in the menu (Stefan: "that also shouldn't be double") */.map(m => [m[1], m[2], ({ users: "who has which login and what they see", stores: "where stock is sent and received", suppliers: "terms, delivery days, what we buy, prices", recipes: "what each pizza, slice and batch uses", sizes: "how much is inside a can, pack or box", accounts: "expense categories, as in the accounting book", books: "what each fund held, lock a finished month", rules: "₱ limit for Mike's approval, safety days" })[m[0]]]);
 const PIN_KEY = "rocketos_pins";
-const PIN_DEFAULT = { master: ["sales", "stock", "money"], finance: ["receive", "bills", "money"], admin: ["bills", "money", "tasks"], lead: ["receive", "count", "order"], walk: ["tasks", "report", "receive"], crew: ["count", "receive", "clean"] };
+const PIN_DEFAULT = { master: ["sales", "stock", "money"], finance: ["receive", "bills", "money"], admin: ["bills", "money", "tasks"], lead: ["tasks", "count", "order"], walk: ["tasks", "report", "receive"], crew: ["count", "receive", "clean"] };
 function pins() {
   let p = null; try { p = JSON.parse(localStorage.getItem(PIN_KEY) || "null"); } catch (e) { }
   const r = financeLogin() ? "finance" : officeLogin() ? "admin" : role(); const ok = modsFor().map(m => m[0]);
@@ -47,6 +47,8 @@ const modShort = id => modLabel(id);   /* Stefan: short names everywhere */
 /* the one place that says who may open what (the database refuses the data anyway) */
 function canOpen(s0) {
   const r = role(), adm = officeLogin(), fin = financeLogin(), m = r === "master";
+  /* v0.22 (Stefan, 15 Nov, Burger Kong access for Cath): the store lead sees tasks, inventory (stock, count, receive) and ordering for her own store */
+  if (r === "lead") return ["", "today", "tasks", "task", "stock", "count", "receive", "receipts", "items", "item", "order", "sizes", "suppliers", "supplier", "more", "settings", "who", "password", "modules"].includes(s0);
   if (["sales", "finance", "approve", "users", "rules"].includes(s0)) return m;
   if (s0 === "books") return m || (adm && !fin);                 /* month close and opening balances: not Finance (Stefan, 2026-11-08) */
   if (["bills", "money", "stores", "accounts"].includes(s0)) return m || adm;
@@ -103,7 +105,7 @@ function homeStripHTML() {
   if (canOpen("bills")) cards.push(["Bills open", MONEY.filter(m => m.mode === "bill" && !m.paid_on).length, "#/bills"]);
   if (canOpen("sizes")) cards.push(["Pack sizes missing", ITEMS.filter(i => i.sizeUnknown).length, "#/sizes"]);
   if (canOpen("recipes")) cards.push(["Recipes not confirmed", (typeof RECIPES !== "undefined" ? RECIPES : []).filter(r => !r.confirmed).length, "#/recipes"]);
-  cards.push(["Tickets open", S.tickets.filter(t => t.status !== "done").length, "#/report"]);
+  if (canOpen("report")) cards.push(["Tickets open", S.tickets.filter(t => t.status !== "done").length, "#/report"]);
   return `<section class="card qa"><h3>Quick actions</h3><div class="qa-row">${acts.map(a => `<button onclick="${a[2]}"><span class="qa-ic">${ic(ICON[modIcon(a[1])] || ICON.dots)}</span><span>${esc(a[0])}</span></button>`).join("")}</div></section>
     <div class="grid2 hcards">${cards.map(c => `<button class="card tap hcard" onclick="go('${c[2]}')"><div class="lab">${esc(c[0])}</div><div class="val num">${c[1]}</div></button>`).join("")}</div>`;
 }

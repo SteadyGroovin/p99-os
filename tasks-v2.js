@@ -15,7 +15,7 @@ let ntask = null;
 /* ---------- small helpers ---------- */
 const daysBetween = (a, b) => Math.round((new Date(b + "T00:00:00") - new Date(a + "T00:00:00")) / 864e5);
 const TK_ORDER = ["MCC", "DC", "MCBC", "P99", "BK", "OK", "SP", "DH"];   /* Stefan's order and short names (2026-11-07); the full name shows on hover and in the pickers */
-const tkStores = () => [{ code: "GROUP", name: "Group", color: "#717680" }].concat((S.stores && S.stores.length ? S.stores : TK_FALLBACK_STORES).slice().sort((a, b) => ((TK_ORDER.indexOf(a.code) + 1) || 99) - ((TK_ORDER.indexOf(b.code) + 1) || 99)));
+const tkStores = () => role() === "lead" && typeof curStore === "function" ? (S.stores || []).filter(s => s.code === curStore()) : [{ code: "GROUP", name: "Group", color: "#717680" }].concat((S.stores && S.stores.length ? S.stores : TK_FALLBACK_STORES).slice().sort((a, b) => ((TK_ORDER.indexOf(a.code) + 1) || 99) - ((TK_ORDER.indexOf(b.code) + 1) || 99)));
 const tkShort = code => code === "GROUP" ? "Group" : code;
 const tkVenue = code => tkStores().find(s => s.code === code) || { code, name: code || "?", color: "#A4A7AE" };
 const tkStoreOf = t => t.store || "P99";                     /* records from before v0.10 carry no venue: they were Pizza 99's */
@@ -174,6 +174,7 @@ const tkVenueOpts = cur => tkStores().map(s => `<option value="${s.code}" ${cur 
 const tkAreaList = () => `<datalist id="tkareas">${[...new Set(TK_AREAS.concat((S.tasks || []).map(t => t.area).filter(Boolean)))].sort().map(a => `<option value="${esc(a)}">`).join("")}</datalist>`;
 
 function viewTasks() {
+  if (role() === "lead" && typeof curStore === "function" && TK.venue === "all") TK.venue = curStore();   /* v0.22: a store lead works on her own store's board */
   const d = today(), all = S.tasks || [], wk = addDays(d, -6);
   /* venue pills: everything for the owners and admin, otherwise only the venues this login has tasks in */
   const seen = new Set(all.map(tkStoreOf)); const venues = tkStores().filter(s => tkAllVenues() || seen.has(s.code));
