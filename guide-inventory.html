@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inventory setup guide</title>
+<style>
+@font-face { font-family: "Unbounded"; font-weight: 700; src: url(fonts/Unbounded-Bold.woff) format("woff"); }
+@font-face { font-family: "Unbounded"; font-weight: 600; src: url(fonts/Unbounded-SemiBold.woff) format("woff"); }
+@font-face { font-family: "Space Grotesk"; font-weight: 400; src: url(fonts/SpaceGrotesk-Regular.woff) format("woff"); }
+@font-face { font-family: "Space Grotesk"; font-weight: 500; src: url(fonts/SpaceGrotesk-Medium.woff) format("woff"); }
+@font-face { font-family: "Space Grotesk"; font-weight: 700; src: url(fonts/SpaceGrotesk-Bold.woff) format("woff"); }
+:root { --ink: #121318; --card: #1C1E25; --line: #2A2D36; --paper: #F4F3EF; --graphite: #9A9EA8; --orange: #FF4A1C; --mint: #00D68F; --red: #FF2E63; --electric: #2E6BFF; }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ink); color: var(--paper); font: 400 17px/1.5 "Space Grotesk", system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+.mast { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-bottom: 14px; border-bottom: 2px solid var(--line); position: relative; }
+.mast::after { content: ""; position: absolute; left: 0; bottom: -2px; width: 64px; height: 2px; background: var(--orange); }
+.mast img { width: 220px; max-width: 55%; height: auto; }
+.label { font-weight: 500; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--graphite); text-align: right; }
+h1 { font: 700 30px/1.15 "Unbounded", sans-serif; margin: 28px 0 8px; }
+h1 em { font-style: normal; color: var(--orange); }
+h2 { font: 600 19px/1.3 "Unbounded", sans-serif; margin: 34px 0 12px; }
+.lede { font-size: 19px; color: var(--paper); margin: 0 0 8px; }
+p, li { color: #D9DAD6; }
+.card { background: var(--card); border-radius: 12px; padding: 16px 18px; margin: 12px 0; }
+.step { display: grid; grid-template-columns: 44px 1fr; gap: 0 14px; }
+.num { font: 700 22px/1 "Unbounded", sans-serif; color: var(--paper); background: var(--line); border-radius: 10px; width: 44px; height: 44px; display: grid; place-items: center; }
+.step h3 { font: 700 18px/1.3 "Space Grotesk", sans-serif; margin: 2px 0 6px; color: var(--paper); }
+.step .when { font-weight: 500; font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--graphite); }
+.step dl { display: grid; grid-template-columns: 92px 1fr; gap: 4px 10px; margin: 8px 0 0; }
+.step dt { font-weight: 500; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--graphite); padding-top: 3px; }
+.step dd { margin: 0; color: #D9DAD6; }
+.pill { display: inline-block; font-weight: 700; font-size: 12px; padding: 2px 9px; border-radius: 99px; color: var(--ink); vertical-align: 2px; }
+.pill.gain { background: var(--mint); } .pill.loss { background: var(--red); } .pill.info { background: var(--electric); color: #fff; }
+.scr { font-weight: 700; color: var(--paper); }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+th { text-align: left; font-weight: 500; font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--graphite); padding: 8px 6px; border-bottom: 1px solid var(--line); }
+td { padding: 9px 6px; border-bottom: 1px solid var(--line); vertical-align: top; color: #D9DAD6; }
+td.n { text-align: right; }
+.rules li { margin: 6px 0; }
+.foot { margin-top: 40px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; color: var(--graphite); }
+@media (max-width: 560px) { h1 { font-size: 24px; } .step { grid-template-columns: 36px 1fr; } .num { width: 36px; height: 36px; font-size: 18px; } .step dl { grid-template-columns: 1fr; } .step dt { padding-top: 6px; } .hide-s { display: none; } }
+</style>
+</head>
+<body>
+<main>
+  <header class="mast"><img src="brand/rb-lockup-line-dark.svg" alt="Rocket Boracay"><div class="label">Admin officer<br>Inventory setup</div></header>
+
+  <h1>Set up the <em>stock</em> for every store</h1>
+  <p class="lede">Three weeks, thirteen steps. Each step is a task in your Tasks list. Do them in order: each one builds on the one before.</p>
+  <p>When the stock is set up, the app knows what every store has, where it is kept, who sells it to us, what each menu item uses, and what is missing. Then it can tell us what to order and where stock disappears.</p>
+
+  <div class="card">
+    <table>
+      <tr><th>Word</th><th>What it means here</th></tr>
+      <tr><td><b>Item</b></td><td>Anything we buy and keep: cheese, cups, gas, soap.</td></tr>
+      <tr><td><b>Place</b></td><td>Where an item sits inside a store: chiller, freezer, shelf, packaging, cleaning, gas.</td></tr>
+      <tr><td><b>Store</b></td><td>Pizza 99, My Crepe Cafe, Dragon Crepe, MyCrepes Beach Club, Burger Kong, and D'Mall Storage (the storage room).</td></tr>
+      <tr><td><b>Pack size</b></td><td>What one buy unit holds: 1 box = 12 bottles, 1 bag = 1,000 g.</td></tr>
+      <tr><td><b>Receipt</b></td><td>One delivery or purchase, typed in the app with a photo of the paper.</td></tr>
+      <tr><td><b>Recipe</b></td><td>What one menu item uses, in grams, ml or pieces. A <b>batch</b> recipe is something the kitchen makes ahead: dough, sauce, batter, patties.</td></tr>
+    </table>
+  </div>
+
+  <h2>Three rules</h2>
+  <ul class="rules">
+    <li><b>Same name, same code in every store.</b> Before you add an item, search for it. If another store has it, use exactly that name.</li>
+    <li><b>Count what you see.</b> Never type a number you did not count, weigh or read. A blank is better than a guess.</li>
+    <li><b>Stuck? Write it in the task.</b> Open the task, write what you found in <span class="scr">Detail</span>, set it to <span class="scr">Blocked</span>. Stefan reads it.</li>
+  </ul>
+
+  <h2>The steps</h2>
+
+  <div class="card step"><div class="num">1</div><div><div class="when">Tue 17 Nov</div><h3>Learn the screens</h3>
+    <p>Open each screen once and look at one item in each store.</p>
+    <dl><dt>Screens</dt><dd><span class="scr">Inventory</span> → Stock, Count, Receive, Transfers · <span class="scr">Catalogue</span> → Items, Pack sizes · <span class="scr">Buying</span> → Suppliers, Order. Switch the store at the top.</dd>
+    <dt>Done</dt><dd>You can open any store's items and one item card.</dd>
+    <dt>Who</dt><dd>You alone.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">2</div><div><div class="when">From Wed 18 Nov, every day</div><h3>Record every delivery</h3>
+    <p>Every delivery and every market buy becomes a receipt on the day it arrives. Take a photo of the supplier's paper.</p>
+    <dl><dt>Screen</dt><dd><span class="scr">Inventory → Receive</span>, pick the store first.</dd>
+    <dt>Done</dt><dd>Every paper from the store leads is in the app the same day, with photo, supplier and price.</dd>
+    <dt>Who</dt><dd>Store leads send you the papers or photos.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">3</div><div><div class="when">Wed 18 Nov</div><h3>Collect the count sheets</h3>
+    <p>The first count sheets went out on 14 and 15 Nov. Get the filled sheets back from every store.</p>
+    <dl><dt>Sheets</dt><dd>Pizza 99 · My Crepe Cafe and Dragon Crepe · Burger Kong and Beach Club. D'Mall Storage has none yet: print the My Crepe Cafe page for it.</dd>
+    <dt>Done</dt><dd>One filled sheet per store in your hand, with the date and the counter's role on it.</dd>
+    <dt>Who</dt><dd>Store leads.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">4</div><div><div class="when">Thu 19 Nov</div><h3>Map the kitchens</h3>
+    <p>Find out which kitchen makes what, and for which store. Example: does Burger Kong make the patties for the Beach Club? Where is the crepe batter made?</p>
+    <dl><dt>Screen</dt><dd>No screen for this yet. Write the table below into the task's Detail.</dd>
+    <dt>Done</dt><dd>For every batch (dough, sauce, batter, patty, cream): who makes it, in which kitchen, for which stores, and how often.</dd>
+    <dt>Who</dt><dd>Each store lead and the cook.</dd></dl>
+    <table style="margin-top:10px"><tr><th>Batch</th><th>Made in</th><th>For</th><th class="hide-s">How often</th></tr>
+      <tr><td>e.g. Burger patty</td><td>Burger Kong</td><td>BK, Beach Club</td><td class="hide-s">daily</td></tr></table></div></div>
+
+  <div class="card step"><div class="num">5</div><div><div class="when">Fri 20 Nov</div><h3>Check the places</h3>
+    <p>Walk through each store and the storage room. Compare the real chillers, freezers and shelves with the places in the app.</p>
+    <dl><dt>Screen</dt><dd><span class="scr">Inventory → Count</span> shows each store's places in order.</dd>
+    <dt>Done</dt><dd>For each store: the places that are missing, wrong or in the wrong order, written in the task. Note any stock kept outside the stores (a freezer somewhere else, the office).</dd>
+    <dt>Who</dt><dd>Store leads.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">6</div><div><div class="when">Mon 23 Nov</div><h3>Clean the items</h3>
+    <p>Go through each store's item list with its count sheet next to you.</p>
+    <dl><dt>Screen</dt><dd><span class="scr">Catalogue → Items</span>, tap an item → Edit. <span class="scr">+ New item</span> for what is missing.</dd>
+    <dt>Done</dt><dd>Every item on the sheet is in the app, in the right place and category. Items the store never uses are switched off. Items written on the blank rows are added, with the same name as in other stores.</dd>
+    <dt>Who</dt><dd>Store lead when you are not sure what an item is.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">7</div><div><div class="when">Tue 24 Nov</div><h3>Enter the opening counts</h3>
+    <p>Type each returned sheet as the first count of that store. Use the date on the sheet.</p>
+    <dl><dt>Screen</dt><dd><span class="scr">Inventory → Count</span>, pick the store, go place by place.</dd>
+    <dt>Done</dt><dd>Every store shows a count on its Stock screen. Blanks on the sheet stay blank.</dd>
+    <dt>Who</dt><dd>You. Ask the store lead about unclear numbers.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">8</div><div><div class="when">Wed 25 Nov</div><h3>Pack sizes</h3>
+    <p>Most crepe-store and Burger Kong items have no pack size yet. Without it the app cannot price a gram or a piece.</p>
+    <dl><dt>Screen</dt><dd><span class="scr">Catalogue → Pack sizes</span>: type, Enter moves down, one button saves all.</dd>
+    <dt>Done</dt><dd>Every item has a pack size, read from the label or the receipt. Unknown ones: photo the label at the store.</dd>
+    <dt>Who</dt><dd>Store leads send label photos.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">9</div><div><div class="when">Thu 26 Nov</div><h3>Suppliers</h3>
+    <p>Every item needs the supplier we usually buy it from, and every supplier needs a phone number and what they sell.</p>
+    <dl><dt>Screen</dt><dd><span class="scr">Buying → Suppliers</span> for the details · item card → Edit for the main supplier.</dd>
+    <dt>Done</dt><dd>No item without a supplier. Every supplier has a phone and "what they sell".</dd>
+    <dt>Second supplier</dt><dd>The app keeps one supplier per item for now. Where we buy the same item from two places, write the second one and its price in the task.</dd>
+    <dt>Who</dt><dd>Store leads, and the receipts.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">10</div><div><div class="when">Fri 27 Nov</div><h3>Pizza 99 recipes</h3>
+    <p>Pizza 99's recipes are in the app, but many are not confirmed yet. Check them with the cook.</p>
+    <dl><dt>Screen</dt><dd><span class="scr">Catalogue → Recipes</span>, filter "Not confirmed". <span class="pill info">opens after an app update</span></dd>
+    <dt>Done</dt><dd>Every pizza, slice, combo and batch is confirmed or corrected.</dd>
+    <dt>Who</dt><dd>Pizza 99 cook.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">11</div><div><div class="when">Tue 1 Dec</div><h3>Burger Kong recipes</h3>
+    <p>Stefan gave the Burger Kong cooks a recipe list to weigh. Get it back and type it in: the batches first, then every menu item.</p>
+    <dl><dt>Screen</dt><dd><span class="scr">Catalogue → Recipes → + New recipe</span>, name exactly as on the till. <span class="pill info">opens after an app update</span></dd>
+    <dt>Done</dt><dd>Every Burger Kong menu item and batch has its ingredients and is marked confirmed. Lines nobody weighed stay out.</dd>
+    <dt>Who</dt><dd>Burger Kong cook, store lead.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">12</div><div><div class="when">Thu 3 Dec</div><h3>Crepe recipes</h3>
+    <p>One recipe list covers My Crepe Cafe, Dragon Crepe and the Beach Club. Same steps as Burger Kong.</p>
+    <dl><dt>Screen</dt><dd><span class="scr">Catalogue → Recipes</span>, for each of the three stores. <span class="pill info">opens after an app update</span></dd>
+    <dt>Done</dt><dd>Every crepe, shake, coffee and batch has its ingredients in all three stores. Dragon Crepe's two dragonfruit shakes too.</dd>
+    <dt>Who</dt><dd>Crepe cooks, store leads.</dd></dl></div></div>
+
+  <div class="card step"><div class="num">13</div><div><div class="when">Fri 4 Dec</div><h3>Where stock really sits</h3>
+    <p>Second count in every store, then look at the gaps. List every place we keep stock, including the storage room and anything kept for two stores. The storage room moves into the Dragon Crepe building when the office moves.</p>
+    <dl><dt>Screen</dt><dd><span class="scr">Inventory → Count</span>, then <span class="scr">Stock</span> to see the gaps.</dd>
+    <dt>Done</dt><dd>A list in the task: every stock place (store, storage room, other), what is kept there, and the ten biggest gaps between the count and the app.</dd>
+    <dt>Who</dt><dd>Store leads.</dd></dl></div></div>
+
+  <h2>Paper only where it helps</h2>
+  <p>Count sheets and recipe weighing lists go into the kitchen on paper. Everything else you do on the iPad.</p>
+
+  <div class="foot">Rocket Boracay · D'Mall Station 2 · Boracay Island, Malay, Aklan · 16 Nov 2026</div>
+</main>
+</body>
+</html>
