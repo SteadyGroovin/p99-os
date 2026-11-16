@@ -169,51 +169,70 @@ function skPriceUnitSection(it) {
    Other names (supplier_alias) are the long names on the expense sheets and invoices that mean this supplier. Online only. */
 const itEditOK = () => role() === "master" || (typeof officerLogin === "function" && officerLogin());
 const IT_CATS = ["Vegetable & fruit", "Meat & fish", "Cheese", "Dairy & eggs", "Ice cream", "Dry & baking", "Canned & jar", "Sauce & oil", "Drink", "Packaging", "Cleaning", "Gas", "Prep (made here)"];
-const IT_UNITS = ["pc", "g", "ml", "btl", "can", "pack", "box", "bag", "jar", "tub", "roll", "container", "sack", "tank", "gal", "pad"];
+/* v0.24 (Stefan, 16 Nov: "We need to be able to measure everything"; migration 047): three plain questions.
+   Measured in (g, ml, pc — what recipes and usage use) · Counted as (the container on the shelf) and what one holds · Bought as and how many. */
+const IT_MEASURE = [["g", "grams (g)"], ["ml", "millilitres (ml)"], ["pc", "pieces (pc) — also slices"]];
+const IT_COUNT = ["pack", "btl", "can", "jar", "box", "bag", "tub", "gal", "sack", "tank", "roll", "pad", "block", "tray", "jug", "container"];
+const IT_BUY = ["case", "box", "bundle", "sack", "pack", "tray", "carton"];
+const IT_EXP_CATS = ["Drink", "Canned & jar", "Sauce & oil", "Dry & baking", "Dairy & eggs", "Cheese", "Ice cream"];
 let itSheet = null, itBusy = false;
 function itNewBtn() { return itEditOK() ? `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn sm" onclick="itOpen(null)">+ New item</button></div>${itSheetHTML()}` : ""; }
 function itEditBtn(it) { return itEditOK() ? `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn sm" onclick="itOpen('${esc(it.id)}')">Edit item</button></div>${itSheetHTML()}` : ""; }
 function itOpen(id) {
   const it = id ? Store.item(id) : null;
-  const packed = it && it.unit && it.base && it.unit !== it.base;   /* counted in packs of base units (a case size, if any, is kept apart and not edited here) */
-  itSheet = it ? { code: it.id, name: it.name, category: IT_CATS.find(c => c.toLowerCase() === it.cat) || it.cat, place: it.place || "", unit: it.base || it.unit, pack_unit: packed ? it.unit : "", pack_qty: packed && it.per ? it.per : "",
-      par: it.par == null ? "" : it.par, supplier: it.supplier || "", brand: it.brand || "", nightly: !!it.nightly, active: true }
-    : { code: null, name: "", category: "", place: "", unit: "pc", pack_unit: "", pack_qty: "", par: "", supplier: "", brand: "", nightly: false, active: true };
+  const packed = it && it.unit && it.base && it.unit !== it.base;
+  itSheet = it ? { code: it.id, name: it.name, category: IT_CATS.find(c => c.toLowerCase() === it.cat) || it.cat, place: it.place || "", unit: ["g", "ml", "pc"].includes(it.base) ? it.base : "pc",
+      pack_unit: packed ? it.unit : "", pack_qty: packed && it.per ? it.per : "", case_unit: it.packUnit || "", case_qty: it.pack || "",
+      par: it.par == null ? "" : it.par, supplier: it.supplier || "", brand: it.brand || "", nightly: !!it.nightly, active: true, expiry: !!it.expiry }
+    : { code: null, name: "", category: "", place: "", unit: "g", pack_unit: "", pack_qty: "", case_unit: "", case_qty: "", par: "", supplier: "", brand: "", nightly: false, active: true, expiry: null };
   render();
+}
+function itRead() {   /* keep what was typed when the sheet redraws */
+  const v = id => { const e = document.getElementById(id); return e ? (e.type === "checkbox" ? e.checked : e.value) : undefined; };
+  const map = { "it-name": "name", "it-cat": "category", "it-place": "place", "it-unit": "unit", "it-sup": "supplier", "it-pu": "pack_unit", "it-pq": "pack_qty", "it-cu": "case_unit", "it-cq": "case_qty", "it-par": "par", "it-brand": "brand", "it-night": "nightly" };
+  Object.keys(map).forEach(k => { const x = v(k); if (x !== undefined) itSheet[map[k]] = x; });
 }
 function itSheetHTML() {
   if (!itSheet) return "";
-  const s = itSheet, opt = (list, v) => list.map(x => `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("");
-  const sel = (id, lab, list, v, blank) => `<div class="field"><label for="${id}">${lab}</label><select class="in" id="${id}">${blank ? `<option value="">${blank}</option>` : ""}${opt(list, v)}</select></div>`;
+  const s = itSheet, opt = (list, v) => list.map(x => Array.isArray(x) ? `<option value="${x[0]}" ${x[0] === v ? "selected" : ""}>${esc(x[1])}</option>` : `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("");
+  const sel = (id, lab, list, v, blank, re) => `<div class="field"><label for="${id}">${lab}</label><select class="in" id="${id}" ${re ? 'onchange="itRead();render()"' : ""}>${blank ? `<option value="">${blank}</option>` : ""}${opt(list, v)}</select></div>`;
   const inp = (id, lab, v, extra = "") => `<div class="field"><label for="${id}">${lab}</label><input class="in" id="${id}" value="${esc(v == null ? "" : v)}" ${extra}></div>`;
-  const cnt = s.pack_unit || s.unit;
+  const cnt = s.pack_unit || s.unit, exp = s.expiry == null ? IT_EXP_CATS.includes(s.category) : !!s.expiry;
+  const step = (n, t, sub) => `<div style="grid-column:1/-1;margin:10px 0 2px"><b>${n}. ${t}</b>${sub ? ` <span class="tiny mut">${sub}</span>` : ""}</div>`;
   return `<div class="sheet-bg" onclick="if(event.target===this){itSheet=null;render()}"><div class="sheet" style="max-height:90vh;overflow:auto">
     <h2>${s.code ? "Edit item" : "New item"}</h2><div class="tiny mut" style="margin-bottom:10px">${esc(typeof skStoreName === "function" ? skStoreName() : curStore())}${s.code ? ` · code ${esc(s.code)}` : " · the code is made from the name"}</div>
     ${inp("it-name", "Name", s.name)}
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">${sel("it-cat", "Category", IT_CATS, s.category, "Pick one")}<div class="field"><label for="it-place">Place</label><select class="in" id="it-place"><option value="">No place yet</option>${PLACES.map(p => `<option value="${esc(p.id)}" ${p.id === s.place || p.name === s.place ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
-    ${sel("it-unit", "Smallest unit", IT_UNITS, s.unit)}${sel("it-sup", "Main supplier", SUPPLIERS.slice().sort(), s.supplier, "None")}
-    ${sel("it-pu", "Counted in packs of", IT_UNITS.filter(u => !["g", "ml"].includes(u)), s.pack_unit, "No, counted by the unit")}${inp("it-pq", "Units in one pack", s.pack_qty, 'inputmode="decimal"')}
-    ${inp("it-par", `Par (${esc(cnt)})`, s.par, 'inputmode="decimal"')}${inp("it-brand", "Brand", s.brand)}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">${sel("it-cat", "Category", IT_CATS, s.category, "Pick one", true)}<div class="field"><label for="it-place">Place</label><select class="in" id="it-place"><option value="">No place yet</option>${PLACES.map(p => `<option value="${esc(p.id)}" ${p.id === s.place || p.name === s.place ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
+    ${step(1, "Measured in", "what recipes and usage count")}${sel("it-unit", "Unit", IT_MEASURE, s.unit, "", true)}<div></div>
+    ${step(2, "Counted as", "what sits on the shelf")}${sel("it-pu", "Container", IT_COUNT, s.pack_unit, "No container: count " + (s.unit === "pc" ? "pieces" : s.unit), true)}${s.pack_unit ? inp("it-pq", `One ${esc(s.pack_unit)} holds (${esc(s.unit)})`, s.pack_qty, 'inputmode="decimal" placeholder="from the label"') : "<div></div>"}
+    ${step(3, "Bought as", "optional")}${sel("it-cu", "Buy unit", IT_BUY, s.case_unit, "Same as counted", true)}${s.case_unit ? inp("it-cq", `One ${esc(s.case_unit)} holds (${esc(cnt)})`, s.case_qty, 'inputmode="decimal"') : "<div></div>"}
+    ${step(4, "Stock rules", "")}${inp("it-par", `Par (${esc(cnt)})`, s.par, 'inputmode="decimal"')}${sel("it-sup", "Main supplier", SUPPLIERS.slice().sort(), s.supplier, "None")}${inp("it-brand", "Brand", s.brand)}<div></div></div>
+    <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="it-exp" ${exp ? "checked" : ""} onchange="itSheet.expiry=this.checked" style="width:20px;height:20px"> Track expiry dates <span class="tiny mut">(asked when a delivery is received)</span></label>
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="it-night" ${s.nightly ? "checked" : ""} style="width:20px;height:20px"> Counted every night</label>
     ${s.code ? `<label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="it-active" checked style="width:20px;height:20px"> Still in use (untick to hide it)</label>` : ""}
+    <div class="tiny mut" style="margin-top:6px">Example: olives — measured in g, counted as can, one can holds 3,000 g, bought as case of 6.</div>
     <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" style="flex:1" onclick="itSave()" ${itBusy ? "disabled" : ""}>${itBusy ? "Saving…" : "Save"}</button><button class="btn ghost" onclick="itSheet=null;render()">Close</button></div></div></div>`;
 }
 async function itSave() {
+  itRead();
   const v = id => { const e = document.getElementById(id); return e ? (e.type === "checkbox" ? e.checked : e.value.trim()) : ""; };
-  const num = id => { const t = String(v(id)).replace(/,/g, ""); return t === "" ? null : +t; };
-  const pu = v("it-pu"), pq = num("it-pq"), par = num("it-par"), placeId = v("it-place");
-  if (String(v("it-name")).length < 2) return toast("Name required.");
-  if (!v("it-cat")) return toast("Pick a category.");
-  if (pu && !(pq > 0)) return toast("How many units are in one pack?");
+  const num = x => { const t = String(x == null ? "" : x).replace(/,/g, "").trim(); return t === "" ? null : +t; };
+  const s = itSheet, pu = s.pack_unit || "", pq = num(s.pack_qty), cu = s.case_unit || "", cq = num(s.case_qty), par = num(s.par), placeId = s.place;
+  if (String(s.name || "").trim().length < 2) return toast("Name required.");
+  if (!s.category) return toast("Pick a category.");
+  if (pq != null && !(pq > 0)) return toast("What one " + pu + " holds: a number above 0.");
+  if (cu && !(cq > 0)) return toast("How many " + (pu || s.unit) + " are in one " + cu + "?");
   if (par != null && !(par >= 0)) return toast("Par: a number.");
-  const p = { store: curStore(), code: itSheet.code, name: v("it-name"), category: v("it-cat"), place: ((PLACES.find(x => x.id === placeId) || {}).name) || placeId, unit: v("it-unit"), pack_unit: pu || null, pack_qty: pu ? pq : null,
-    par: par == null ? null : pu ? par * pq : par, supplier: v("it-sup") || null, brand: v("it-brand") || null, nightly: v("it-night"), active: itSheet.code ? v("it-active") : true };
+  const exp = document.getElementById("it-exp") ? document.getElementById("it-exp").checked : !!s.expiry;
+  const p = { store: curStore(), code: s.code, name: String(s.name).trim(), category: s.category, place: ((PLACES.find(x => x.id === placeId) || {}).name) || placeId, unit: s.unit, pack_unit: pu || null, pack_qty: pu ? pq : null,
+    case_unit: cu || null, case_qty: cu ? cq : null, par: par == null ? null : pu && pq ? par * pq : par, supplier: s.supplier || null, brand: String(s.brand || "").trim() || null, nightly: !!s.nightly,
+    track_expiry: exp, active: s.code ? v("it-active") : true };
   itBusy = true; render();
   let code = p.code;
   if (window.OS_LOADED && window.OS_LOADED.dev || typeof sb === "undefined") {   /* dev page: in memory only */
     code = code || p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const it = Store.item(code) || (ITEMS.push({ id: code }), ITEMS[ITEMS.length - 1]);
-    Object.assign(it, { name: p.name, cat: p.category.toLowerCase(), place: placeId, base: p.unit, unit: pu || p.unit, per: pu ? pq : 1, par: par, supplier: p.supplier || undefined, brand: p.brand, nightly: p.nightly });
+    Object.assign(it, { name: p.name, cat: p.category.toLowerCase(), place: placeId, base: p.unit, unit: pu || p.unit, per: pu ? pq : 1, sizeUnknown: !!pu && pq == null, packUnit: cu || undefined, pack: cu ? cq : undefined, par: par, supplier: p.supplier || undefined, brand: p.brand, nightly: p.nightly, expiry: exp });
   } else {
     const r = await sb.rpc("os_save_item", { p }); if (r.error) { itBusy = false; toast("Not saved: " + r.error.message); return render(); }
     code = r.data.code;

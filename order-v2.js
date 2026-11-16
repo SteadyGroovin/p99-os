@@ -155,53 +155,42 @@ async function pushOn() {
 }
 function pushState() { try { return localStorage.getItem("p99os_push") === "on"; } catch (e) { return false; } }
 
-/* ---------- PACK SIZES (v0.13, migration 021; v0.23.5, migration 044) ---------- */
-/* Stefan, 2026-11-08: no photo reading; the team writes the size down. Receive asks for it when an item without a size arrives.
-   v0.23.5 (Stefan, 16 Nov: "The pack sizes category is not right clear"): the screen asked only "1 block = ? pc" (4 butter rows) while
-   ~200 rows counted in a jar, bottle, pack, gallon, tub, can, box, bag or sack had no label content. Now one question per line:
-   "one <unit> holds ___ g / ml / pc". Label content saves through os_set_net_content (owners and the Admin officer fill every store
-   that counts the item the same way; a lead the own store). The old count-unit size still goes through os_submit 'pack_size'. */
-const SZ_CONT = ["pack", "btl", "jar", "gal", "tub", "can", "box", "bag", "sack", "container"];
+/* ---------- PACK SIZES (v0.13, migration 021; v0.23.5; v0.24, migration 047) ---------- */
+/* v0.24 (Stefan, 16 Nov: "We need to be able to measure everything"): every item is measured in g, ml or pc and counted in its container.
+   One size per item: "1 jar holds ___ g". The unit can still be changed here while the size is open (a guess from migration 047).
+   Saved through os_set_item_size: owners and the Admin officer fill every store with the same item and container; a lead the own store.
+   What was already counted or received in the container is converted once (os_item_size_apply). */
 const SZ_NAME = { btl: "bottle", gal: "gallon", pc: "piece" };
 const szUnitName = u => SZ_NAME[u] || u;
-const szNeedsNet = it => SZ_CONT.includes(it.base) && !(it.net > 0) && !it.sizeUnknown;
-function szNeeds(it) { return !!it && (it.sizeUnknown || szNeedsNet(it)); }
+function szNeeds(it) { return !!it && !!it.sizeUnknown; }
 function szMissing() { return ITEMS.filter(szNeeds).length; }
-const szGuess = it => ["btl", "gal"].includes(it.base) ? "ml" : it.base === "box" ? "pc" : "g";
 const szOK = () => ["lead", "master", "officer"].includes(role());
 let szEdit = {}, szUnit = {}, szBusy = false;
 function viewSizes() {
   if (!szOK()) return shell("Pack sizes", "", `<div class="alert info">For the store lead, the Admin officer and the owners.</div>`, { back: "#/stock" });
   const list = ITEMS.filter(szNeeds).sort((a, b) => (typeof skCatKey === "function" ? skCatKey(a) - skCatKey(b) : 0) || a.name.localeCompare(b.name));
   const all = role() !== "lead";
-  const rows = list.map((it, i) => {
-    const net = szNeedsNet(it), u = net ? (szUnit[it.id] || szGuess(it)) : it.base;
-    const unitCell = net ? `<select class="in szu" style="width:4.6em;display:inline-block;padding-left:6px;padding-right:4px" aria-label="unit for ${esc(it.name)}" onchange="szUnit['${it.id}']=this.value">${["g", "ml", "pc"].map(x => `<option ${x === u ? "selected" : ""}>${x}</option>`).join("")}</select>` : `<small>${esc(it.base)}</small>`;
-    return `<tr><td class="nm">${esc(it.name)}<div class="sub2">${esc(it.supplier || "no supplier")}</div></td><td class="h1 mut">${typeof skGrp === "function" ? esc(skGrp(it)) : ""}</td><td class="mut">1 ${esc(szUnitName(net ? it.base : it.unit))} holds</td>
-    <td class="n szc" style="white-space:nowrap"><input class="in num szin" style="width:6em" inputmode="decimal" data-i="${i}" placeholder="${net ? (u === "ml" ? "750" : u === "pc" ? "100" : "500") : ""}" aria-label="what one ${esc(szUnitName(net ? it.base : it.unit))} of ${esc(it.name)} holds" value="${szEdit[it.id] != null ? szEdit[it.id] : ""}" oninput="szEdit['${it.id}']=this.value===''?null:parseFloat(this.value.replace(',','.'));szCount()" onkeydown="if(event.key==='Enter'){const n=document.querySelector('.szin[data-i=&quot;${i + 1}&quot;]');if(n)n.focus();else szSaveAll()}"> ${unitCell}</td></tr>`; }).join("");
+  const rows = list.map((it, i) => { const u = szUnit[it.id] || it.base;
+    return `<tr><td class="nm">${esc(it.name)}<div class="sub2">${esc(it.supplier || "no supplier")}</div></td><td class="h1 mut">${typeof skGrp === "function" ? esc(skGrp(it)) : ""}</td><td class="mut">1 ${esc(szUnitName(it.unit))} holds</td>
+    <td class="n szc" style="white-space:nowrap"><input class="in num szin" style="width:6em" inputmode="decimal" data-i="${i}" placeholder="${u === "ml" ? "750" : u === "pc" ? "100" : "500"}" aria-label="what one ${esc(szUnitName(it.unit))} of ${esc(it.name)} holds" value="${szEdit[it.id] != null ? szEdit[it.id] : ""}" oninput="szEdit['${it.id}']=this.value===''?null:parseFloat(this.value.replace(',','.'));szCount()" onkeydown="if(event.key==='Enter'){const n=document.querySelector('.szin[data-i=&quot;${i + 1}&quot;]');if(n)n.focus();else szSaveAll()}"> <select class="in szu" style="width:4.6em;display:inline-block;padding-left:6px;padding-right:4px" aria-label="unit for ${esc(it.name)}" onchange="szUnit['${it.id}']=this.value">${["g", "ml", "pc"].map(x => `<option ${x === u ? "selected" : ""}>${x}</option>`).join("")}</select></td></tr>`; }).join("");
   const n = Object.values(szEdit).filter(v => v > 0).length;
   return shell("Pack sizes", list.length ? `${list.length} without a size` : "all done", `
     <section class="card"><h2>What goes here</h2><div class="small">For each item, write what <b>one</b> of it holds, as printed on the label:</div>
-      <div class="tiny mut" style="margin:6px 0">1 jar of peanut butter = <b>340 g</b> · 1 bottle of caramel syrup = <b>750 ml</b> · 1 gallon of bleach = <b>3,785 ml</b> · 1 box of gloves = <b>100 pc</b></div>
-      <div class="tiny mut">The app needs it to work out recipe costs and the price per kg or litre. No label: weigh it once. Pick g, ml or pc on the right. Enter jumps to the next line.${all ? " What you save fills every store that uses the same item." : ""}</div></section>
+      <div class="tiny mut" style="margin:6px 0">1 jar of peanut butter = <b>340 g</b> · 1 bottle of syrup = <b>750 ml</b> · 1 gallon of bleach = <b>3,785 ml</b> · 1 pack of cheese = <b>10 pc</b> (slices)</div>
+      <div class="tiny mut">Recipes and usage work in g, ml or pieces; the shelf is counted in jars, packs and bottles. This number joins the two. No label: weigh it once. Change g / ml / pc if it is measured differently. Enter jumps to the next line.${all ? " What you save fills every store that uses the same item." : ""}</div></section>
     ${list.length ? `<div class="itwrap"><table class="itbl sz"><thead><tr><th>Item</th><th class="h1">Category</th><th>One</th><th class="n">Holds</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="bottom-act"><button class="btn primary full" id="szall" onclick="szSaveAll()" ${n && !szBusy ? "" : "disabled"}>${szBusy ? "Saving…" : `Save ${n || ""} size${n === 1 ? "" : "s"}`}</button></div>` : `<section class="card"><div class="mut">Every item has a size.</div></section>`}`, { back: "#/stock" });
 }
 function szCount() { const n = Object.values(szEdit).filter(v => v > 0).length; const b = document.getElementById("szall"); if (b) { b.disabled = !n; b.textContent = `Save ${n || ""} size${n === 1 ? "" : "s"}`; } }
 async function szSaveAll() {
   const ids = Object.keys(szEdit).filter(k => szEdit[k] > 0); if (!ids.length) return toast("Type a size first.");
-  const nets = ids.filter(id => szNeedsNet(Store.item(id) || {})), olds = ids.filter(id => !nets.includes(id));
-  if (olds.length) { S.sizeDecisions = S.sizeDecisions || [];
-    olds.forEach(code => { S.sizeDecisions.push({ id: "sz-" + code + "-" + Date.now(), item: code, qty: szEdit[code], synced: false }); const it = Store.item(code); if (it) { it.per = szEdit[code]; it.sizeUnknown = false; } delete szEdit[code]; });
-    save(); }
-  if (nets.length) {
-    const items = nets.map(code => ({ code, net: szEdit[code], unit: szUnit[code] || szGuess(Store.item(code)) }));
-    if (!(window.OS_LOADED && window.OS_LOADED.dev) && typeof sb !== "undefined") {
-      szBusy = true; render();
-      const r = await sb.rpc("os_set_net_content", { p: { store: curStore(), items } }); szBusy = false;
-      if (r.error) { render(); return toast("Not saved: " + r.error.message); }
-    }
-    items.forEach(x => { const it = Store.item(x.code); if (it) { it.net = x.net; it.netUnit = x.unit; } delete szEdit[x.code]; delete szUnit[x.code]; });
-  }
+  const items = ids.map(code => ({ code, qty: szEdit[code], unit: szUnit[code] || (Store.item(code) || {}).base || "g" }));
+  if (!(window.OS_LOADED && window.OS_LOADED.dev) && typeof sb !== "undefined") {
+    szBusy = true; render();
+    const r = await sb.rpc("os_set_item_size", { p: { store: curStore(), items } }); szBusy = false;
+    if (r.error) { render(); return toast("Not saved: " + r.error.message); }
+    const L = await loadRecords(); if (!L.error) { window.OS_LOADED = L.data; dbCatalogue(L.data); }
+  } else items.forEach(x => { const it = Store.item(x.code); if (it) { it.per = x.qty; it.base = x.unit; it.sizeUnknown = false; } });
+  ids.forEach(c => { delete szEdit[c]; delete szUnit[c]; });
   toast(ids.length + (ids.length === 1 ? " size saved." : " sizes saved.")); render();
 }

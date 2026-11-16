@@ -97,7 +97,7 @@ const RECEIPT_KINDS = [["delivery", "Delivery"], ["purchase", "Bought with cash"
    The app's item keeps its old meaning: unit = what is counted, packUnit/pack = the bigger unit and how many count units it holds.
    Par in the database is in base units when the pack size is known, else in count units (os_item_base stores those "as typed"). */
 const PAY_SOURCES = [["store_fund", "Store cash"], ["office_fund", "Office fund"], ["vault", "Vault"], ["gcash", "GCash"], ["stefan", "Stefan"], ["mike", "Mike"], ["bank", "Bank"]];
-let SUPPLIER_INFO = {}, REORDER = [], ORDERS = [], MONEY = [], OS_SETTINGS = {}, PRICES = [];
+let SUPPLIER_INFO = {}, REORDER = [], ORDERS = [], MONEY = [], OS_SETTINGS = {}, PRICES = [], EXPIRING = [];
 function dbCatalogue(L) {
   if (!L || L.dev || !Array.isArray(L.items)) return false;   /* v0.23.6: a real store with no items yet (Head Office) shows an empty list, never the sample one */
   const n = v => v == null || v === "" ? null : +v;
@@ -108,7 +108,7 @@ function dbCatalogue(L) {
     const it = { id: d.id, name: d.name, place: d.place || "", cat: String(d.cat || "").toLowerCase(), unit: d.packUnit || d.unit, base: d.unit, per,
       par: d.par == null ? null : (d.packUnit && per ? n(d.par) / per : n(d.par)), nightly: !!d.nightly, supplier: d.supplier || undefined, buys: d.buys || [],
       verify: !d.confirmed || (!!d.packUnit && per == null), sizeUnknown: !!d.packUnit && per == null,
-      brand: d.brand || null, net: n(d.net), netUnit: d.netUnit || null, container: d.container || null, specOk: !!d.specOk, specNote: d.specNote || null };   /* v0.19.9: product facts (migration 029/030) */   /* v0.13: Receive asks the crew to write the size off the label */
+      brand: d.brand || null, net: n(d.net), netUnit: d.netUnit || null, container: d.container || null, specOk: !!d.specOk, specNote: d.specNote || null, expiry: !!d.expiry };   /* v0.24: track_expiry (migration 047) */   /* v0.19.9: product facts (migration 029/030) */   /* v0.13: Receive asks the crew to write the size off the label */
     if (d.caseUnit && n(d.case)) { it.packUnit = d.caseUnit; it.pack = n(d.case); }
     if (d.pos) it.pos = d.pos;
     return it; }));
@@ -120,7 +120,7 @@ function dbCatalogue(L) {
 function dbRefresh(L) {   /* the parts that change during the day: reorder levels, open orders, bills */
   SUPPLIER_INFO = Object.fromEntries((L.suppliers || []).map(s => [s.name, s]));
   REORDER = (L.reorder || []).map(r => Object.assign({}, r, { expected: r.expected == null ? null : +r.expected, rop: r.rop == null ? null : +r.rop, per_day: r.per_day == null ? null : +r.per_day, cover: r.cover == null ? null : +r.cover, suggest: r.suggest == null ? null : +r.suggest, buy_qty: r.buy_qty == null ? null : +r.buy_qty, on_order: +r.on_order || 0 }));
-  ORDERS = L.orders || []; MONEY = L.money || []; OS_SETTINGS = L.settings || {}; PRICES = L.prices || []; if (typeof MOVE_BAL !== "undefined") MOVE_BAL = L.balances || []; if (typeof booksRefresh === "function") booksRefresh(L);   /* v0.15 balances · v0.14: prices per base unit (office, owners) */
+  ORDERS = L.orders || []; EXPIRING = L.expiring || []; MONEY = L.money || []; OS_SETTINGS = L.settings || {}; PRICES = L.prices || []; if (typeof MOVE_BAL !== "undefined") MOVE_BAL = L.balances || []; if (typeof booksRefresh === "function") booksRefresh(L);   /* v0.15 balances · v0.14: prices per base unit (office, owners) */
 }
 const DB_CATALOGUE = dbCatalogue(window.OS_LOADED);
 
