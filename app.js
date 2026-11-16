@@ -442,7 +442,9 @@ function render() {
     default: html = role() === "walk" ? viewWalk() : viewToday();
   }
   if ((seg[0] || "today") === "today" && typeof homeStripHTML === "function") html = html.replace(/<main class="wrap( two)?">/, m => m + homeStripHTML());   /* v0.26.0: the main tag may carry "two" */   /* v0.17: Home = quick actions + what needs attention, then the day */
+  const sbTop = ($(".sidebar") || {}).scrollTop || 0;   /* v0.26.1 (Stefan, 16 Nov: "not really able to open all categories"): every redraw rebuilt the menu at the top, so a background reload threw the iPad drawer back up mid-scroll; keep its place */
   $("#app").innerHTML = html;
+  const sbNew = $(".sidebar"); if (sbNew && sbTop) sbNew.scrollTop = sbTop;
   if (render._h !== location.hash) { render._h = location.hash; window.scrollTo(0, 0); } /* a new page opens at the top; a re-render of the same page keeps its place */
   if (pad || cpad) { const s = $(".sheet"); if (s) s.scrollIntoView({ block: "end" }); }
 }
