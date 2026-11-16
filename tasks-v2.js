@@ -250,5 +250,16 @@ function viewTask(id) {
     <section class="card"><h3>Owner</h3><select class="in" onchange="c2TSet('${t.id}','owner',this.value||null)">${tkPersonOpts(t.owner, "No owner yet")}</select><h3 style="margin-top:14px">Due</h3>${dueChips(t.due, "_tDue")}<input class="in" type="date" value="${t.due || ""}" onchange="_tDue(this.value)">
       <h3 style="margin-top:14px">Repeats</h3><select class="in" onchange="tkRepeat('${t.id}',this.value)">${TK_REPEATS.map(([v, l]) => `<option value="${v}" ${(t.repeat_unit ? t.repeat_unit + ":" + (t.repeat_every || 1) : "") === v ? "selected" : ""}>${l}</option>`).join("")}</select>
       ${t.repeat_unit ? `<div class="tiny mut" style="margin-top:6px">When it is done, the next one appears with the due date moved on${t.due ? "" : " (set a due date)"}.</div>` : ""}</section>
-    ${log.length || t.created ? `<section class="card"><h3>History</h3><ol class="c2log">${log.map(e => `<li><span class="tiny mut num">${esc(dayName(String(e.at).slice(0, 10)))} ${timeOf(e.at)}</span><div><b>${esc(fname(e.by) || "—")}</b> ${evT(e)}</div></li>`).join("")}${!log.some(e => e.ev === "created") && t.created ? `<li><span class="tiny mut num">${esc(dayName(t.created.slice(0, 10)))}</span><div>added</div></li>` : ""}</ol></section>` : ""}`, { back: "#/tasks" });
+    ${log.length || t.created ? `<section class="card"><h3>History</h3><ol class="c2log">${log.map(e => `<li><span class="tiny mut num">${esc(dayName(String(e.at).slice(0, 10)))} ${timeOf(e.at)}</span><div><b>${esc(fname(e.by) || "—")}</b> ${evT(e)}</div></li>`).join("")}${!log.some(e => e.ev === "created") && t.created ? `<li><span class="tiny mut num">${esc(dayName(t.created.slice(0, 10)))}</span><div>added</div></li>` : ""}</ol></section>` : ""}${role() === "master" ? `<section class="card"><button class="btn ghost danger full" onclick="tkDelete('${t.id}')">Delete this task</button></section>` : ""}`, { back: "#/tasks" });
+}
+
+/* v0.23.7 (Stefan, 16 Nov: "I should also be able to delete tasks"): owners delete a task outright (policy task_masters allows it). */
+async function tkDelete(id) {
+  const t = (S.tasks || []).find(x => x.id === id); if (!t) return;
+  if (!confirm(`Delete the task "${t.title}"? This cannot be undone.`)) return;
+  if (typeof Sync !== "undefined" && Sync.outbox) { Sync.outbox = Sync.outbox.filter(x => !(x.kind === "task" && x.rec && x.rec.id === id)); try { Sync.put(Sync.K.outbox, Sync.outbox); } catch (e) { } }
+  if (!(window.OS_LOADED && window.OS_LOADED.dev) && typeof sb !== "undefined") { const r = await sb.from("task").delete().eq("client_id", id); if (r.error) return toast("Not deleted: " + r.error.message); }
+  S.tasks = S.tasks.filter(x => x.id !== id);
+  if (typeof Sync !== "undefined" && Sync.snap) { delete Sync.snap["task:" + id]; try { Sync.put(Sync.K.snap, Sync.snap); } catch (e) { } }
+  save(); toast("Task deleted."); go("#/tasks");
 }

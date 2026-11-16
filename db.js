@@ -9,7 +9,7 @@ const bootEl = document.getElementById("app");
 const bootEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /* every release loads as one matching set: GitHub Pages caches files for 10 minutes, and a stale db.js next to a new app.js left Tasks blank (v0.10.0, 2026-11-07) */
-const APP_V = "0.23.6";
+const APP_V = "0.23.7";
 function loadScript(src) {
   return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src + (src.includes("?") ? "&" : "?") + "v=" + APP_V; s.onload = ok; s.onerror = () => no(new Error("could not load " + src)); document.body.appendChild(s); });
 }
@@ -87,7 +87,7 @@ window.loadRecords = loadRecords;
 async function start() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return signInForm();
-  bootScreen(`<div class="mut" style="text-align:center">Loading sales from the database…</div>`);
+  bootScreen(`<div class="mut" style="text-align:center">Loading data…</div>`);
   const { data: member, error: mErr } = await sb.from("os_member").select("role").maybeSingle();
   if (mErr || !member) return bootScreen(`<div><b>Signed in as ${bootEsc(session.user.email)}</b></div>
     <div class="small mut" style="margin:8px 0 16px">This account is not on the member list yet. Ask Stefan to add it.</div>
