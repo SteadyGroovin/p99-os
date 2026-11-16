@@ -332,7 +332,7 @@ function viewReceipts() {
 /* Categories (Stefan, 2026-11-13: "close to the categories Mike has in his accounting sheets, but better"): the group is the purchase
    category of the accounting book, so stock and purchases add up under the same headings; the chef sheet's finer category is the sub-category. */
 const SK_BOOK = [["Beverages & Liquor", ["drink"]], ["Purified Water", ["water", "purified water"]], ["Vegetables & Fruit", ["vegetable & fruit"]], ["Chilled", ["cheese", "meat & fish", "dairy & eggs", "ice cream"]], ["Dry Food", ["dry & baking", "canned & jar", "sauce & oil"]],
-  ["Consumables", ["packaging"]], ["Cleaning Supplies", ["cleaning"]], ["Gas", ["gas"]], ["Made here", ["prep (made here)"]]];
+  ["Consumables", ["packaging"]], ["Cleaning Supplies", ["cleaning"]], ["Tools & Equipment", ["tools & equipment"]], ["Gas", ["gas"]], ["Made here", ["prep (made here)"]]];
 const skGrpIx = it => { const i = SK_BOOK.findIndex(g => g[1].includes(it.cat || "")); return i < 0 ? SK_BOOK.length : i; };
 const skGrp = it => (SK_BOOK[skGrpIx(it)] || ["Other"])[0];
 const skSub = it => it.cat ? it.cat[0].toUpperCase() + it.cat.slice(1) : "—";
@@ -450,7 +450,7 @@ function viewItem(id) {
     <tr><td>Counted as</td><td class="n">${it.pack ? `${esc(it.packUnit)} of ${it.pack} ${esc(it.unit)}${it.verify ? " " + chip("warn", "verify") : ""}` : esc(it.unit)}</td></tr>
     <tr><td>Nightly short list</td><td class="n">${it.nightly ? "yes" : "no"}</td></tr><tr><td>Sold as-is on UTAK</td><td class="n">${it.pos ? esc(it.pos) : "via recipes"}</td></tr>
     ${db ? `<tr><td>Chef sheet</td><td class="n">${db.confirmed ? chip("ok", "confirmed") : `<span class="sample">to check</span>`} · ${esc(db.base_unit)}${db.pack_unit ? " · " + esc(db.pack_unit) + (db.pack_qty ? " = " + fmt(db.pack_qty) + " " + esc(db.base_unit) : "") : ""}</td></tr>` : ""}</tbody></table></section>`;
-  return shell(it.name, `${esc(skPlace(it.place))}${it.supplier ? " · " + esc(it.supplier) : ""}`, `${typeof itEditBtn === "function" ? itEditBtn(it) : ""}${tiles}${typeof grpWhereCard === "function" ? grpWhereCard(id) : ""}<div class="skact"><button class="btn" onclick="startDraft();go('#/count/${it.place}');setTimeout(()=>openPad('${id}'),0)">${ic("grid-01", "sm")}Count it</button><button class="btn" onclick="rc=rc||{kind:'delivery',supplier:${esc(JSON.stringify(it.supplier || ""))},lines:[],photo:null,amount:''};go('#/receive');setTimeout(()=>skRcPad('${id}'),0)">${ic("package", "sm")}Receive it</button></div>${math}${usage}${typeof skPriceUnitSection === "function" && typeof supMoney === "function" && supMoney() ? skPriceUnitSection(it) : price}${skProductCard(it)}${recipe}${countsHTML}${recHTML}${settings}`, { back: "#/items" });
+  return shell(it.name, `${esc(skPlace(it.place))}${it.supplier ? " · " + esc(it.supplier) : ""}`, `${typeof itEditBtn === "function" ? itEditBtn(it) : ""}${tiles}${typeof grpWhereCard === "function" ? grpWhereCard(id) : ""}<div class="skact"><button class="btn" onclick="startDraft();go('#/count/${it.place}');setTimeout(()=>openPad('${id}'),0)">${ic("grid-01", "sm")}Count it</button><button class="btn" onclick="rc=rc||{kind:'delivery',supplier:${esc(JSON.stringify(it.supplier || ""))},lines:[],photo:null,amount:''};go('#/receive');setTimeout(()=>skRcPad('${id}'),0)">${ic("package", "sm")}Receive it</button></div>${math}${usage}${typeof skPriceUnitSection === "function" && typeof supMoney === "function" && supMoney() ? skPriceUnitSection(it) : price}${skProductCard(it)}${skInflowHTML(it)}${recipe}${countsHTML}${recHTML}${settings}`, { back: "#/items" });
 }
 
 /* ---------- VARIANCE ---------- */
@@ -491,4 +491,28 @@ function skExpiringHTML() {
   const band = d => d < 0 ? chip("bad", "expired") : d <= 7 ? chip("bad", d + " d") : d <= 14 ? chip("warn", d + " d") : chip("", d + " d");
   const left = e => e.count != null && e.countUnit ? `${fmt(e.count)} ${esc(e.countUnit)}` : `${fmt(e.left)} ${esc(e.unit)}`;
   return `<section class="card"><h2>Expiring soon <span class="tiny mut">next 30 days · oldest delivery still on the shelf</span></h2><div class="itwrap flat"><table class="itbl"><thead><tr><th>Item</th><th class="h1">Delivered</th><th class="n">About left</th><th class="n">Expires</th></tr></thead><tbody>${L.map(e => `<tr onclick="go('#/item/${encodeURIComponent(e.item)}')"><td class="nm">${esc(e.name)}</td><td class="h1 mut">${esc(dayName(e.delivered))}</td><td class="n num">${left(e)}</td><td class="n">${esc(dayName(e.exp))} ${band(e.days)}</td></tr>`).join("")}</tbody></table></div><div class="itfoot tiny mut">Use these first. "About left" assumes the newest deliveries are still on the shelf and the older ones were used.</div></section>`;
+}
+
+/* v0.25 (Stefan, 16 Nov: "we want to see when the last time was they received a broom ... how many liters they're consuming"):
+   what reached this place — deliveries plus transfers in — the last one and the average per month over 90 days. For brooms, mops,
+   sand and cleaning liquids this is the consumption, with no nightly count needed. */
+function skInflow(it) {
+  const st = typeof curStore === "function" ? curStore() : "P99", since = addDays(today(), -90), ev = [];
+  (S.receipts || []).forEach(r => { if (r.kind === "other" || (r.location && r.location !== st)) return; r.lines.forEach(l => { if (l.item === it.id && l.qty > 0) ev.push({ day: r.day, qty: +l.qty, how: r.supplier || "delivery" }); }); });
+  (S.transfers || []).forEach(t => { if (t.to !== st || !t.received_at) return; t.lines.forEach(l => { if (l.item === it.id && l.received > 0) ev.push({ day: t.day, qty: +l.received, how: "from " + (typeof locName === "function" ? locName(t.from) : t.from) }); }); });
+  ev.sort((a, b) => a.day < b.day ? 1 : -1);
+  const win = ev.filter(e => e.day >= since), first = win.length ? win[win.length - 1].day : null;
+  const days = first ? Math.max(30, Math.round((new Date(today() + "T00:00:00") - new Date(first + "T00:00:00")) / 864e5)) : null;
+  const tot = win.reduce((a, e) => a + e.qty, 0);
+  return { last: ev[0] || null, n: win.length, perMonth: days ? tot / days * 30 : null };
+}
+function skInflowHTML(it) {
+  const x = skInflow(it), isTool = (it.cat || "") === "tools & equipment";
+  if (!x.last && !isTool) return "";
+  const base = q => it.per && it.unit !== it.base ? ` <span class="tiny mut">(${fmt(Math.round(q * it.per * 10) / 10)} ${esc(it.base)})</span>` : "";
+  const big = q => { if (!(it.per && it.unit !== it.base)) return ""; const b = q * it.per; return b >= 1000 && ["g", "ml"].includes(it.base) ? ` <span class="tiny mut">≈ ${fmt(Math.round(b / 100) / 10)} ${it.base === "g" ? "kg" : "L"}</span>` : base(q); };
+  return `<section class="card"><h2>Received here <span class="tiny mut">deliveries and transfers in · 90 days</span></h2><div class="grid2">
+    ${tile("Last received", x.last ? esc(dayName(x.last.day)) : "—", x.last ? `${fmt(x.last.qty)} ${esc(it.unit)} · ${esc(x.last.how)}` : `<span class="mut">nothing recorded yet</span>`, "")}
+    ${tile("Per month", x.perMonth != null ? `${fmt(Math.round(x.perMonth * 10) / 10)} <span class="small mut">${esc(it.unit)}</span>` : "—", x.perMonth != null ? `${x.n} time${x.n === 1 ? "" : "s"} in 90 days${big(x.perMonth)}` : `<span class="mut">needs a delivery first</span>`, "")}</div>
+    ${isTool ? `<div class="tiny mut" style="margin-top:6px">Not counted every night: what was received is what was used. Record each new broom, mop or refill under Receive or as a pull-out.</div>` : ""}</section>`;
 }

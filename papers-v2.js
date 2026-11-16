@@ -5,7 +5,7 @@
    uploaded paper, with issue and expiry date; "many" types hold one row per staff member or extinguisher). Files: bucket 'papers', private.
    Who: owners, the office (admin, finance) and the admin officer. Online only: every save goes straight to the database. */
 
-const PAP = { state: "idle", locs: [], facts: {}, rent: {}, types: [], papers: [], err: "" };
+const PAP = { state: "idle", locs: [], facts: {}, rent: {}, types: [], papers: [], assets: [], err: "" };
 let papSheet = null, papBusy = false;
 const papDev = () => typeof sb === "undefined" || (window.OS_LOADED && window.OS_LOADED.dev);
 const papOK = () => ["master", "admin", "finance", "officer"].includes(window.DB_ROLE) || !window.DB_ROLE;
@@ -16,13 +16,14 @@ async function papLoad(force) {
   if (PAP.state === "loading" || (["ok", "fail"].includes(PAP.state) && !force)) return;   /* a failed load waits for "Try again", never loops */
   PAP.state = "loading";
   try {
-    if (papDev()) { const d = await fetch("dev-papers.json").then(r => r.json()); Object.assign(PAP, { locs: d.location, types: d.paper_type, papers: d.paper || [] }); PAP.facts = {}; (d.site_fact || []).forEach(f => PAP.facts[f.location] = f); PAP.rent = {}; if (papRentOK()) (d.site_rent || []).forEach(x => PAP.rent[x.location] = x); }
+    if (papDev()) { const d = await fetch("dev-papers.json").then(r => r.json()); Object.assign(PAP, { locs: d.location, types: d.paper_type, papers: d.paper || [] }); PAP.facts = {}; (d.site_fact || []).forEach(f => PAP.facts[f.location] = f); PAP.rent = {}; if (papRentOK()) (d.site_rent || []).forEach(x => PAP.rent[x.location] = x); PAP.assets = d.asset || []; }
     else {
       const [a, b, c, e] = await Promise.all([sb.from("location").select("code,name,kind,active,sort").eq("active", true).order("sort"), sb.from("site_fact").select("*"),
         sb.from("paper_type").select("*").eq("active", true).order("sort"), sb.from("paper").select("*").order("created", { ascending: false })]);
       const bad = [a, b, c, e].find(x => x.error); if (bad) throw bad.error;
       PAP.locs = a.data; PAP.facts = {}; b.data.forEach(f => PAP.facts[f.location] = f); PAP.types = c.data; PAP.papers = e.data;
       PAP.rent = {}; if (papRentOK()) { const rr = await sb.from("site_rent").select("*"); if (!rr.error) rr.data.forEach(x => PAP.rent[x.location] = x); }
+      const aa = await sb.from("asset").select("*").order("name"); PAP.assets = aa.error ? [] : aa.data;   /* v0.25 (migration 048) */
     }
     PAP.state = "ok";
   } catch (x) { PAP.state = "fail"; PAP.err = x.message || String(x); }
@@ -79,6 +80,7 @@ function viewPapers(loc) {
   locs.forEach(l => PAP.types.forEach(t => { const x = papState(l.code, t);
     if (["expired", "d30", "d60"].includes(x.s)) x.rows.filter(p => ["expired", "d30", "d60"].includes(papRowState(p))).forEach(p => due.push([p.expires, l, t, p])); }));
   locs.forEach(l => { const f = PAP.facts[l.code] || {}; [["Lease ends", f.lease_end], ["Lease renewal", f.renewal_day]].forEach(([lab, d]) => { const n = papDays(d); if (d && n <= 90) due.push([d, l, { name: lab, code: "_fact" }, null]); }); });
+  PAP.assets.filter(a => a.next_check && a.condition !== "gone" && papDays(a.next_check) <= 60).forEach(a => { const l = locs.find(x => x.code === a.location); if (l) due.push([a.next_check, l, { name: a.name + " · " + (a.check_what || "check"), code: "_asset" }, null]); });
   due.sort((a, b) => a[0].localeCompare(b[0]));
   const dueRows = due.map(([d, l, t, p]) => { const n = papDays(d);
     return `<tr onclick="go('#/papers/${l.code}')"><td class="nm">${esc(t.name)}${p && p.label ? ` <small>${esc(p.label)}</small>` : ""}<div class="sub2" style="white-space:normal;max-width:none">${esc(l.name)} · ${papDate(d)}</div></td><td class="h1">${esc(l.name)}</td><td class="h1">${papDate(d)}</td><td class="n">${n < 0 ? chip("bad", `${-n} d ago`) : chip("warn", `in ${n} d`)}</td></tr>`; }).join("");
@@ -116,6 +118,7 @@ function viewPaperPlace(loc) {
   return shell(esc(l.name), `${s.total - s.missing - s.expired} of ${s.total} papers in${s.soon ? ` · ${s.soon} expiring` : ""}`, `
     <section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">Place</h2><button class="btn sm" onclick="papFacts('${loc}')">Edit</button></div><div class="itwrap" style="margin-top:8px">${facts}</div></section>
     <section class="card"><h2>Checklist</h2><div class="itwrap"><table class="itbl"><thead><tr><th>Paper</th><th class="h1">What it is</th><th>Status</th><th class="n">Expires</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>
+    ${papAssetsHTML(loc)}
     ${papSheetHTML()}`, { back: "#/papers" });
 }
 
@@ -128,7 +131,8 @@ function papSheetHTML() {
   const close = `<button class="btn ghost" onclick="papSheet=null;render()">Close</button>`;
   const inp = (id, lab, val, type = "text", extra = "") => `<div class="field"><label for="${id}">${lab}</label><input class="in" id="${id}" type="${type}" value="${esc(val == null ? "" : val)}" ${extra}></div>`;
   let body;
-  if (papSheet.kind === "facts") {
+  if (papSheet.kind === "asset") body = papAssetForm(close);
+  else if (papSheet.kind === "facts") {
     const f = PAP.facts[papSheet.loc] || {};
     body = `<h2>${esc(papLocName(papSheet.loc))}</h2>
       ${inp("pf-ad", "Address", f.address)}${inp("pf-bld", "Building (places that share one get the same name)", f.building)}<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">${inp("pf-m2", "Floor area (m²)", f.floor_m2, "text", 'inputmode="decimal"')}${inp("pf-ll", "Landlord", f.landlord)}
@@ -208,6 +212,67 @@ async function papView(id) {
   if (papDev()) return toast("Files open on the live app only.");
   const w = window.open("", "_blank");   /* open the tab inside the tap, or the phone blocks it */
   const r = await sb.storage.from("papers").createSignedUrl(p.file_path, 300);
+  if (r.error) { if (w) w.close(); return toast("Could not open: " + r.error.message); }
+  if (w) w.location = r.data.signedUrl; else location.href = r.data.signedUrl;
+}
+
+/* ---------- assets (v0.25, migration 048; Stefan, 16 Nov: "They get assets there, like a freezer, a chiller ... an emergency kit") ----------
+   One line per freezer, chiller, kit or extinguisher at a place: condition and the next check (service, refill, expiry), which also
+   shows under "Coming up". Brooms, mops, sand and cleaning liquids are items ("Tools & equipment"), not assets. */
+const PAP_KINDS = ["Freezer", "Chiller", "Fridge", "Oven", "Stove / range", "Fryer", "Coffee machine", "Blender", "Aircon", "Fire extinguisher", "Emergency kit", "First aid kit", "POS / tablet", "CCTV", "Furniture", "Other"];
+const PAP_COND = [["good", "Good"], ["needs repair", "Needs repair"], ["broken", "Broken"], ["gone", "Gone (sold, thrown away)"]];
+const papCondChip = c => c === "good" ? chip("ok", "good") : c === "needs repair" ? chip("warn", "needs repair") : c === "broken" ? chip("bad", "broken") : chip("", "gone");
+const papCheckChip = d => { const n = papDays(d); return d == null ? `<span class="tiny mut">—</span>` : n < 0 ? chip("bad", `${papDate(d)} · overdue`) : n <= 30 ? chip("warn", `${papDate(d)} · ${n} d`) : `<span class="small">${papDate(d)}</span>`; };
+function papAssetsHTML(loc) {
+  const L = PAP.assets.filter(a => a.location === loc).sort((a, b) => (a.condition === "gone") - (b.condition === "gone") || (a.kind || "").localeCompare(b.kind || "") || a.name.localeCompare(b.name));
+  const rows = L.map(a => `<tr onclick="papAsset('${loc}','${a.id}')" tabindex="0" onkeydown="if(event.key==='Enter')papAsset('${loc}','${a.id}')" class="${a.condition === "gone" ? "mut" : ""}"><td class="nm">${esc(a.name)}<div class="sub2" style="white-space:normal;max-width:none">${esc([a.kind, a.brand, a.received_on ? "since " + papDate(a.received_on) : ""].filter(Boolean).join(" · "))}</div></td><td>${papCondChip(a.condition)}</td><td class="n">${papCheckChip(a.next_check)}${a.check_what ? `<div class="tiny mut">${esc(a.check_what)}</div>` : ""}</td><td class="n mut" style="width:24px">›</td></tr>`).join("");
+  return `<section class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><h2 style="margin:0">Assets <span class="tiny mut">${L.filter(a => a.condition !== "gone").length} in use</span></h2><button class="btn sm" onclick="papAsset('${loc}',null)">+ Add asset</button></div>
+    ${L.length ? `<div class="itwrap" style="margin-top:8px"><table class="itbl"><thead><tr><th>Asset</th><th>Condition</th><th class="n">Next check</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="mut small" style="margin-top:8px">No assets yet: freezers, chillers, the emergency kit, fire extinguishers.</div>`}
+    <div class="tiny mut" style="margin-top:8px">Brooms, mops and cleaning supplies are items (Items → Tools &amp; equipment), so you see when they were last received and how much is used.</div></section>`;
+}
+function papAsset(loc, id) { papSheet = { kind: "asset", loc, id }; render(); }
+function papAssetForm(close) {
+  const { loc, id } = papSheet, a = id ? PAP.assets.find(x => x.id === id) || {} : { condition: "good" };
+  const inp = (fid, lab, val, type = "text", extra = "") => `<div class="field"><label for="${fid}">${lab}</label><input class="in" id="${fid}" type="${type}" value="${esc(val == null ? "" : val)}" ${extra}></div>`;
+  const sel = (fid, lab, list, v, blank) => `<div class="field"><label for="${fid}">${lab}</label><select class="in" id="${fid}">${blank ? `<option value="">${blank}</option>` : ""}${list.map(x => Array.isArray(x) ? `<option value="${x[0]}" ${x[0] === v ? "selected" : ""}>${esc(x[1])}</option>` : `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("")}</select></div>`;
+  return `<h2>${id ? "Asset" : "New asset"}</h2><div class="tiny mut" style="margin-bottom:10px">${esc(papLocName(loc))}</div>
+    ${inp("as-name", "Name", a.name, "text", 'placeholder="e.g. Chest freezer, kitchen"')}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">${sel("as-kind", "Kind", PAP_KINDS, a.kind, "Pick one")}${sel("as-cond", "Condition", PAP_COND, a.condition)}
+    ${inp("as-brand", "Brand / model", a.brand)}${inp("as-serial", "Serial no.", a.serial)}
+    ${inp("as-rec", "Received", a.received_on, "date")}${inp("as-cost", "Cost (₱)", a.cost, "text", 'inputmode="decimal"')}
+    ${inp("as-next", "Next check", a.next_check, "date")}${inp("as-what", "What check", a.check_what, "text", 'placeholder="service, refill, expiry"')}</div>
+    <div class="field"><label for="as-file">Photo</label>${a.photo_name ? `<div class="small" style="margin-bottom:6px"><button class="btn sm" onclick="papAssetPhoto('${a.id}')">Open ${esc(a.photo_name)}</button></div>` : ""}<input class="in" id="as-file" type="file" accept="image/*,application/pdf"></div>
+    ${inp("as-note", "Note", a.note)}
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn primary" style="flex:1" onclick="papSaveAsset()" ${papBusy ? "disabled" : ""}>${papBusy ? "Saving…" : "Save"}</button>${id && role() === "master" ? `<button class="btn ghost danger" onclick="papDeleteAsset('${id}')">Delete</button>` : ""}${close}</div>`;
+}
+async function papSaveAsset() {
+  const { loc, id } = papSheet, el = document.getElementById("as-file"), file = el && el.files && el.files[0];
+  const rec = { location: loc, name: papV("as-name"), kind: papV("as-kind") || null, condition: papV("as-cond") || "good", brand: papV("as-brand") || null, serial: papV("as-serial") || null,
+    received_on: papV("as-rec") || null, cost: papNum("as-cost"), next_check: papV("as-next") || null, check_what: papV("as-what") || null, note: papV("as-note") || null,
+    updated: new Date().toISOString(), by_email: window.DB_USER || null };
+  if (rec.name.length < 2) return toast("Name the asset.");
+  if (rec.cost != null && !(rec.cost >= 0)) return toast("Cost: numbers only.");
+  if (file && file.size > 15e6) return toast("The file is too big (15 MB at most).");
+  papBusy = true; render();
+  if (file) {
+    const path = `${loc}/asset/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, "_")}`;
+    if (!papDev()) { const up = await sb.storage.from("papers").upload(path, file, { contentType: file.type || undefined }); if (up.error) { papBusy = false; toast("Upload failed: " + up.error.message); return render(); } }
+    rec.photo_path = path; rec.photo_name = file.name;
+  }
+  const r = await papWrite("asset", rec, id || null); papBusy = false;
+  if (r.error) { toast("Not saved: " + r.error.message); return render(); }
+  PAP.assets = [r.data].concat(PAP.assets.filter(a => a.id !== r.data.id)); papSheet = null; toast("Asset saved."); render();
+}
+async function papDeleteAsset(id) {
+  if (!confirm("Delete this asset? To keep its history, set the condition to Gone instead.")) return;
+  if (!papDev()) { const r = await sb.from("asset").delete().eq("id", id); if (r.error) return toast("Not deleted: " + r.error.message); }
+  PAP.assets = PAP.assets.filter(a => a.id !== id); papSheet = null; toast("Asset deleted."); render();
+}
+async function papAssetPhoto(id) {
+  const a = PAP.assets.find(x => x.id === id); if (!a || !a.photo_path) return;
+  if (papDev()) return toast("Files open on the live app only.");
+  const w = window.open("", "_blank");
+  const r = await sb.storage.from("papers").createSignedUrl(a.photo_path, 300);
   if (r.error) { if (w) w.close(); return toast("Could not open: " + r.error.message); }
   if (w) w.location = r.data.signedUrl; else location.href = r.data.signedUrl;
 }

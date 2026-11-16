@@ -168,7 +168,7 @@ function skPriceUnitSection(it) {
    Owners and the Admin officer. Items save through os_save_item (one store: the one recorded into); the catalogue reloads after each save.
    Other names (supplier_alias) are the long names on the expense sheets and invoices that mean this supplier. Online only. */
 const itEditOK = () => role() === "master" || (typeof officerLogin === "function" && officerLogin());
-const IT_CATS = ["Vegetable & fruit", "Meat & fish", "Cheese", "Dairy & eggs", "Ice cream", "Dry & baking", "Canned & jar", "Sauce & oil", "Drink", "Packaging", "Cleaning", "Gas", "Prep (made here)"];
+const IT_CATS = ["Vegetable & fruit", "Meat & fish", "Cheese", "Dairy & eggs", "Ice cream", "Dry & baking", "Canned & jar", "Sauce & oil", "Drink", "Packaging", "Cleaning", "Tools & equipment", "Gas", "Prep (made here)"];
 /* v0.24 (Stefan, 16 Nov: "We need to be able to measure everything"; migration 047): three plain questions.
    Measured in (g, ml, pc — what recipes and usage use) · Counted as (the container on the shelf) and what one holds · Bought as and how many. */
 const IT_MEASURE = [["g", "grams (g)"], ["ml", "millilitres (ml)"], ["pc", "pieces (pc) — also slices"]];
