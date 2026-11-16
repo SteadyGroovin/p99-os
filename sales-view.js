@@ -187,8 +187,10 @@ function pickRange(k) {
 function viewSales() {
   if (!salesDay || !SD[salesDay]) salesDay = LAST_DAY;
   const tabs = `<div class="seg tabs2"><button class="btn ${salesTab === "overview" ? "on" : ""}" onclick="salesTab='overview';render()">Overview</button><button class="btn ${salesTab === "txns" ? "on" : ""}" onclick="salesTab='txns';render()">Transactions</button><button class="btn ${salesTab === "run" ? "on" : ""}" onclick="salesTab='run';render()">Morning run</button></div>`;
-  if (salesTab === "txns") return viewTxns(tabs);
   if (salesTab === "run") return viewRuns(tabs);
+  /* v0.26.2 (Stefan, 16 Nov: "the sales tab doesn't work"): a store with no till feed (only Pizza 99 is connected) crashed the page; say so instead */
+  if (!SDAYS.length) return shell("Sales", esc(curStore()), `${tabs}<section class="card"><h2>No till sales for ${esc(curStore())} yet</h2><div class="small mut" style="margin:6px 0 12px">Only the Pizza 99 till is connected so far. Switch the store to see its sales.</div><button class="btn primary full" onclick="stSheet=JSON.parse(JSON.stringify(storeCfg()));render()">Change store</button></section>`);
+  if (salesTab === "txns") return viewTxns(tabs);
   return salesRange === "day" ? viewSalesDay(tabs) : viewSalesRange(tabs);
 }
 function viewSalesRange(tabs) {
