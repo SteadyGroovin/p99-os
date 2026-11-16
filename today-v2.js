@@ -50,7 +50,7 @@ function viewTodayLead() {
     + `<section class="card"><h2>Tasks</h2><div class="list">${list || '<div class="mut small">No open tasks.</div>'}</div><div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">${go2("All tasks", "#/tasks")}${go2("Count", "#/count")}${go2("Receive", "#/receive")}${go2("Order", "#/order")}</div></section>`);
 }
 function viewToday() {
-  if (role() === "lead" && typeof sb !== "undefined") return viewTodayLead();
+  if ((role() === "lead" || role() === "officer") && typeof sb !== "undefined") return viewTodayLead();   /* v0.23: the admin officer gets the same working home */
   if (role() !== "master" && typeof sb !== "undefined") return viewTodayStore();
   if (role() === "crew") return viewToday_v1();
   const d = today(), yd = bizYesterday(), y = SD[yd], p = me();

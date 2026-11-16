@@ -436,6 +436,7 @@ function render() {
     case "recipes": html = viewRecipes(); break;            /* v0.16: recipe editor */
     case "recipe": html = viewRecipe(seg[1]); break;
     case "password": html = viewPassword(); break;
+    case "papers": html = viewPapers(seg[1]); break;      /* v0.23: permits, lease and rent per place (papers-v2.js) */
     default: html = role() === "walk" ? viewWalk() : viewToday();
   }
   if ((seg[0] || "today") === "today" && typeof homeStripHTML === "function") html = html.replace('<main class="wrap">', '<main class="wrap">' + homeStripHTML());   /* v0.17: Home = quick actions + what needs attention, then the day */
