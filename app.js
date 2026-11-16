@@ -13,7 +13,7 @@ const dayName = d => new Date(d + "T00:00:00").toLocaleDateString("en-PH", { wee
 const dayLong = d => new Date(d + "T00:00:00").toLocaleDateString("en-PH", { weekday: "long", day: "numeric", month: "long" });
 const timeOf = iso => iso ? iso.slice(11, 16) : "";
 const ageDays = iso => Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 86400000));
-const go = h => { if (location.hash === h) { if (typeof render === "function") render(); } else location.hash = h; };   /* same hash fires no hashchange, so draw it here */
+const go = h => { if (location.hash === h) { toggleNav(false); if (typeof render === "function") render(); } else location.hash = h; };   /* same hash fires no hashchange, so draw it here */
 const save = () => Store.save();
 let toastT = null;
 function toast(msg) { let t = $(".toast"); if (!t) { t = document.createElement("div"); t.className = "toast"; document.body.appendChild(t); } t.textContent = msg; clearTimeout(toastT); toastT = setTimeout(() => t.remove(), 2400); }
@@ -60,14 +60,16 @@ function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split(
 /* ---------- shell ---------- */
 function shell(title, sub, body, { back } = {}) {   /* v0.17: Home + three pinned modules + More (nav-v2.js) */
   const p = me(); const seg = (location.hash.slice(1) || "/today").split("/")[1] || "today";
+  const two = ["today", "item", "supplier"].includes(seg) ? " two" : "";   /* v0.26.0: detail pages in two columns on a wide screen (styles.css, layout block) */
   return `
+  <div class="navscrim" onclick="toggleNav(false)"></div>
   <nav class="sidebar"><div class="brand"><img class="rb-line rb-light" src="brand/rb-lockup-line-light.svg" alt="Rocket Boracay"><img class="rb-line rb-dark" src="brand/rb-lockup-line-dark.svg" alt="Rocket Boracay"></div>${sidebarHTML(seg)}</nav>
   <div class="page">
-    <header class="top">${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
+    <header class="top"><button class="navbtn" onclick="toggleNav()" aria-label="Menu"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
       ${storeChip()}<button class="me" onclick="go('#/settings')" aria-label="Settings"><span class="av">${p ? esc(p.short[0]) : "?"}</span></button>
     </header>
-    <main class="wrap">${body}</main>
+    <main class="wrap${two}">${body}</main>
   </div>
   <nav class="tabbar">${tabbarHTML(seg)}</nav>${storeSheetHTML()}`;
 }
@@ -439,12 +441,15 @@ function render() {
     case "papers": html = viewPapers(seg[1]); break;      /* v0.23: permits, lease and rent per place (papers-v2.js) */
     default: html = role() === "walk" ? viewWalk() : viewToday();
   }
-  if ((seg[0] || "today") === "today" && typeof homeStripHTML === "function") html = html.replace('<main class="wrap">', '<main class="wrap">' + homeStripHTML());   /* v0.17: Home = quick actions + what needs attention, then the day */
+  if ((seg[0] || "today") === "today" && typeof homeStripHTML === "function") html = html.replace(/<main class="wrap( two)?">/, m => m + homeStripHTML());   /* v0.26.0: the main tag may carry "two" */   /* v0.17: Home = quick actions + what needs attention, then the day */
   $("#app").innerHTML = html;
   if (render._h !== location.hash) { render._h = location.hash; window.scrollTo(0, 0); } /* a new page opens at the top; a re-render of the same page keeps its place */
   if (pad || cpad) { const s = $(".sheet"); if (s) s.scrollIntoView({ block: "end" }); }
 }
 window.addEventListener("hashchange", render);
+/* v0.26.0: on an iPad (700-1099 px) the menu is a drawer behind the button at the top left; a tap on a menu row navigates and closes it */
+function toggleNav(on) { document.body.classList.toggle("navopen", on === undefined ? !document.body.classList.contains("navopen") : on); }
+window.addEventListener("hashchange", () => toggleNav(false));
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) navigator.serviceWorker.register("sw.js").catch(() => {});
 render();
 if (typeof Sync !== "undefined" && Sync.hookPhoto) Sync.hookPhoto();

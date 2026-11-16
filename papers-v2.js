@@ -88,14 +88,14 @@ function viewPapers(loc) {
       <td class="nm">${esc(l.name)}<div class="sub2" style="white-space:normal;max-width:none">${esc(f.building || f.address || "no address yet")}</div></td><td class="h1 mut wrapc">${esc(f.address || "—")}${f.building ? `<div class="tiny">${esc(f.building)}</div>` : ""}</td>
       ${rentOK ? `<td class="n num">${papPeso(papRent(l.code).rent_month)}</td>` : ""}<td class="n num h1">${f.floor_m2 ? fmt(+f.floor_m2) + " m²" : "—"}</td>
       <td class="n">${s.missing ? chip("bad", s.missing) : chip("ok", 0)}</td><td class="n">${s.expired ? chip("bad", s.expired) : ""}${s.soon ? chip("warn", s.soon) : ""}${!s.expired && !s.soon ? `<span class="tiny mut">—</span>` : ""}</td>
-      <td class="n h1">${s.next ? papDate(s.next) : "—"}</td><td class="n mut" style="width:24px">›</td></tr>`).join("");
+      <td class="n h1">${s.next ? papDate(s.next) : "—"}</td><td class="n mut h7" style="width:24px">›</td></tr>`).join("");
   return shell("Papers", "permits, lease and rent per place", `
     <div class="grid2">${tile("Missing", tot.missing, `papers in ${sums.filter(([, s]) => s.missing).length} places`, tot.missing ? "band-bad" : "")}
       ${tile("Expiring", tot.soon + tot.expired, tot.expired ? `${tot.expired} already expired` : "within 60 days", tot.expired ? "band-bad" : "")}
       ${rentOK ? tile("Rent per month", peso(rentSum), `${rents.length} of ${locs.length} places known`) : tile("Leases", leases, "ending within 90 days")}
       ${tile("Places", locs.length, `${new Set(sums.map(([, , f]) => f.building).filter(Boolean)).size} shared buildings`)}</div>
     ${dueRows ? `<section class="card"><h2>Coming up</h2><div class="itwrap"><table class="itbl"><thead><tr><th>Paper</th><th class="h1">Place</th><th class="h1">Date</th><th class="n">When</th></tr></thead><tbody>${dueRows}</tbody></table></div></section>` : ""}
-    <section class="card"><h2>Places</h2><div class="itwrap"><table class="itbl"><thead><tr><th>Place</th><th class="h1">Address</th>${rentOK ? `<th class="n">Rent / month</th>` : ""}<th class="n h1">Area</th><th class="n">Missing</th><th class="n">Expiring</th><th class="n h1">Next date</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <section class="card"><h2>Places</h2><div class="itwrap"><table class="itbl"><thead><tr><th>Place</th><th class="h1">Address</th>${rentOK ? `<th class="n">Rent / month</th>` : ""}<th class="n h1">Area</th><th class="n">Missing</th><th class="n">Expiring</th><th class="n h1">Next date</th><th class="h7"></th></tr></thead><tbody>${rows}</tbody></table></div>
       <div class="tiny mut" style="margin-top:8px">Rent from the books where the lease is not in yet. Open a place to upload papers and fill in its facts.</div></section>`);
 }
 

@@ -69,7 +69,7 @@
 .mr-bar{z-index:4}
 .mr-barin{display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--surf); border:1px solid var(--line2); border-radius:var(--r-card); padding:8px 8px 8px 14px; box-shadow:0 4px 16px rgba(0,0,0,.12)}
 .mr-bt{display:grid; line-height:20px; font-size:15px} .mr-barin .btn{min-height:48px; flex:none}
-@media (min-width:900px){ .mr-bar{bottom:12px} }
+@media (min-width:700px){ .mr-bar{bottom:12px} }   /* v0.26.0: no bottom bar from 700 px */
 
 /* result */
 .mr-res h2{font-size:18px; line-height:26px}

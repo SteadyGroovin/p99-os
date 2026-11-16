@@ -97,3 +97,7 @@
   .tkadd-p{position:static; box-shadow:none; margin-top:6px}
   .tkbar select.in{min-width:0; flex:1 1 40%}
 }
+
+/* v0.26.0: iPad portrait — the board scrolls sideways, three columns in view, each wide enough to read; laptop and iPad landscape — all five fit */
+@media (min-width:700px) and (max-width:1099px){ .tkboard{grid-template-columns:repeat(5, 248px); scroll-snap-type:x mandatory} .tkcol{scroll-snap-align:start} }
+@media (min-width:1100px){ .tkboard{grid-template-columns:repeat(5, minmax(168px, 1fr))} }

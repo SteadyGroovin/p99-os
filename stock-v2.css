@@ -149,3 +149,6 @@
 /* v0.19.6 */
 .itbl td.sk-neg b{color:var(--bad)}
 @media (max-width:1320px){ .itbl .h5{display:none} }
+
+/* v0.26.0 phone: the row is the link, so the › column goes; headers may wrap and the name column gives a little, so Papers fits 390 px */
+@media (max-width:699px){ .itbl .h7{display:none} .itbl th{white-space:normal; line-height:14px} .itbl td.nm{min-width:120px} }

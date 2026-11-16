@@ -165,8 +165,9 @@ textarea.in{padding:10px 12px; min-height:80px; resize:vertical; line-height:24p
 .sidebar button.on{background:var(--n100); color:var(--ink)}
 :root[data-theme="dark"] .sidebar button.on{background:var(--n800)}
 .sidebar .brand{font-family:var(--fd); font-size:17px; font-weight:600; padding:4px 12px 16px; display:flex; align-items:center; gap:10px}
-@media (min-width:900px){ .tabbar{display:none} body{padding-bottom:24px} .sidebar{display:flex} } /* after .sidebar{display:none} so the wide-screen rule wins */
-@media (min-width:900px){ .page{margin-left:240px} }
+@media (min-width:700px){ .tabbar{display:none} body{padding-bottom:24px} }   /* v0.26.0: no bottom bar from iPad size up; the menu is a drawer (700-1099) or the sidebar (1100+) */
+@media (min-width:1100px){ .sidebar{display:flex} } /* after .sidebar{display:none} so the wide-screen rule wins */
+@media (min-width:1100px){ .page{margin-left:240px} }
 
 /* who */
 .who{min-height:100dvh; display:grid; place-items:center; padding:24px}
@@ -383,7 +384,7 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .storechip small{color:var(--mut); font-weight:600}
 .fab{position:fixed; right:16px; bottom:calc(var(--tab) + env(safe-area-inset-bottom) + 14px); width:52px; height:52px; border-radius:50%; border:0; background:var(--p99); color:var(--on-accent); font-size:28px; line-height:1; box-shadow:0 6px 18px rgba(0,0,0,.22); z-index:11}
 .sheet.stsheet .row{gap:8px}
-@media (min-width:900px){ .fab{bottom:24px; right:24px} }
+@media (min-width:700px){ .fab{bottom:24px; right:24px} }
 
 /* v0.17 Home: quick actions + attention cards; sidebar groups */
 .qa h3{margin:0 0 8px}
@@ -417,8 +418,8 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 .rb-logo{display:block; margin:0 auto 10px; width:168px; max-width:60%}   /* v0.19.1: stacked lockup, symmetric, so it centres (the side lockup looked off-centre) */
 .rb-dark{display:none} :root[data-theme="dark"] .rb-light{display:none} :root[data-theme="dark"] .rb-dark{display:block}
 
-/* v0.19.5 (Stefan, 2026-11-13: "the navigation takes too much from the screen"): the left menu at 156 px instead of 240, tighter rows */
-@media (min-width:900px){
+/* v0.19.5 (Stefan, 2026-11-13: "the navigation takes too much from the screen"): the left menu at 156 px instead of 240, tighter rows. v0.26.0: from 1100 px (below that it is the drawer) */
+@media (min-width:1100px){
   .sidebar{width:156px; padding:12px 8px 24px; gap:1px}
   .page{margin-left:156px}
   .sidebar button{padding:5px 8px; gap:8px; font-size:13px; line-height:20px; font-weight:500}
@@ -438,3 +439,43 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
   .top .back{width:32px; height:32px}
   .top .storechip, .top .me{transform:scale(.85); transform-origin:right center}
 }
+
+/* ===================================================================================================================
+   v0.26.0 (Stefan, 2026-11-16: the iPad layout is "not so cool") — one layout, three sizes:
+   phone  < 700    bottom bar, one column (unchanged)
+   iPad   700-1099 no bottom bar; the full menu is a drawer behind the button at the top left; content uses the whole width
+   laptop 1100+    the sidebar stays; content up to 1240 px; Today, item and supplier pages in two columns (.wrap.two)
+   An iPad in landscape (1180) is the laptop layout; with a finger (pointer:coarse) the menu rows are taller.
+   =================================================================================================================== */
+.navbtn{display:none; width:40px; height:40px; flex:none; border-radius:var(--r-ctl); border:1px solid var(--line2); background:var(--surf); box-shadow:var(--shadow-xs); place-items:center; color:var(--ink2); padding:0}
+.navscrim{display:none}
+@media (min-width:700px) and (max-width:1099px){
+  .navbtn{display:grid}
+  .sidebar{display:flex; width:272px; z-index:40; transform:translateX(-100%); transition:transform .22s ease; box-shadow:none; padding:16px 12px 28px}
+  .sidebar button{padding:10px 12px; font-size:16px; line-height:24px; min-height:44px}
+  .sidebar .sgroup{padding:14px 12px 4px}
+  body.navopen .sidebar{transform:none; box-shadow:0 12px 40px rgba(0,0,0,.25)}
+  body.navopen .navscrim{display:block; position:fixed; inset:0; background:rgba(11,12,16,.35); z-index:39}
+  .top{padding:10px 24px}
+  .wrap{padding:16px 24px 24px; gap:12px}
+  .toast{bottom:24px}
+}
+@media (min-width:700px){ .bottom-act{bottom:8px} }
+@media (min-width:1100px) and (pointer:coarse){
+  .sidebar{width:184px} .page{margin-left:184px}
+  .sidebar button{padding:9px 10px; font-size:14px; line-height:20px; min-height:38px}
+  .rb-line{width:150px}
+}
+@media (min-width:1100px){ .wrap{max-width:1240px} }
+/* two columns: the page's header pieces span the width, the cards below flow into two balanced columns (no row gaps) */
+@media (min-width:800px){
+  .wrap.two{display:block; columns:2; column-gap:12px}
+  .wrap.two > *{break-inside:avoid; margin:0 0 12px; column-span:all}
+  .wrap.two > section.card:not(.qa):not(.hero2){column-span:none; display:block}
+}
+/* the joined number strip: hairlines drawn by each cell, so a short last row leaves white, not a grey block */
+.wrap .grid2{gap:0; background:var(--surf)}
+.wrap .grid2 > .card, .wrap .grid2 > section{border-left:1px solid var(--line); border-top:1px solid var(--line); margin:-1px 0 0 -1px}   /* each cell draws its left and top line; the first column and row lines fall outside and are clipped */
+@media (min-width:900px){ .wrap .grid2{grid-template-columns:repeat(auto-fit, minmax(140px, 1fr))} }
+/* iPad portrait: the Order soon table drops Category (Supplier stays) so Status fits */
+@media (max-width:899px){ .itbl .h6{display:none} }
