@@ -27,7 +27,7 @@ async function papLoad(force) {
 }
 
 /* ---------- status ---------- */
-const PAP_ORDER = ["P99", "MCC", "DC", "MCBC", "BK", "HO", "STO"];
+const PAP_ORDER = ["P99", "MCC", "DC", "STO", "MCBC", "BK", "DH", "HO", "OK", "SP"];   /* places in one building sit together (037) */
 const papLocs = () => PAP.locs.filter(l => ["store", "office", "storage"].includes(l.kind)).sort((a, b) => (PAP_ORDER.indexOf(a.code) + 99) % 99 - (PAP_ORDER.indexOf(b.code) + 99) % 99);
 const papLocName = c => ((PAP.locs.find(l => l.code === c) || {}).name) || c;
 const papDays = d => d ? Math.round((new Date(d + "T00:00:00") - new Date(today() + "T00:00:00")) / 864e5) : null;
@@ -57,6 +57,7 @@ function papSummary(loc) {
   const f = PAP.facts[loc] || {}; [f.lease_end, f.renewal_day].filter(Boolean).forEach(d => { if (!out.next || d < out.next) out.next = d; });
   return out;
 }
+const papMates = loc => { const b = (PAP.facts[loc] || {}).building; const m = b ? Object.values(PAP.facts).filter(f => f.building === b && f.location !== loc).map(f => papLocName(f.location)) : []; return m.length ? `<div class="tiny mut">with ${m.map(esc).join(", ")} · rent kept apart</div>` : ""; };
 const papPeso = v => v == null || v === "" ? "—" : peso(+v);
 
 /* ---------- the overview ---------- */
@@ -78,7 +79,7 @@ function viewPapers(loc) {
   const dueRows = due.map(([d, l, t, p]) => { const n = papDays(d);
     return `<tr onclick="go('#/papers/${l.code}')"><td class="nm">${esc(t.name)}${p && p.label ? ` <small>${esc(p.label)}</small>` : ""}<div class="sub2" style="white-space:normal;max-width:none">${esc(l.name)} · ${papDate(d)}</div></td><td class="h1">${esc(l.name)}</td><td class="h1">${papDate(d)}</td><td class="n">${n < 0 ? chip("bad", `${-n} d ago`) : chip("warn", `in ${n} d`)}</td></tr>`; }).join("");
   const rows = sums.map(([l, s, f]) => `<tr onclick="go('#/papers/${l.code}')" tabindex="0" onkeydown="if(event.key==='Enter')go('#/papers/${l.code}')">
-      <td class="nm">${esc(l.name)}<div class="sub2" style="white-space:normal;max-width:none">${esc(f.address || "no address yet")}</div></td><td class="h1 mut wrapc">${esc(f.address || "—")}</td>
+      <td class="nm">${esc(l.name)}<div class="sub2" style="white-space:normal;max-width:none">${esc(f.building || f.address || "no address yet")}</div></td><td class="h1 mut wrapc">${esc(f.address || "—")}${f.building ? `<div class="tiny">${esc(f.building)}</div>` : ""}</td>
       <td class="n num">${papPeso(f.rent_month)}</td><td class="n num h1">${f.floor_m2 ? fmt(+f.floor_m2) + " m²" : "—"}</td>
       <td class="n">${s.missing ? chip("bad", s.missing) : chip("ok", 0)}</td><td class="n">${s.expired ? chip("bad", s.expired) : ""}${s.soon ? chip("warn", s.soon) : ""}${!s.expired && !s.soon ? `<span class="tiny mut">—</span>` : ""}</td>
       <td class="n h1">${s.next ? papDate(s.next) : "—"}</td><td class="n mut" style="width:24px">›</td></tr>`).join("");
@@ -86,7 +87,7 @@ function viewPapers(loc) {
     <div class="grid2">${tile("Missing", tot.missing, `papers in ${sums.filter(([, s]) => s.missing).length} places`, tot.missing ? "band-bad" : "")}
       ${tile("Expiring", tot.soon + tot.expired, tot.expired ? `${tot.expired} already expired` : "within 60 days", tot.expired ? "band-bad" : "")}
       ${tile("Rent per month", peso(rentSum), `${rents.length} of ${locs.length} places known`)}
-      ${tile("Places", locs.length, "stores, office, storage")}</div>
+      ${tile("Places", locs.length, `${new Set(sums.map(([, , f]) => f.building).filter(Boolean)).size} shared buildings`)}</div>
     ${dueRows ? `<section class="card"><h2>Coming up</h2><div class="itwrap"><table class="itbl"><thead><tr><th>Paper</th><th class="h1">Place</th><th class="h1">Date</th><th class="n">When</th></tr></thead><tbody>${dueRows}</tbody></table></div></section>` : ""}
     <section class="card"><h2>Places</h2><div class="itwrap"><table class="itbl"><thead><tr><th>Place</th><th class="h1">Address</th><th class="n">Rent / month</th><th class="n h1">Area</th><th class="n">Missing</th><th class="n">Expiring</th><th class="n h1">Next date</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
       <div class="tiny mut" style="margin-top:8px">Rent from the books where the lease is not in yet. Open a place to upload papers and fill in its facts.</div></section>`);
@@ -99,7 +100,7 @@ function viewPaperPlace(loc) {
   const fact = (lab, val) => `<tr><td style="font-weight:500;color:var(--mut);width:34%">${lab}</td><td style="white-space:normal">${val}</td></tr>`;
   const leaseN = papDays(f.lease_end);
   const facts = `<table class="itbl"><tbody>
-    ${fact("Address", esc(f.address || "—"))}${fact("Floor area", f.floor_m2 ? fmt(+f.floor_m2) + " m²" : "—")}${fact("Landlord", esc(f.landlord || "—"))}
+    ${fact("Address", esc(f.address || "—"))}${f.building ? fact("Building", esc(f.building) + papMates(loc)) : ""}${fact("Floor area", f.floor_m2 ? fmt(+f.floor_m2) + " m²" : "—")}${fact("Landlord", esc(f.landlord || "—"))}
     ${fact("Rent / month", `<b class="num">${papPeso(f.rent_month)}</b>${f.rent_note ? `<div class="tiny mut" style="white-space:normal">${esc(f.rent_note)}</div>` : ""}`)}${fact("Deposit", `<span class="num">${papPeso(f.deposit)}</span>`)}
     ${fact("Lease", f.lease_start || f.lease_end ? `${papDate(f.lease_start) || "?"} – ${papDate(f.lease_end) || "?"}${leaseN != null && leaseN <= 90 ? " " + (leaseN < 0 ? chip("bad", "ended") : chip("warn", `ends in ${leaseN} d`)) : ""}` : "—")}
     ${fact("Renewal", f.renewal_day ? papDate(f.renewal_day) : "—")}${f.note ? fact("Note", esc(f.note)) : ""}</tbody></table>`;
@@ -126,7 +127,7 @@ function papSheetHTML() {
   if (papSheet.kind === "facts") {
     const f = PAP.facts[papSheet.loc] || {};
     body = `<h2>${esc(papLocName(papSheet.loc))}</h2>
-      ${inp("pf-ad", "Address", f.address)}<div class="grid2" style="grid-template-columns:1fr 1fr">${inp("pf-m2", "Floor area (m²)", f.floor_m2, "text", 'inputmode="decimal"')}${inp("pf-ll", "Landlord", f.landlord)}
+      ${inp("pf-ad", "Address", f.address)}${inp("pf-bld", "Building (places that share one get the same name)", f.building)}<div class="grid2" style="grid-template-columns:1fr 1fr">${inp("pf-m2", "Floor area (m²)", f.floor_m2, "text", 'inputmode="decimal"')}${inp("pf-ll", "Landlord", f.landlord)}
       ${inp("pf-rent", "Rent per month (₱)", f.rent_month, "text", 'inputmode="decimal"')}${inp("pf-dep", "Deposit (₱)", f.deposit, "text", 'inputmode="decimal"')}
       ${inp("pf-ls", "Lease start", f.lease_start, "date")}${inp("pf-le", "Lease end", f.lease_end, "date")}${inp("pf-rn", "Renewal date", f.renewal_day, "date")}</div>
       ${inp("pf-rnote", "Rent note", f.rent_note)}${inp("pf-note", "Note", f.note)}
@@ -158,7 +159,7 @@ async function papWrite(table, rec, id) {   /* one row straight to the database 
   return await q;
 }
 async function papSaveFacts() {
-  const loc = papSheet.loc, rec = { location: loc, address: papV("pf-ad") || null, floor_m2: papNum("pf-m2"), landlord: papV("pf-ll") || null, rent_month: papNum("pf-rent"), deposit: papNum("pf-dep"),
+  const loc = papSheet.loc, rec = { location: loc, address: papV("pf-ad") || null, building: papV("pf-bld") || null, floor_m2: papNum("pf-m2"), landlord: papV("pf-ll") || null, rent_month: papNum("pf-rent"), deposit: papNum("pf-dep"),
     lease_start: papV("pf-ls") || null, lease_end: papV("pf-le") || null, renewal_day: papV("pf-rn") || null, rent_note: papV("pf-rnote") || null, note: papV("pf-note") || null,
     updated: new Date().toISOString(), by_email: window.DB_USER || null };
   if ([rec.floor_m2, rec.rent_month, rec.deposit].some(v => v != null && !(v >= 0))) return toast("Numbers only for area, rent and deposit.");
