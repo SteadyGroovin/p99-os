@@ -123,7 +123,8 @@ function storeChip() {
 }
 function storeSheetHTML() {
   if (!stSheet) return "";
-  const all = (S.locations || []).filter(l => l.kind === "store" && l.active !== false);
+  /* v0.23.6 (migration 046): D'Mall Storage and Head Office have their own stock lists; the owners, the office and the Admin officer can record into them */
+  const all = (S.locations || []).filter(l => l.active !== false && (l.kind === "store" || (role() !== "lead" && ["storage", "office"].includes(l.kind))));
   return `<div class="sheet-bg" onclick="if(event.target===this){stSheet=null;render()}"><div class="sheet stsheet"><h2>Stores</h2>
     <div class="tiny mut" style="margin-bottom:8px">Tick the stores to include. Pick one to record into.</div>
     <div class="list">${all.map(l => { const on = stSheet.on.includes(l.code); return `<div class="row"><label style="display:flex;gap:10px;align-items:center;flex:1"><input type="checkbox" ${on ? "checked" : ""} onchange="stTick('${l.code}',this.checked)" style="width:22px;height:22px"><span class="main"><span class="name">${esc(l.name)}</span><span class="meta"> ${esc(l.code)}</span></span></label>

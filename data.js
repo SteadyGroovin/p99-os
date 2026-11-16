@@ -99,7 +99,7 @@ const RECEIPT_KINDS = [["delivery", "Delivery"], ["purchase", "Bought with cash"
 const PAY_SOURCES = [["store_fund", "Store cash"], ["office_fund", "Office fund"], ["vault", "Vault"], ["gcash", "GCash"], ["stefan", "Stefan"], ["mike", "Mike"], ["bank", "Bank"]];
 let SUPPLIER_INFO = {}, REORDER = [], ORDERS = [], MONEY = [], OS_SETTINGS = {}, PRICES = [];
 function dbCatalogue(L) {
-  if (!L || L.dev || !Array.isArray(L.items) || !L.items.length) return false;
+  if (!L || L.dev || !Array.isArray(L.items)) return false;   /* v0.23.6: a real store with no items yet (Head Office) shows an empty list, never the sample one */
   const n = v => v == null || v === "" ? null : +v;
   const places = (L.places || []).map(p => ({ id: p.name, name: p.name }));
   if (places.length) PLACES.splice(0, PLACES.length, ...places);
