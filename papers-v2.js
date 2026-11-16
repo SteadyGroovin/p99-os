@@ -127,7 +127,7 @@ function papSheetHTML() {
   if (papSheet.kind === "facts") {
     const f = PAP.facts[papSheet.loc] || {};
     body = `<h2>${esc(papLocName(papSheet.loc))}</h2>
-      ${inp("pf-ad", "Address", f.address)}${inp("pf-bld", "Building (places that share one get the same name)", f.building)}<div class="grid2" style="grid-template-columns:1fr 1fr">${inp("pf-m2", "Floor area (m²)", f.floor_m2, "text", 'inputmode="decimal"')}${inp("pf-ll", "Landlord", f.landlord)}
+      ${inp("pf-ad", "Address", f.address)}${inp("pf-bld", "Building (places that share one get the same name)", f.building)}<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">${inp("pf-m2", "Floor area (m²)", f.floor_m2, "text", 'inputmode="decimal"')}${inp("pf-ll", "Landlord", f.landlord)}
       ${inp("pf-rent", "Rent per month (₱)", f.rent_month, "text", 'inputmode="decimal"')}${inp("pf-dep", "Deposit (₱)", f.deposit, "text", 'inputmode="decimal"')}
       ${inp("pf-ls", "Lease start", f.lease_start, "date")}${inp("pf-le", "Lease end", f.lease_end, "date")}${inp("pf-rn", "Renewal date", f.renewal_day, "date")}</div>
       ${inp("pf-rnote", "Rent note", f.rent_note)}${inp("pf-note", "Note", f.note)}
@@ -140,7 +140,7 @@ function papSheetHTML() {
     const list = t.many ? `<div class="list" style="margin-bottom:8px">${rows.map(r => `<button class="row tap" onclick="papEdit('${r.id}')"><div class="main"><div class="name">${esc(r.label || "—")}</div><div class="meta">${r.expires ? "expires " + papDate(r.expires) : "no expiry date"}${r.file_name ? " · file" : " · no file"}</div></div>${papChip(papRowState(r))}</button>`).join("") || `<div class="mut small">None yet.</div>`}</div>
       ${!p ? `<button class="btn full" onclick="papEdit('new')">Add ${t.code === "health" ? "a staff member" : "one"}</button>` : ""}` : "";
     const form = p ? `${inp("pp-lab", t.code === "health" ? "Staff member" : t.code === "extinguisher" ? "Unit (where it hangs)" : "Number on the paper", p.label)}
-      <div class="grid2" style="grid-template-columns:1fr 1fr">${inp("pp-iss", "Issued", p.issued, "date")}${inp("pp-exp", "Expires", p.expires, "date")}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">${inp("pp-iss", "Issued", p.issued, "date")}${inp("pp-exp", "Expires", p.expires, "date")}</div>
       <div class="field"><label for="pp-file">File (photo or PDF)</label>${p.file_name ? `<div class="small" style="margin-bottom:6px"><button class="btn sm" onclick="papView('${p.id}')">Open ${esc(p.file_name)}</button></div>` : ""}<input class="in" id="pp-file" type="file" accept="image/*,application/pdf"></div>
       ${inp("pp-note", "Note", p.note)}
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn primary" style="flex:1" onclick="papSavePaper('${p.id || ""}')" ${papBusy ? "disabled" : ""}>${papBusy ? "Saving…" : "Save"}</button>${p.id && t.many ? `<button class="btn ghost" onclick="papDelete('${p.id}')">Remove</button>` : ""}${close}</div>` : `<div style="display:flex;gap:8px;margin-top:12px">${close}</div>`;

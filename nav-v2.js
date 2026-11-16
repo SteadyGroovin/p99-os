@@ -33,7 +33,7 @@ const moduleOf = seg => SEG_MODULE[seg] || seg;
 const modsFor = () => MODULES.filter(m => canOpen(m[0]));
 const SETUP = MODULES.filter(m => ["users", "stores", "rules"].includes(m[0]))   /* v0.19.6: nothing that is already in the menu (Stefan: "that also shouldn't be double") */.map(m => [m[1], m[2], ({ users: "who has which login and what they see", stores: "where stock is sent and received", suppliers: "terms, delivery days, what we buy, prices", recipes: "what each pizza, slice and batch uses", sizes: "how much is inside a can, pack or box", accounts: "expense categories, as in the accounting book", books: "what each fund held, lock a finished month", rules: "₱ limit for Mike's approval, safety days" })[m[0]]]);
 const PIN_KEY = "rocketos_pins";
-const PIN_DEFAULT = { master: ["sales", "stock", "money"], finance: ["receive", "bills", "money"], admin: ["bills", "money", "tasks"], officer: ["stock", "order", "tasks"], lead: ["tasks", "count", "order"], walk: ["tasks", "report", "receive"], crew: ["count", "receive", "clean"] };
+const PIN_DEFAULT = { master: ["sales", "stock", "money"], finance: ["receive", "bills", "money"], admin: ["bills", "money", "tasks"], officer: ["walk", "stock", "tasks"], lead: ["tasks", "count", "order"], walk: ["tasks", "report", "receive"], crew: ["count", "receive", "clean"] };
 function pins() {
   let p = null; try { p = JSON.parse(localStorage.getItem(PIN_KEY) || "null"); } catch (e) { }
   const r = financeLogin() ? "finance" : officeLogin() ? "admin" : officerLogin() ? "officer" : role(); const ok = modsFor().map(m => m[0]);
@@ -50,8 +50,8 @@ const modShort = id => modLabel(id);   /* Stefan: short names everywhere */
 function canOpen(s0) {
   const r = role(), adm = officeLogin(), fin = financeLogin(), m = r === "master";
   /* v0.22 (Stefan, 15 Nov, Burger Kong access for Cath): the store lead sees tasks, inventory (stock, count, receive) and ordering for her own store */
-  /* v0.23 (Stefan, 15 Nov: Hannah gets inventory, buying and the team): every store and D'Mall Storage, the all-stores stock, Papers. Not money, sales, approving or roles */
-  if (r === "officer") return ["", "today", "stock", "stock-all", "count", "receive", "receipts", "transfers", "transfer", "variance", "items", "item", "sizes", "order", "suppliers", "supplier", "tasks", "task", "report", "clean", "papers", "more", "settings", "who", "password", "modules"].includes(s0);
+  /* v0.23 (Stefan, 15 Nov: Hannah gets inventory, buying and the team): every store and D'Mall Storage, the all-stores stock, Papers. v0.23.2 (16 Nov): plus the morning run and the cash count (migration 040). Not sales, funds, bills, approving or roles */
+  if (r === "officer") return ["", "today", "walk", "cash", "stock", "stock-all", "count", "receive", "receipts", "transfers", "transfer", "variance", "items", "item", "sizes", "order", "suppliers", "supplier", "tasks", "task", "report", "clean", "papers", "more", "settings", "who", "password", "modules"].includes(s0);
   if (s0 === "papers") return m || adm;   /* the office (admin, finance) and the owners */
   if (r === "lead") return ["", "today", "tasks", "task", "stock", "count", "receive", "receipts", "items", "item", "order", "sizes", "suppliers", "supplier", "more", "settings", "who", "password", "modules"].includes(s0);
   if (["sales", "finance", "approve", "users", "rules"].includes(s0)) return m;
@@ -152,7 +152,7 @@ function viewSettings() {   /* v0.19.6: the whole settings section, reached from
 
 /* ---------- Users & roles (owners) ---------- */
 let MEMBERS = (window.OS_LOADED && window.OS_LOADED.members) || [];
-const ROLE_INFO = [["master", "Owner", "everything"], ["finance", "Finance", "morning run, receiving, purchases, bills, funds, ordering, suppliers, cash count, papers"], ["admin", "Office", "money, bills, stores, suppliers, recipes, tasks, papers"], ["officer", "Admin officer", "stock, counts, transfers, receiving, ordering, suppliers, tasks, papers, every store"], ["walk", "Morning run / HR", "the morning run, tasks, tickets, receiving at Head Office"],
+const ROLE_INFO = [["master", "Owner", "everything"], ["finance", "Finance", "morning run, receiving, purchases, bills, funds, ordering, suppliers, cash count, papers"], ["admin", "Office", "money, bills, stores, suppliers, recipes, tasks, papers"], ["officer", "Admin officer", "morning run, cash count, stock, counts, transfers, receiving, ordering, items and suppliers (edit), own tasks, papers, every store"], ["walk", "Morning run / HR", "the morning run, tasks, tickets, receiving at Head Office"],
   ["lead", "Store lead", "stock, ordering, recipes, cash count, tasks"], ["crew", "Crew", "count, receive, clean, tickets"], ["maint", "Maintenance", "tickets"]];
 function viewUsers() {
   if (role() !== "master") return shell("Users & roles", "", `<div class="alert info">For the owners only.</div>`, { back: "#/settings" });

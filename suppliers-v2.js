@@ -4,7 +4,7 @@
    (name, phone), which stays "to complete" until the office fills in terms and delivery days. Prices and money are for the office and owners. */
 
 const supMoney = () => moneyOK();
-const supOffice = () => moneyOK();
+const supOffice = () => moneyOK() || (typeof officerLogin === "function" && officerLogin());   /* v0.23.2: the Admin officer edits suppliers too (migration 041) */
 const supEnc = s => encodeURIComponent(s);
 let supNew = null, supEdit = null, locNew = null;
 
@@ -110,7 +110,7 @@ function viewSupplier(enc) {
   const deliveries = `<section class="card"><h2>Deliveries <span class="tiny mut">${st.recs.length} in the app</span></h2>
     <div class="small">${st.received.length} order${st.received.length === 1 ? "" : "s"} received${st.received.length ? `, ${st.short.length} came short` : ""}.</div>
     ${st.recs.length ? `<div class="list" style="margin-top:8px">${st.recs.slice(0, 8).map(r => `<div class="row"><div class="main"><div class="name">${esc(dayName(r.day))}${r.invoice ? ` · ${esc(r.invoice)}` : ""}</div><div class="meta">${r.lines.map(l => `${fmt(l.qty)} ${esc((Store.item(l.item) || {}).unit || "")} ${esc((Store.item(l.item) || { name: l.item }).name)}`).join(" · ")}</div></div></div>`).join("")}</div>` : ""}</section>`;
-  return shell(name, i.offers || "supplier", `${facts}${form}${typeof grpDeliversCard === "function" ? grpDeliversCard(name) : ""}${money}<section class="card"><h2>What we buy <span class="tiny mut">${Object.keys(st.items).length}</span></h2>${itemRows ? `<div class="list">${itemRows}</div>` : `<div class="mut small">No items linked yet.</div>`}</section>${deliveries}`, { back: "#/suppliers" });
+  return shell(name, i.offers || "supplier", `${facts}${form}${salCard(name)}${typeof grpDeliversCard === "function" ? grpDeliversCard(name) : ""}${money}<section class="card"><h2>What we buy <span class="tiny mut">${Object.keys(st.items).length}</span></h2>${itemRows ? `<div class="list">${itemRows}</div>` : `<div class="mut small">No items linked yet.</div>`}</section>${deliveries}`, { back: "#/suppliers" });
 }
 function supSaveEdit() {
   const e = supEdit; if (!e || (e.name || "").trim().length < 2) return toast("Name required.");
@@ -162,4 +162,87 @@ function skPriceUnitSection(it) {
     ${ps.length >= 2 ? skLineChart(ps.map(p => ({ x: p.day, y: p.p * U.f, sup: p.sup })), U.u) : ""}
     ${Object.keys(bySup).length > 1 ? `<div class="small" style="margin-top:6px">By supplier: ${Object.keys(bySup).map(s => `${esc(s)} ${skP(bySup[s].reduce((a, v) => a + v, 0) / bySup[s].length)}`).join(" · ")}</div>` : ""}
     ${skTable(["Day", `Price per ${U.u}`, "Supplier", "From"], ps.slice().reverse().map(p => [esc(dayName(p.day)), skP(p.p * U.f), esc(p.sup || ""), p.src === "app" ? "app" : "September books"]))}</section>`;
+}
+
+/* ---------- v0.23.2 (migration 041, Stefan 16 Nov: "Hannah needs to be able to edit items/suppliers"): add and edit items, other names of a supplier ----------
+   Owners and the Admin officer. Items save through os_save_item (one store: the one recorded into); the catalogue reloads after each save.
+   Other names (supplier_alias) are the long names on the expense sheets and invoices that mean this supplier. Online only. */
+const itEditOK = () => role() === "master" || (typeof officerLogin === "function" && officerLogin());
+const IT_CATS = ["Vegetable & fruit", "Meat & fish", "Cheese", "Dairy & eggs", "Ice cream", "Dry & baking", "Canned & jar", "Sauce & oil", "Drink", "Packaging", "Cleaning", "Gas", "Prep (made here)"];
+const IT_UNITS = ["pc", "g", "ml", "btl", "can", "pack", "box", "bag", "jar", "tub", "roll", "container", "sack", "tank", "gal", "pad"];
+let itSheet = null, itBusy = false;
+function itNewBtn() { return itEditOK() ? `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn sm" onclick="itOpen(null)">+ New item</button></div>${itSheetHTML()}` : ""; }
+function itEditBtn(it) { return itEditOK() ? `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn sm" onclick="itOpen('${esc(it.id)}')">Edit item</button></div>${itSheetHTML()}` : ""; }
+function itOpen(id) {
+  const it = id ? Store.item(id) : null;
+  const packed = it && it.unit && it.base && it.unit !== it.base;   /* counted in packs of base units (a case size, if any, is kept apart and not edited here) */
+  itSheet = it ? { code: it.id, name: it.name, category: IT_CATS.find(c => c.toLowerCase() === it.cat) || it.cat, place: it.place || "", unit: it.base || it.unit, pack_unit: packed ? it.unit : "", pack_qty: packed && it.per ? it.per : "",
+      par: it.par == null ? "" : it.par, supplier: it.supplier || "", brand: it.brand || "", nightly: !!it.nightly, active: true }
+    : { code: null, name: "", category: "", place: "", unit: "pc", pack_unit: "", pack_qty: "", par: "", supplier: "", brand: "", nightly: false, active: true };
+  render();
+}
+function itSheetHTML() {
+  if (!itSheet) return "";
+  const s = itSheet, opt = (list, v) => list.map(x => `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("");
+  const sel = (id, lab, list, v, blank) => `<div class="field"><label for="${id}">${lab}</label><select class="in" id="${id}">${blank ? `<option value="">${blank}</option>` : ""}${opt(list, v)}</select></div>`;
+  const inp = (id, lab, v, extra = "") => `<div class="field"><label for="${id}">${lab}</label><input class="in" id="${id}" value="${esc(v == null ? "" : v)}" ${extra}></div>`;
+  const cnt = s.pack_unit || s.unit;
+  return `<div class="sheet-bg" onclick="if(event.target===this){itSheet=null;render()}"><div class="sheet" style="max-height:90vh;overflow:auto">
+    <h2>${s.code ? "Edit item" : "New item"}</h2><div class="tiny mut" style="margin-bottom:10px">${esc(typeof skStoreName === "function" ? skStoreName() : curStore())}${s.code ? ` · code ${esc(s.code)}` : " · the code is made from the name"}</div>
+    ${inp("it-name", "Name", s.name)}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">${sel("it-cat", "Category", IT_CATS, s.category, "Pick one")}<div class="field"><label for="it-place">Place</label><select class="in" id="it-place"><option value="">No place yet</option>${PLACES.map(p => `<option value="${esc(p.id)}" ${p.id === s.place || p.name === s.place ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
+    ${sel("it-unit", "Smallest unit", IT_UNITS, s.unit)}${sel("it-sup", "Main supplier", SUPPLIERS.slice().sort(), s.supplier, "None")}
+    ${sel("it-pu", "Counted in packs of", IT_UNITS.filter(u => !["g", "ml"].includes(u)), s.pack_unit, "No, counted by the unit")}${inp("it-pq", "Units in one pack", s.pack_qty, 'inputmode="decimal"')}
+    ${inp("it-par", `Par (${esc(cnt)})`, s.par, 'inputmode="decimal"')}${inp("it-brand", "Brand", s.brand)}</div>
+    <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="it-night" ${s.nightly ? "checked" : ""} style="width:20px;height:20px"> Counted every night</label>
+    ${s.code ? `<label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="it-active" checked style="width:20px;height:20px"> Still in use (untick to hide it)</label>` : ""}
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="btn primary" style="flex:1" onclick="itSave()" ${itBusy ? "disabled" : ""}>${itBusy ? "Saving…" : "Save"}</button><button class="btn ghost" onclick="itSheet=null;render()">Close</button></div></div></div>`;
+}
+async function itSave() {
+  const v = id => { const e = document.getElementById(id); return e ? (e.type === "checkbox" ? e.checked : e.value.trim()) : ""; };
+  const num = id => { const t = String(v(id)).replace(/,/g, ""); return t === "" ? null : +t; };
+  const pu = v("it-pu"), pq = num("it-pq"), par = num("it-par"), placeId = v("it-place");
+  if (String(v("it-name")).length < 2) return toast("Name required.");
+  if (!v("it-cat")) return toast("Pick a category.");
+  if (pu && !(pq > 0)) return toast("How many units are in one pack?");
+  if (par != null && !(par >= 0)) return toast("Par: a number.");
+  const p = { store: curStore(), code: itSheet.code, name: v("it-name"), category: v("it-cat"), place: ((PLACES.find(x => x.id === placeId) || {}).name) || placeId, unit: v("it-unit"), pack_unit: pu || null, pack_qty: pu ? pq : null,
+    par: par == null ? null : pu ? par * pq : par, supplier: v("it-sup") || null, brand: v("it-brand") || null, nightly: v("it-night"), active: itSheet.code ? v("it-active") : true };
+  itBusy = true; render();
+  let code = p.code;
+  if (window.OS_LOADED && window.OS_LOADED.dev || typeof sb === "undefined") {   /* dev page: in memory only */
+    code = code || p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const it = Store.item(code) || (ITEMS.push({ id: code }), ITEMS[ITEMS.length - 1]);
+    Object.assign(it, { name: p.name, cat: p.category.toLowerCase(), place: placeId, base: p.unit, unit: pu || p.unit, per: pu ? pq : 1, par: par, supplier: p.supplier || undefined, brand: p.brand, nightly: p.nightly });
+  } else {
+    const r = await sb.rpc("os_save_item", { p }); if (r.error) { itBusy = false; toast("Not saved: " + r.error.message); return render(); }
+    code = r.data.code;
+    const L = await loadRecords(); if (!L.error) { window.OS_LOADED = L.data; dbCatalogue(L.data); }
+  }
+  itBusy = false; itSheet = null; toast("Item saved."); go(p.active === false ? "#/items" : "#/item/" + encodeURIComponent(code));
+}
+
+/* other names of a supplier (supplier_alias) */
+const SAL = { name: null, rows: null, busy: false };
+async function salLoad(name) {
+  if (SAL.name === name && SAL.rows) return; SAL.name = name; SAL.rows = null;
+  if (typeof sb === "undefined" || (window.OS_LOADED && window.OS_LOADED.dev)) { SAL.rows = []; return render(); }
+  const s = await sb.from("supplier").select("id").eq("name", name).maybeSingle(); if (s.error || !s.data) { SAL.rows = []; return render(); }
+  SAL.id = s.data.id; const a = await sb.from("supplier_alias").select("alias").eq("supplier_id", SAL.id).order("alias"); SAL.rows = (a.data || []).map(x => x.alias); render();
+}
+function salCard(name) {
+  if (!itEditOK()) return ""; salLoad(name);
+  const rows = SAL.name === name && SAL.rows;
+  return `<section class="card"><h2>Other names <span class="tiny mut">how this supplier is written on sheets and invoices</span></h2>
+    ${!rows ? `<div class="mut small">Loading…</div>` : rows.length ? `<div class="list">${rows.map(a => `<div class="row"><div class="main"><div class="name" style="font-weight:500">${esc(a)}</div></div><button class="btn ghost sm" onclick="salDel(${esc(JSON.stringify(a))})">Remove</button></div>`).join("")}</div>` : `<div class="mut small">None yet.</div>`}
+    <div style="display:flex;gap:8px;margin-top:8px"><input class="in" id="sal-new" placeholder="e.g. the name on their receipt"><button class="btn" onclick="salAdd()">Add</button></div></section>`;
+}
+async function salAdd() {
+  const t = (document.getElementById("sal-new").value || "").trim(); if (t.length < 2) return toast("Type the other name.");
+  if (typeof sb !== "undefined" && SAL.id) { const r = await sb.from("supplier_alias").insert({ alias: t, supplier_id: SAL.id }); if (r.error) return toast("Not saved: " + r.error.message); }
+  SAL.rows = (SAL.rows || []).concat(t).sort(); toast("Added."); render();
+}
+async function salDel(a) {
+  if (typeof sb !== "undefined" && SAL.id) { const r = await sb.from("supplier_alias").delete().eq("alias", a).eq("supplier_id", SAL.id); if (r.error) return toast("Not removed: " + r.error.message); }
+  SAL.rows = (SAL.rows || []).filter(x => x !== a); render();
 }
