@@ -152,3 +152,25 @@
 
 /* v0.26.0 phone: the row is the link, so the › column goes; headers may wrap and the name column gives a little, so Papers fits 390 px */
 @media (max-width:699px){ .itbl .h7{display:none} .itbl th{white-space:normal; line-height:14px} .itbl td.nm{min-width:120px} }
+/* v0.27.1 Items: one line on top (search · Filters · + New); the filters fold away below laptop width */
+.ittop{display:flex; gap:6px; align-items:center; margin-bottom:6px}
+.ittop .in{flex:1; min-width:0; min-height:36px; height:36px; padding:0 10px; font-size:14px}
+.ittop .btn{min-height:36px; height:36px; white-space:nowrap; flex:none}
+.ittop .itfbtn.on{background:var(--n100); color:var(--ink); border-color:var(--line2)}
+.itflt{display:none; margin-bottom:6px}
+.itflt.open{display:grid}
+@media (min-width:1100px){
+  .ittop{display:grid; grid-template-columns:minmax(220px,1fr) auto; margin-bottom:6px}
+  .ittop:has(> :nth-child(3)){grid-template-columns:minmax(220px,1fr) auto}
+  .ittop .itfbtn{display:none}
+  .itflt{display:grid; grid-template-columns:repeat(5,minmax(0,1fr))}
+  .itflt.open{display:grid}
+}
+@media (min-width:1100px){   /* laptop: search, the five filters and + New in one line */
+  .itbar{display:flex; gap:6px; align-items:center; margin-bottom:6px}
+  .itbar .ittop{display:contents}
+  .itbar .ittop .in{flex:2 1 220px; order:0}
+  .itbar .itflt{display:flex; flex:5 1 0; gap:6px; margin:0; order:1}
+  .itbar .itflt .in{flex:1 1 0}
+  .itbar .ittop .btn{order:2}
+}

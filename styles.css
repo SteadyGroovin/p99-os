@@ -479,3 +479,7 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 @media (min-width:900px){ .wrap .grid2{grid-template-columns:repeat(auto-fit, minmax(140px, 1fr))} }
 /* iPad portrait: the Order soon table drops Category (Supplier stays) so Status fits */
 @media (max-width:899px){ .itbl .h6{display:none} }
+
+/* v0.27.1 (Stefan, 16 Nov: "the S is not centered"): the account button shows only the round initial, so no room is kept for a name */
+.top .me{padding:4px; gap:0; min-height:0}
+.top .me .av{width:32px; height:32px; line-height:1; text-align:center}

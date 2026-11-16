@@ -148,7 +148,8 @@ function plusActions() {
 function viewSettings() {   /* v0.19.6: the whole settings section, reached from the account button; one line per entry */
   const p = me(); const rows = SETUP.filter(s => canOpen(subHref(s))).map(s => [s[0], s[2], `go('${s[1]}')`])
     .concat([["Stores shown", `${storesOn().join(", ")} · recording into ${curStore()}`, "stSheet=JSON.parse(JSON.stringify(storeCfg()));render()"], ["Device", "theme, order alerts, sync state, sign out", "go('#/more')"], ["Password", "change the password of this login", "go('#/password')"]]);
-  return shell("Settings", p ? esc(p.name || p.short) : "", `<div class="itwrap"><table class="itbl"><tbody>${rows.map(([n, m, h]) => `<tr onclick="${h}" tabindex="0" onkeydown="if(event.key==='Enter'){${h}}"><td class="nm">${esc(n)}<div class="sub2 wrap">${esc(m)}</div></td><td class="h1 mut wrapc">${esc(m)}</td><td class="n mut" style="width:28px">›</td></tr>`).join("")}</tbody></table></div>`, { back: "#/today" });
+  /* v0.27.1 (Stefan, 16 Nov: "the UI looks very small … very, very tiny"): big tappable rows instead of the compact item table */
+  return shell("Settings", p ? esc(p.name || p.short) : "", `<section class="card flinks">${rows.map(([n, m, h]) => `<button class="row tap" onclick="${h}"><div class="main"><div class="name">${esc(n)}</div><div class="meta">${esc(m)}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("")}</section>`, { back: "#/today" });
 }
 
 /* ---------- Users & roles (owners) ---------- */

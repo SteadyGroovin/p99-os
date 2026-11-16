@@ -7,7 +7,7 @@
    Adds to the data shape only: S.draft.skip = { itemId: true } (kept on the sent count as .skip). */
 
 const SK_PRICE_TOL = 0.02;                 // flag a price change of 2 % or more on receiving
-let skBoard = "all", skItemQ = "", skItemPlace = "", skItemSup = "", skItemFlt = "", skItemSort = "cat", skItemSrc = "store", skItemCat = "";
+let skFltOpen = false, skBoard = "all", skItemQ = "", skItemPlace = "", skItemSup = "", skItemFlt = "", skItemSort = "cat", skItemSrc = "store", skItemCat = "";
 let skCountFlt = "todo", skVarSel = 0, skVarAll = false, skRx = { range: "90", sup: "", kind: "" };
 
 /* ---------- numbers ---------- */
@@ -355,11 +355,15 @@ function viewItems() {
   Ls = Ls.slice().sort((a, b) => { const x = key(a), y = key(b); const c = x < y ? -1 : x > y ? 1 : 0; return c * skItemDir * desc || skCatKey(a.it) - skCatKey(b.it) || a.it.name.localeCompare(b.it.name); });
   const sups = [...new Set(ITEMS.map(i => i.supplier).filter(Boolean))].sort();
   const flts = [["", "All statuses"], ["low", "Below par"], ["none", "Not counted"], ["nightly", "Short list"], ["verify", "Pack to verify"]];
-  const tool = `<div class="ittool">${search}
+  /* v0.27.1 (Stefan, 16 Nov: Items "takes too much space away at the top … the filters"): one line on top (search · Filters · + New);
+     the five filters fold away behind Filters on phone and iPad, and sit in that one line on a laptop */
+  const nOn = [skItemCat, skItemPlace, skItemSup, skItemFlt].filter(Boolean).length + (skItemSrc !== "store" ? 1 : 0);
+  const canNew = typeof itEditOK === "function" && itEditOK();
+  const tool = `<div class="itbar"><div class="ittop">${search}<button class="btn sm itfbtn ${skFltOpen || nOn ? "on" : ""}" onclick="skFltOpen=!skFltOpen;render()" aria-expanded="${skFltOpen}">Filters${nOn ? ` · ${nOn}` : ""}</button>${canNew ? `<button class="btn sm" onclick="itOpen(null)">+ New</button>` : ""}</div><div class="ittool itflt${skFltOpen ? " open" : ""}">
     <select class="in" onchange="skItemCat=this.value;render()" aria-label="Category"><option value="">All categories</option>${SK_BOOK.map(g => g[0]).concat("Other").filter(g => ITEMS.some(i => skGrp(i) === g)).map(g => `<option ${skItemCat === g ? "selected" : ""}>${esc(g)}</option>`).join("")}</select>
     <select class="in" onchange="skItemPlace=this.value;render()" aria-label="Place"><option value="">All places</option>${PLACES.map(p => `<option value="${p.id}" ${skItemPlace === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select>
     <select class="in" onchange="skItemSup=this.value;render()" aria-label="Supplier"><option value="">All suppliers</option>${sups.map(s => `<option ${skItemSup === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select>
-    <select class="in" onchange="skItemFlt=this.value;render()" aria-label="Status">${flts.map(([k, l]) => `<option value="${k}" ${skItemFlt === k ? "selected" : ""}>${l}${k ? ` (${ITEMS.map(skLevel).filter(L => k === "low" ? ["low", "out", "neg"].includes(L.st.k) : k === "none" ? L.st.k === "none" : k === "nightly" ? L.it.nightly : L.it.verify).length})` : ""}</option>`).join("")}</select>${srcSel}</div>`;
+    <select class="in" onchange="skItemFlt=this.value;render()" aria-label="Status">${flts.map(([k, l]) => `<option value="${k}" ${skItemFlt === k ? "selected" : ""}>${l}${k ? ` (${ITEMS.map(skLevel).filter(L => k === "low" ? ["low", "out", "neg"].includes(L.st.k) : k === "none" ? L.st.k === "none" : k === "nightly" ? L.it.nightly : L.it.verify).length})` : ""}</option>`).join("")}</select>${srcSel}</div></div>`;
   const cols = [["name", "Item", ""], ["cat", "Category", "h1 h5"], ["place", "Place", "h3"], ["sup", "Supplier", "h1"], ["pack", "Pack", "h4 ns"], ["par", "Par", "n h2"], ["stock", "Stock", "n"], ["lvl", "", "h2 ns lv"], ["use", "Used/day", "n h2"], ["cover", "Days left", "n"], ["price", "Last price", "n h1"], ["val", "Value", "n h1"], ["counted", "Counted", "n h1 h5"], ["st", "Status", "st"]];
   const head = `<tr>${cols.map(([k, l, c]) => c.includes("ns") || k === "st" ? `<th class="${c}">${l}</th>` : `<th class="${c}"><button onclick="skItemSortBy('${k}')" class="${skItemSort === k ? "on" : ""}">${l}${skItemSort === k ? (skItemDir * desc > 0 ? " ▲" : " ▼") : ""}</button></th>`).join("")}</tr>`;
   const skVerifyRows = ITEMS.filter(i => i.verify).length * 2 < ITEMS.length;   /* a tag on (nearly) every row says nothing: then it moves to the footer and the status filter */
@@ -376,7 +380,7 @@ function viewItems() {
   const body = gOf ? [...new Set(Ls.map(gOf))].map(g => { const r = Ls.filter(L => gOf(L) === g); return `<tr class="gh"><td colspan="${cols.length}">${esc(g)} <span>· ${r.length}${gVal(g)}</span></td></tr>${r.map(row).join("")}`; }).join("") : Ls.map(row).join("");
   const vals = Ls.filter(L => L.val != null); const low = Ls.filter(L => ["low", "out", "neg"].includes(L.st.k)).length; const unv = Ls.filter(L => L.it.verify).length;
   const foot = `<div class="itfoot tiny mut">${Ls.length} of ${ITEMS.length} items · ${low} below par · stock value ${peso(skSum(vals.map(L => L.val)))} (${vals.length} with a price)${unv && !skVerifyRows ? ` · ${unv} pack size${unv === 1 ? "" : "s"} not confirmed by the store yet (filter "Pack to verify")` : ""} · Used/day = UTAK, last 4 weeks, items sold 1:1 · tap a column to sort</div>`;
-  return shell("Items", `${Ls.length} of ${ITEMS.length} items`, (typeof itNewBtn === "function" ? itNewBtn() : "") + tool + (Ls.length ? `<div class="itwrap"><table class="itbl wide"><thead>${head}</thead><tbody>${body}</tbody></table></div>` + foot : `<div class="card mut small">No item matches.</div>`), { back: "#/stock" });
+  return shell("Items", `${Ls.length} of ${ITEMS.length} items`, (canNew && typeof itSheetHTML === "function" ? itSheetHTML() : "") + tool + (Ls.length ? `<div class="itwrap"><table class="itbl wide"><thead>${head}</thead><tbody>${body}</tbody></table></div>` + foot : `<div class="card mut small">No item matches.</div>`), { back: "#/stock" });
 }
 function skDbList(q) {
   if (SKDB.state === "loading" || SKDB.state === "idle") return `<div class="card mut small">Loading the ingredients list…</div>`;

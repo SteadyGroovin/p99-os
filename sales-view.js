@@ -11,6 +11,18 @@ const kfmt = v => v >= 1e6 ? "₱" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + 
 const monthName = m => new Date(m + "-01T00:00:00").toLocaleDateString("en-PH", { month: "short", year: "numeric" });
 const sum = a => a.reduce((s, x) => s + x, 0);
 const pct = (a, b) => b ? (a - b) / b : null;
+/* v0.27 (16 Nov): stores without a till feed get their days from the Sales Monitoring sheet (migration 049). A sheet day has
+   total, cash and GCash only; tickets, hours, items and cashiers are null and show as "not available", never as zero. */
+const NA = `<span class="mut">not available in the sales sheet</span>`;
+const UTAK_STORES = ["P99", "BK"];   /* stores whose UTAK till feeds the database (utak-sync v3) */
+const osStore = () => typeof OS_STORE !== "undefined" ? OS_STORE : "P99";   /* dev.html has no db.js */
+const tillStore = () => UTAK_STORES.includes(osStore());
+const srcCount = a => [a.trading - a.sheetDays ? `${a.trading - a.sheetDays} till day${a.trading - a.sheetDays > 1 ? "s" : ""}` : "", a.sheetDays ? `${a.sheetDays} sheet day${a.sheetDays > 1 ? "s" : ""}` : ""].filter(Boolean).join(" · ");
+const srcChip = x => x && x.src === "sheet" ? chip("warn", "Sales sheet") : chip("ok", "Till (UTAK)");
+function srcLine() {
+  const H = SALES_HISTORY, ld = H.sheet_loaded ? new Date(H.sheet_loaded).toLocaleDateString("en-PH", { day: "numeric", month: "short" }) : null;
+  return `Source: ${esc(H.source || "")}.${H.sheet_days ? ` Sheet days are the counted cash + GCash from the Sales Monitoring sheet${ld ? `, loaded ${esc(ld)}` : ""}.` : ""}`;
+}
 
 /* ---------- data ---------- */
 function calDays(from, to) { const o = []; for (let d = from; d <= to; d = addDays(d, 1)) o.push(d); return o; }
@@ -36,10 +48,12 @@ function rangeOf(r, end) {
   return { days, prev, n: days.length };
 }
 function agg(days) {
-  const a = { total: 0, tickets: 0, cashbox: 0, cash: 0, gcash: 0, card: 0, slices: 0, wholes: 0, trading: 0, items: {}, cats: {}, daily: [], bestDay: null, worstDay: null };
+  const a = { total: 0, tickets: 0, tkTotal: 0, tkDays: 0, sheetDays: 0, cashbox: 0, cash: 0, gcash: 0, card: 0, slices: 0, wholes: 0, trading: 0, items: {}, cats: {}, daily: [], bestDay: null, worstDay: null };
   days.forEach(d => {
     const x = SD[d]; a.daily.push(x || null); if (!x) return;
-    a.trading++; a.total += x.total; a.tickets += x.tickets; a.cashbox += x.cashbox_opens || 0;
+    a.trading++; a.total += x.total; a.cashbox += x.cashbox_opens || 0;
+    if (x.tickets != null) { a.tickets += x.tickets; a.tkTotal += x.total; a.tkDays++; } /* v0.27: a sales-sheet day has no tickets; it never counts as zero */
+    if (x.src === "sheet") a.sheetDays++;
     a.cash += x.pay.cash || 0; a.gcash += x.pay.gcash || 0; a.card += x.pay.card || 0;
     if (!a.bestDay || x.total > SD[a.bestDay].total) a.bestDay = d;
     if (!a.worstDay || x.total < SD[a.worstDay].total) a.worstDay = d;
@@ -49,7 +63,7 @@ function agg(days) {
       if (cat === "Pizza Slice") a.slices += q; if (cat === "Pizza Whole") a.wholes += q;
     });
   });
-  a.avgTicket = a.tickets ? a.total / a.tickets : 0; a.perDay = a.trading ? a.total / a.trading : 0;
+  a.avgTicket = a.tickets ? a.tkTotal / a.tickets : 0; a.perDay = a.trading ? a.total / a.trading : 0;
   a.gshare = a.total ? a.gcash / (a.cash + a.gcash + a.card || 1) : 0;
   return a;
 }
@@ -135,7 +149,7 @@ document.addEventListener("pointerdown", ev => { const el = ev.target.closest &&
 /* ---------- when we sell: weekday x hour heat map + weekday bars ---------- */
 function heat(days) {
   const cnt = Array(7).fill(0), H = Array.from({ length: 7 }, () => Array(24).fill(0)), tot = Array(7).fill(0);
-  days.forEach(d => { const x = SD[d]; if (!x) return; const w = wdOf(d); cnt[w]++; tot[w] += x.total; x.hours.forEach((v, h) => { H[w][h] += v; }); });
+  days.forEach(d => { const x = SD[d]; if (!x || !x.hours) return; const w = wdOf(d); cnt[w]++; tot[w] += x.total; x.hours.forEach((v, h) => { H[w][h] += v; }); });
   const order = []; for (let k = 4; k < 28; k++) order.push(k % 24);
   const hourTot = order.map(h => sum(H.map(r => r[h]))); let a = hourTot.findIndex(v => v > 0), b = hourTot.length - 1 - [...hourTot].reverse().findIndex(v => v > 0); if (a < 0) return { html: "", cnt, tot, H, order };
   const hrs = order.slice(a, b + 1); let mx = 0, best = null; hrs.forEach(h => H.forEach((r, w) => { const v = cnt[w] ? r[h] / cnt[w] : 0; if (v > mx) { mx = v; best = [w, h, v]; } }));
@@ -158,13 +172,14 @@ function itemBars(a, by) {
 /* ---------- insights, in plain words ---------- */
 function insights(a, p, h, days) {
   const L = [];
-  if (a.bestDay) L.push(["▲", `Best day: <b>${esc(dayName(a.bestDay))}</b>, ${peso(SD[a.bestDay].total)} on ${SD[a.bestDay].tickets} tickets.`]);
+  if (a.bestDay) L.push(["▲", `Best day: <b>${esc(dayName(a.bestDay))}</b>, ${peso(SD[a.bestDay].total)}${SD[a.bestDay].tickets != null ? ` on ${SD[a.bestDay].tickets} tickets` : ""}.`]);
   if (h.best) L.push(["◔", `Busiest hour: <b>${WD[h.best[0]]} ${pad2(h.best[1])}:00</b>, about ${peso(h.best[2])} in that hour on an average ${WD[h.best[0]]}.`]);
   const avg = WD.map((_, w) => h.cnt[w] ? h.tot[w] / h.cnt[w] : null); const ok = avg.map((v, w) => v == null ? null : [v, w]).filter(Boolean).sort((x, y) => y[0] - x[0]);
   if (ok.length >= 3) { const hi = ok[0], lo = ok[ok.length - 1]; L.push(["▤", `<b>${WD[hi[1]]}</b> averages ${peso(hi[0])}, <b>${WD[lo[1]]}</b> only ${peso(lo[0])} (${Math.round(100 * (hi[0] / lo[0] - 1))}% more).`]); }
   const pz = a.slices + a.wholes; if (pz) L.push(["◐", `Slices are <b>${Math.round(100 * a.slices / pz)}%</b> of pizzas sold: ${fmt(a.slices)} slices, ${fmt(a.wholes)} whole.`]);
-  if (p) { const pa = pct(a.avgTicket, p.avgTicket); if (pa != null && Math.abs(pa) >= 0.02) L.push([pa > 0 ? "▲" : "▼", `Average ticket ${pa > 0 ? "rose" : "fell"} ${Math.round(Math.abs(pa) * 100)}% to ${peso(a.avgTicket)}; tickets are ${delta(a.tickets, p.tickets).replace(/<[^>]+>/g, "")} on the previous period.`]); }
-  if (a.trading) { const cbd = a.cashbox / a.trading; L.push(["▣", `Cash box opened <b>${cbd.toFixed(1)}×</b> a day without a sale${p && p.trading ? ` (was ${(p.cashbox / p.trading).toFixed(1)}×)` : ""}.`]); }
+  if (a.sheetDays) L.push(["▦", a.sheetDays === a.trading ? `All ${a.trading} days come from the <b>sales sheet</b>: cash and GCash only. Tickets, hours and items are not available.` : `<b>${a.sheetDays}</b> of ${a.trading} days come from the sales sheet (no tickets, hours or items); the rest from the till.`]);
+  if (p && a.tkDays && p.tkDays) { const pa = pct(a.avgTicket, p.avgTicket); if (pa != null && Math.abs(pa) >= 0.02) L.push([pa > 0 ? "▲" : "▼", `Average ticket ${pa > 0 ? "rose" : "fell"} ${Math.round(Math.abs(pa) * 100)}% to ${peso(a.avgTicket)}; tickets are ${delta(a.tickets, p.tickets).replace(/<[^>]+>/g, "")} on the previous period.`]); }
+  if (a.tkDays) { const cbd = a.cashbox / a.tkDays; L.push(["▣", `Cash box opened <b>${cbd.toFixed(1)}×</b> a day without a sale${p && p.tkDays ? ` (was ${(p.cashbox / p.tkDays).toFixed(1)}×)` : ""}.`]); }
   const missing = days.length - a.trading; if (missing > 0) L.push(["○", `${missing} of ${days.length} days have no sales data (closed or not synced yet).`]);
   return `<ul class="ins">${L.map(([i, t]) => `<li><span>${i}</span><div>${t}</div></li>`).join("")}</ul>`;
 }
@@ -189,7 +204,8 @@ function viewSales() {
   const tabs = `<div class="seg tabs2"><button class="btn ${salesTab === "overview" ? "on" : ""}" onclick="salesTab='overview';render()">Overview</button><button class="btn ${salesTab === "txns" ? "on" : ""}" onclick="salesTab='txns';render()">Transactions</button><button class="btn ${salesTab === "run" ? "on" : ""}" onclick="salesTab='run';render()">Morning run</button></div>`;
   if (salesTab === "run") return viewRuns(tabs);
   /* v0.26.2 (Stefan, 16 Nov: "the sales tab doesn't work"): a store with no till feed (only Pizza 99 is connected) crashed the page; say so instead */
-  if (!SDAYS.length) return shell("Sales", esc(curStore()), `${tabs}<section class="card"><h2>No till sales for ${esc(curStore())} yet</h2><div class="small mut" style="margin:6px 0 12px">Only the Pizza 99 till is connected so far. Switch the store to see its sales.</div><button class="btn primary full" onclick="stSheet=JSON.parse(JSON.stringify(storeCfg()));render()">Change store</button></section>`);
+  if (!SDAYS.length) return shell("Sales", esc(curStore()), `${tabs}<section class="card"><h2>No sales for ${esc(curStore())} yet</h2><div class="small mut" style="margin:6px 0 12px">Neither the till nor the sales sheet has a day for this store yet.</div><button class="btn primary full" onclick="stSheet=JSON.parse(JSON.stringify(storeCfg()));render()">Change store</button></section>`);
+  if (salesTab === "txns" && SALES_HISTORY.utak_days === 0) return shell("Sales", esc(curStore()), `${tabs}<section class="card"><h2>No transactions</h2><div class="small mut" style="margin-top:6px">This store's till is not connected. Its sales come from the sales sheet: one total per day, no tickets.</div></section>`);
   if (salesTab === "txns") return viewTxns(tabs);
   return salesRange === "day" ? viewSalesDay(tabs) : viewSalesRange(tabs);
 }
@@ -204,32 +220,34 @@ function viewSalesRange(tabs) {
   const cell = (lab, val, note, cls = "") => `<div class="ss-c ${cls}"><div class="lab">${lab}</div><div class="val num">${val}</div><div class="note">${note}</div></div>`;
   const hero = `<section class="card sstrip">
     ${cell("Sales", peso(a.total), `${p ? delta(a.total, p.total, lab) : '<span class="mut">no earlier period to compare</span>'}<div class="mut">${peso(a.perDay)} per open day · ${a.trading} open days</div>`, "lead")}
-    ${cell("Tickets", fmt(a.tickets), p ? delta(a.tickets, p.tickets) : "")}
-    ${cell("Average ticket", peso(a.avgTicket), p ? delta(a.avgTicket, p.avgTicket) : "")}
-    ${cell("Pizzas", fmt(a.slices + a.wholes), `<span class="mut">${fmt(a.slices)} slices · ${fmt(a.wholes)} whole</span>`)}
+    ${a.tkDays ? cell("Tickets", fmt(a.tickets), a.tkDays < a.trading ? `<span class="mut">till days only (${a.tkDays})</span>` : p && p.tkDays === p.trading ? delta(a.tickets, p.tickets) : "") : cell("Tickets", "—", NA)}
+    ${a.tkDays ? cell("Average ticket", peso(a.avgTicket), a.tkDays < a.trading ? `<span class="mut">till days only</span>` : p && p.tkDays ? delta(a.avgTicket, p.avgTicket) : "") : cell("Average ticket", "—", NA)}
+    ${a.slices + a.wholes ? cell("Pizzas", fmt(a.slices + a.wholes), `<span class="mut">${fmt(a.slices)} slices · ${fmt(a.wholes)} whole</span>`) : cell("Source", a.sheetDays === a.trading ? "Sheet" : a.sheetDays ? "Till + sheet" : "Till", `<span class="mut">${srcCount(a)}</span>`)}
     ${cell("GCash share", Math.round(a.gshare * 100) + "%", `<span class="mut">${p ? `was ${Math.round(p.gshare * 100)}%` : "of takings"}</span>`)}
   </section>`;
   const tiles = "";
   const chart = `<section class="card"><h2>Sales over time <span class="tiny mut">${size === 7 ? "per full week, Mon–Sun" : "per day"}${pp ? " · dashed = previous period" : ""}</span></h2>${trendChart("tc", pts, pp)}
     <div class="legend"><span><b style="background:var(--s1)"></b>${size === 7 ? "Week" : "Day"}</span>${pp ? `<span><b class="dash"></b>Previous period</span>` : ""}<span class="mut">${size === 1 ? "tap a bar to open the day" : ""}</span></div>
     <details class="tbl" ${salesTable ? "open" : ""} ontoggle="salesTable=this.open"><summary>Show as table</summary><table class="t"><thead><tr><th>${size === 7 ? "Week" : "Day"}</th><th class="n">Sales</th>${pp ? '<th class="n">Previous</th>' : ""}</tr></thead><tbody>${pts.slice().reverse().map((q, i) => `<tr><td>${esc(q.label)}</td><td class="n num">${q.v == null ? '<span class="mut">no data</span>' : peso(q.v)}</td>${pp ? `<td class="n num mut">${pp[pts.length - 1 - i] && pp[pts.length - 1 - i].v != null ? peso(pp[pts.length - 1 - i].v) : ""}</td>` : ""}</tr>`).join("")}</tbody></table></details></section>`;
-  const when = h.html ? `<section class="card"><h2>When we sell <span class="tiny mut">weekday × hour</span></h2>${h.html}</section>
+  const when = !h.html && a.sheetDays ? `<section class="card"><h2>When we sell</h2><div class="small mut">Not available: the sales sheet has no hours.</div></section>` : h.html ? `<section class="card"><h2>When we sell <span class="tiny mut">weekday × hour</span></h2>${h.html}</section>
     <section class="card"><h2>Average per weekday</h2>${weekdayBars(h)}<div class="tiny mut" style="margin-top:6px">Open days only; the best weekday is highlighted.</div></section>` : "";
-  const sells = `<section class="card"><div class="split"><h2>What sells</h2><div class="seg sm"><button class="btn ${salesItemBy === "gross" ? "on" : ""}" onclick="salesItemBy='gross';render()">₱</button><button class="btn ${salesItemBy === "qty" ? "on" : ""}" onclick="salesItemBy='qty';render()">Qty</button></div></div>${itemBars(a, salesItemBy)}</section>
+  const sells = !Object.keys(a.items).length ? `<section class="card"><h2>What sells</h2><div class="small mut">Not available: the sales sheet has one total per day, no items.</div><h2 style="margin-top:18px">Payment <span class="tiny mut">how customers paid</span></h2>${stackBar([{ name: "Cash", v: a.cash, c: CATC[0] }, { name: "GCash", v: a.gcash, c: CATC[1] }, { name: "Card", v: a.card, c: CATC[2] }], peso)}</section>` : `<section class="card"><div class="split"><h2>What sells</h2><div class="seg sm"><button class="btn ${salesItemBy === "gross" ? "on" : ""}" onclick="salesItemBy='gross';render()">₱</button><button class="btn ${salesItemBy === "qty" ? "on" : ""}" onclick="salesItemBy='qty';render()">Qty</button></div></div>${itemBars(a, salesItemBy)}</section>
     <section class="card"><h2>Mix <span class="tiny mut">by category, ₱</span></h2>${stackBar(catParts(a.cats, "gross"), peso)}<h2 style="margin-top:18px">Payment <span class="tiny mut">how customers paid</span></h2>${stackBar([{ name: "Cash", v: a.cash, c: CATC[0] }, { name: "GCash", v: a.gcash, c: CATC[1] }, { name: "Card", v: a.card, c: CATC[2] }], peso)}</section>`;
   let months = ""; if (R.n >= 90 && !R.month) {
     const ms = [...new Set(R.days.filter(d => SD[d]).map(d => d.slice(0, 7)))]; const rows = ms.map(m => { const ds = SDAYS.filter(d => d.startsWith(m)); const aa = agg(ds); return { m, ...aa, ds: ds.length }; });
     const mx = Math.max(...rows.map(r => r.total), 1);
-    months = `<section class="card"><h2>By month</h2><table class="t mt"><thead><tr><th>Month</th><th class="n">Sales</th><th class="n">vs month before</th><th class="n">Avg ticket</th></tr></thead><tbody>${rows.slice().reverse().map((r, i, arr) => { const prv = arr[i + 1]; return `<tr><td>${monthName(r.m)}<div class="mbar"><i style="width:${(100 * r.total / mx).toFixed(0)}%"></i></div></td><td class="n num">${peso(r.total)}</td><td class="n">${prv ? delta(r.perDay, prv.perDay) : ""}</td><td class="n num">${peso(r.avgTicket)}</td></tr>`; }).join("")}</tbody></table><div class="tiny mut">Month-on-month compares sales per open day, so a short month is not penalised.</div></section>`;
+    months = `<section class="card"><h2>By month</h2><table class="t mt"><thead><tr><th>Month</th><th class="n">Sales</th><th class="n">vs month before</th><th class="n">Avg ticket</th></tr></thead><tbody>${rows.slice().reverse().map((r, i, arr) => { const prv = arr[i + 1]; return `<tr><td>${monthName(r.m)}<div class="mbar"><i style="width:${(100 * r.total / mx).toFixed(0)}%"></i></div></td><td class="n num">${peso(r.total)}</td><td class="n">${prv ? delta(r.perDay, prv.perDay) : ""}</td><td class="n num">${r.tkDays ? peso(r.avgTicket) : '<span class="mut">—</span>'}</td></tr>`; }).join("")}</tbody></table><div class="tiny mut">Month-on-month compares sales per open day, so a short month is not penalised.</div></section>`;
   }
-  return shell("Sales", `${esc(dn(from))} – ${esc(dn(to))}`, `<div class="pbar">${tabs}${rangeBar()}</div>` + syncBar() + hero + tiles + chart + `<section class="card"><h2>What the numbers say</h2>${insights(a, p, h, R.days)}</section>` + when + sells + months + `<div class="tiny mut">Source: ${esc(SALES_HISTORY.source)}. Tickets exclude cash-box openings.</div>`);
+  return shell("Sales", `${esc(dn(from))} – ${esc(dn(to))}`, `<div class="pbar">${tabs}${rangeBar()}</div>` + syncBar() + hero + tiles + chart + `<section class="card"><h2>What the numbers say</h2>${insights(a, p, h, R.days)}</section>` + when + sells + months + `<div class="tiny mut">${srcLine()}${a.tkDays ? " Tickets exclude cash-box openings." : ""}</div>`);
 }
 function viewSalesDay(tabs) {
   const d = SD[salesDay], i = SDAYS.indexOf(salesDay), prev = SDAYS[i - 1], next = SDAYS[i + 1];
+  if (d.src === "sheet") return viewSheetDay(tabs, d, prev, next);
   const nav = `<div class="daynav"><button class="btn" ${prev ? "" : "disabled"} onclick="salesDay='${prev}';render()" aria-label="Previous day">${ic("chevron-left")}</button><input class="in" type="date" value="${salesDay}" min="${SDAYS[0]}" max="${LAST_DAY}" onchange="if(SD[this.value]){salesDay=this.value;render()}"><button class="btn" ${next ? "" : "disabled"} onclick="salesDay='${next}';render()" aria-label="Next day">${ic("chevron-right")}</button></div>`;
   const w = wdOf(salesDay); const same = []; for (let k = 1; same.length < 8 && k <= 80; k++) { const x = addDays(salesDay, -7 * k); if (SD[x]) same.push(x); } const sa = agg(same); const typ = same.length ? sa.total / same.length : null;
   const hrs = []; for (let k = 4; k < 28; k++) hrs.push(k % 24); const first = hrs.findIndex(h => d.hours[h] > 0), lastI = hrs.length - 1 - [...hrs].reverse().findIndex(h => d.hours[h] > 0); const hh = hrs.slice(Math.max(0, first), lastI + 1);
-  const typH = hh.map(h => same.length ? sum(same.map(x => SD[x].hours[h])) / same.length : null);
+  const sameH = same.filter(x => SD[x].hours); /* sheet days have no hours */
+  const typH = hh.map(h => sameH.length ? sum(sameH.map(x => SD[x].hours[h])) / sameH.length : null);
   const W = 640, H = 200, L = 46, R = 10, T = 12, B = 26, iw = W - L - R, ih = H - T - B, bw = iw / hh.length; const mx0 = Math.max(...hh.map(h => d.hours[h]), ...typH.map(v => v || 0), 1); const mag = Math.pow(10, Math.floor(Math.log10(mx0))); const mx = [1, 2, 2.5, 5, 10].map(x => x * mag).find(x => x >= mx0 * 1.02) || mx0; const Y = v => T + ih - ih * v / mx;
   const bars = hh.map((h, k) => `<rect class="sbar" x="${(L + bw * k + bw * .14).toFixed(1)}" y="${Y(d.hours[h]).toFixed(1)}" width="${(bw * .72).toFixed(1)}" height="${(T + ih - Y(d.hours[h])).toFixed(1)}" rx="3" data-tt="${pad2(h)}:00|${peso(d.hours[h])}${typH[k] != null ? " · usual " + peso(typH[k]) : ""}"/>`).join("");
   const ty = typH.every(v => v == null) ? "" : `<path class="prev" d="${typH.map((v, k) => `${k ? "L" : "M"}${(L + bw * (k + .5)).toFixed(1)} ${Y(v || 0).toFixed(1)}`).join("")}"/>`;
@@ -239,24 +257,42 @@ function viewSalesDay(tabs) {
   const co = Object.values(cats).sort((a, b) => b.gross - a.gross); const slices = (cats["Pizza Slice"] || { qty: 0 }).qty, wholes = (cats["Pizza Whole"] || { qty: 0 }).qty;
   const tix = d.tickets;
   return shell("Sales", dayLong(salesDay), `<div class="pbar">${tabs}${rangeBar()}</div>` + syncBar() + yestBanner() + nav + `
-    <section class="card hero2"><div class="lab">${esc(WD[w])} sales</div><div class="big num">${peso(d.total)}</div><div class="trend">${typ != null ? delta(d.total, typ, `vs a usual ${WD[w]} (${peso(typ)}, last ${same.length})`) : '<span class="mut">no earlier same weekday</span>'}</div></section>
-    <div class="grid2">${tile("Tickets", tix, `avg ${peso(d.total / Math.max(1, tix))}`, "")}${tile("Pizzas", `${fmt(slices + wholes)}`, `${fmt(slices)} slices · ${fmt(wholes)} whole`, "")}${tile("Cash box", d.cashbox_opens + "×", "opened without a sale", "")}${tile("Cashiers", d.cashiers.length, d.cashiers.map(([n, k]) => `${esc(n || "—")} ${k}`).join(" · "), "")}</div>
+    <section class="card hero2"><div class="lab">${esc(WD[w])} sales</div><div class="big num">${peso(d.total)}</div><div class="trend">${typ != null ? delta(d.total, typ, `vs a usual ${WD[w]} (${peso(typ)}, last ${same.length})`) : '<span class="mut">no earlier same weekday</span>'}</div><div class="tiny" style="margin-top:6px">${srcChip(d)}${d.sheet_total != null ? ` <span class="mut">sales sheet counted ${peso(d.sheet_total)}</span>` : ""}</div></section>
+    <div class="grid2">${tile("Tickets", tix, `avg ${peso(d.total / Math.max(1, tix))}`, "")}${slices + wholes ? tile("Pizzas", `${fmt(slices + wholes)}`, `${fmt(slices)} slices · ${fmt(wholes)} whole`, "") : tile("Items sold", fmt(sum(d.items.map(r => r[2]))), `${d.items.length} different items`, "")}${tile("Cash box", d.cashbox_opens + "×", "opened without a sale", "")}${tile("Cashiers", d.cashiers.length, d.cashiers.map(([n, k]) => `${esc(n || "—")} ${k}`).join(" · "), "")}</div>
     <section class="card"><h2>By hour <span class="tiny mut">dashed = a usual ${WD[w]}</span></h2><svg class="chart trend" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Sales by hour">${grid}${ty}${bars}${xl}</svg></section>
     <section class="card"><h2>Payment</h2>${stackBar([{ name: "Cash", v: d.pay.cash || 0, c: CATC[0] }, { name: "GCash", v: d.pay.gcash || 0, c: CATC[1] }, { name: "Card", v: d.pay.card || 0, c: CATC[2] }], peso)}</section>
     ${co.map(c => `<section class="card"><h2>${esc(c.cat)} <span class="tiny mut">${fmt(c.qty)} · ${peso(c.gross)}</span></h2><div class="hb items">${c.rows.sort((a, b) => b[2] - a[2]).map(([item, q, g]) => `<div class="hbr" data-tt="${esc(item)}|${fmt(q)} · ${peso(g)}"><span class="nm">${esc(item)}</span><span class="tr"><i style="width:${(100 * g / (c.rows[0][2] || 1)).toFixed(1)}%"></i></span><span class="vl num">${fmt(q)}<small>${kfmt(g)}</small></span></div>`).join("")}</div></section>`).join("")}
     <div class="tiny mut">Source: ${esc(SALES_HISTORY.source)}. Item lines before discount; totals after.</div>`);
 }
 
+/* v0.27: a day that only the Sales Monitoring sheet has: total, cash and GCash; the rest is not available */
+function viewSheetDay(tabs, d, prev, next) {
+  const nav = `<div class="daynav"><button class="btn" ${prev ? "" : "disabled"} onclick="salesDay='${prev}';render()" aria-label="Previous day">${ic("chevron-left")}</button><input class="in" type="date" value="${salesDay}" min="${SDAYS[0]}" max="${LAST_DAY}" onchange="if(SD[this.value]){salesDay=this.value;render()}"><button class="btn" ${next ? "" : "disabled"} onclick="salesDay='${next}';render()" aria-label="Next day">${ic("chevron-right")}</button></div>`;
+  const w = wdOf(salesDay); const same = []; for (let k = 1; same.length < 8 && k <= 80; k++) { const x = addDays(salesDay, -7 * k); if (SD[x]) same.push(x); } const typ = same.length ? sum(same.map(x => SD[x].total)) / same.length : null;
+  const na = lab => tile(lab, "—", "not in the sales sheet", "");
+  return shell("Sales", dayLong(salesDay), `<div class="pbar">${tabs}${rangeBar()}</div>` + syncBar() + yestBanner() + nav + `
+    <section class="card hero2"><div class="lab">${esc(WD[w])} sales</div><div class="big num">${peso(d.total)}</div><div class="trend">${typ != null ? delta(d.total, typ, `vs a usual ${WD[w]} (${peso(typ)}, last ${same.length})`) : '<span class="mut">no earlier same weekday</span>'}</div><div class="tiny" style="margin-top:6px">${srcChip(d)}</div></section>
+    <div class="grid2">${tile("Cash", d.pay.cash != null ? peso(d.pay.cash) : "—", d.pay.cash != null ? "counted" : "not typed in the sheet", "")}${tile("GCash", d.pay.gcash != null ? peso(d.pay.gcash) : "—", d.pay.gcash != null ? "received" : "not typed in the sheet", "")}${na("Tickets")}${na("Cashiers")}</div>
+    <section class="card"><h2>Payment</h2>${stackBar([{ name: "Cash", v: d.pay.cash || 0, c: CATC[0] }, { name: "GCash", v: d.pay.gcash || 0, c: CATC[1] }], peso)}</section>
+    <section class="card"><h2>By hour and items</h2><div class="small mut">Not available: the sales sheet has one total per day. Hours, items and tickets come only from a connected till.</div></section>
+    <div class="tiny mut">${srcLine()}</div>`);
+}
+
 /* ---------- sync with UTAK (Supabase edge function utak-sync) ---------- */
 const SYNC = { busy: false, msg: "", last: null, loaded: false };
 async function loadSyncInfo() {
-  try { const { data } = await sb.from("sync_log").select("at,trigger,ok,through_day,tickets,detail").order("at", { ascending: false }).limit(1); SYNC.last = data && data[0] || null; } catch (e) { /* the label just says never */ }
+  try { const { data } = await sb.from("sync_log").select("at,trigger,ok,through_day,tickets,detail").eq("store", osStore()).order("at", { ascending: false }).limit(1); SYNC.last = data && data[0] || null; } catch (e) { /* the label just says never */ }
   render();
 }
 function syncBar() {
   if (typeof sb === "undefined") return "";
-  if (!SYNC.loaded) { SYNC.loaded = true; loadSyncInfo(); }
-  const y = bizYesterday(); const behind = LAST_DAY < y ? Math.round((new Date(y + "T00:00:00") - new Date(LAST_DAY + "T00:00:00")) / 864e5) : 0;
+  const y = bizYesterday();
+  if (!tillStore()) { /* v0.27: no till feed; the days come from the Sales Monitoring sheet, loaded by a session */
+    const behind = LAST_DAY < y ? Math.round((new Date(y + "T00:00:00") - new Date(LAST_DAY + "T00:00:00")) / 864e5) : 0;
+    const ld = SALES_HISTORY.sheet_loaded ? new Date(SALES_HISTORY.sheet_loaded).toLocaleString("en-PH", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" }) : "never";
+    return `<div class="syncbar ${behind ? "stale" : ""}"><div class="sb-t"><b>Data to ${esc(dayName(LAST_DAY))}</b> ${behind ? `<span class="dl down"><i>▼</i>${behind} day${behind > 1 ? "s" : ""} behind</span>` : `<span class="dl up"><i>●</i>up to date</span>`}<div class="tiny mut">From the sales sheet · loaded ${esc(ld)} · no till connected</div></div></div>`;
+  }
+  if (!SYNC.loaded) { SYNC.loaded = true; loadSyncInfo(); } const behind = LAST_DAY < y ? Math.round((new Date(y + "T00:00:00") - new Date(LAST_DAY + "T00:00:00")) / 864e5) : 0;
   const l = SYNC.last; const when = l ? new Date(l.at).toLocaleString("en-PH", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Manila" }) + " · " + (l.trigger === "nightly" ? "nightly" : "button") + (l.ok ? "" : " · failed") : "no sync recorded yet";
   return `<div class="syncbar ${behind ? "stale" : ""}"><div class="sb-t"><b>Data to ${esc(dayName(LAST_DAY))}</b> ${behind ? `<span class="dl down"><i>▼</i>${behind} day${behind > 1 ? "s" : ""} behind</span>` : `<span class="dl up"><i>●</i>up to date</span>`}<div class="tiny mut">Last sync: ${esc(when)}${SYNC.msg ? " · " + esc(SYNC.msg) : ""}</div></div><button class="btn ${behind ? "primary" : ""}" ${SYNC.busy ? "disabled" : ""} onclick="syncNow()">${SYNC.busy ? "Syncing…" : "Sync now"}</button></div>`;
 }
@@ -266,14 +302,14 @@ async function syncNow() {
   try {
     let more = true, n = 0, tk = 0;
     while (more && n++ < 8) {
-      const { data, error } = await sb.functions.invoke("utak-sync", { body: {} });
+      const { data, error } = await sb.functions.invoke("utak-sync", { body: { store: osStore() } });
       let r = data;
       if (error) { try { r = await error.context.json(); } catch (e) { r = { ok: false, errors: [error.message] }; } }
       if (!r || !r.ok) throw new Error((r && (r.error || (r.errors || []).join("; "))) || "sync failed");
       tk += r.tickets; more = r.more; SYNC.msg = `${tk} tickets read…`; render();
     }
     if (role() !== "master") { await loadGlance(); SYNC.msg = `done, ${tk} tickets checked`; SYNC.busy = false; render(); return; } /* the store team gets two numbers, never the history */
-    const { data: sh, error: e2 } = await sb.rpc("sales_history", { p_store: "P99" }); if (e2) throw e2;
+    const { data: sh, error: e2 } = await sb.rpc("sales_history", { p_store: osStore() }); if (e2) throw e2;
     const nd = Object.assign({}, sh.days); window.SALES_HISTORY = sh; Object.keys(SD).forEach(k => delete SD[k]); Object.assign(SD, nd); SDAYS.length = 0; SDAYS.push(...Object.keys(SD).sort()); LAST_DAY = SDAYS[SDAYS.length - 1];
     TX.cache = {}; SYNC.msg = `done, ${tk} tickets checked`;
   } catch (e) { SYNC.msg = "failed: " + (e.message || e); }

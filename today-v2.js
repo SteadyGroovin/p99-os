@@ -3,7 +3,7 @@
    Lightspeed-style attention lists. Everything shown is computed from data that exists; nothing is invented, and a missing source says so.
    The old crew view stays in app.js as viewToday_v1 (one-person mode means every name gets this briefing). */
 
-const usualWeekday = (day, n = 8) => { const same = []; for (let k = 1; same.length < n && k <= 80; k++) { const x = addDays(day, -7 * k); if (SD[x]) same.push(x); } return same.length ? { avg: sum(same.map(x => SD[x].total)) / same.length, n: same.length, tk: sum(same.map(x => SD[x].tickets)) / same.length, box: sum(same.map(x => SD[x].cashbox_opens || 0)) / same.length } : null; };
+const usualWeekday = (day, n = 8) => { const same = []; for (let k = 1; same.length < n && k <= 80; k++) { const x = addDays(day, -7 * k); if (SD[x]) same.push(x); } return same.length ? { avg: sum(same.map(x => SD[x].total)) / same.length, n: same.length, tk: (t => t.length ? sum(t) / t.length : null)(same.map(x => SD[x].tickets).filter(v => v != null)), /* v0.27: sheet days have no tickets */ box: sum(same.map(x => SD[x].cashbox_opens || 0)) / same.length } : null; };
 const boxUsual = (day, n = 14) => { const ds = []; for (let k = 1; ds.length < n && k <= 60; k++) { const x = addDays(day, -k); if (SD[x]) ds.push(x); } return ds.length ? sum(ds.map(x => SD[x].cashbox_opens || 0)) / ds.length : null; };
 const greet = () => { const h = new Date().getHours(); return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening"; };
 
@@ -62,7 +62,7 @@ function viewToday() {
   const hero = y
     ? `<section class="card hero2 tdy tapc" onclick="salesRange='day';salesDay='${yd}';salesTab='overview';go('#/sales')"><div class="tdy-n"><div class="lab">Yesterday · ${esc(dayLong(yd))}</div><div class="big num">${peso(y.total)}</div>
         <div class="trend">${u ? delta(y.total, u.avg, `vs a usual ${WD[wdOf(yd)]} (${peso(u.avg)})`) : '<span class="mut">no earlier same weekday to compare</span>'}</div>
-        <div class="sub num">${y.tickets} tickets · avg ${peso(y.total / Math.max(1, y.tickets))}${u ? ` · usual ${Math.round(u.tk)}` : ""}</div></div>
+        <div class="sub num">${y.tickets != null ? `${y.tickets} tickets · avg ${peso(y.total / Math.max(1, y.tickets))}${u && u.tk != null ? ` · usual ${Math.round(u.tk)}` : ""}` : "from the sales sheet · no ticket count"}</div></div>
         <div class="tdy-c"><div class="tiny mut">Sales per day, last 14 days${u ? ` · dashed = a usual ${WD[wdOf(yd)]}` : ""}</div>${tdyBars(yd, u)}</div></section>`
     : `<section class="card hero2"><div class="lab">Yesterday · ${esc(dayLong(yd))}</div><div class="big num mut">—</div><div class="trend"><span class="dl down"><i>▼</i>not in the database yet</span></div><div class="sub">The newest day we have is ${esc(dayLong(LAST_DAY))}. Press <b>Sync now</b> above.</div></section>`;
   /* morning run + cash */
@@ -176,7 +176,7 @@ function tdyBars(yd, u) {
   const W = 460, H = 92, T = 6, B = 18, L = 2, R = 2, iw = W - L - R, ih = H - T - B, bw = iw / days.length;
   const hi = Math.max(1, ...vals.filter(v => v != null), u ? u.avg : 0) * 1.08, Y = v => T + ih - v / hi * ih;
   const ywd = wdOf(yd);
-  const bars = days.map((x, i) => { const v = vals[i], tip = `data-tt="${esc(dayName(x))}|${v == null ? "no record" : peso(v) + " · " + SD[x].tickets + " tickets"}"`;
+  const bars = days.map((x, i) => { const v = vals[i], tip = `data-tt="${esc(dayName(x))}|${v == null ? "no record" : peso(v) + (SD[x].tickets != null ? " · " + SD[x].tickets + " tickets" : " · sales sheet")}"`;
     const hit = `<rect class="hitb" x="${(L + bw * i).toFixed(1)}" y="${T}" width="${bw.toFixed(1)}" height="${ih}" ${tip}/>`;
     const cls = x === yd ? "on" : wdOf(x) === ywd ? "same" : "";
     const lab = `<text x="${(L + bw * (i + .5)).toFixed(1)}" y="${H - 4}" text-anchor="middle" class="${x === yd ? "on" : ""}">${WD[wdOf(x)][0]}</text>`;
