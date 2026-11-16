@@ -108,7 +108,7 @@ function homeStripHTML() {
   if (canOpen("approve")) { const n = (S.orders || []).filter(o => o.status === "requested" && o.approval_needed).length; cards.push(["Orders to approve", n, "#/approve"]); }
   if (canOpen("order")) cards.push(["Items to order", REORDER.filter(r => r.order_now).length, "#/order"]);
   if (canOpen("bills")) cards.push(["Bills open", MONEY.filter(m => m.mode === "bill" && !m.paid_on).length, "#/bills"]);
-  if (canOpen("sizes")) cards.push(["Pack sizes missing", ITEMS.filter(i => i.sizeUnknown).length, "#/sizes"]);
+  if (canOpen("sizes")) cards.push(["Pack sizes missing", szMissing(), "#/sizes"]);
   if (canOpen("recipes")) cards.push(["Recipes not confirmed", (typeof RECIPES !== "undefined" ? RECIPES : []).filter(r => !r.confirmed).length, "#/recipes"]);
   if (canOpen("report")) cards.push(["Tickets open", S.tickets.filter(t => t.status !== "done").length, "#/report"]);
   return `<section class="card qa"><h3>Quick actions</h3><div class="qa-row">${acts.map(a => `<button onclick="${a[2]}"><span class="qa-ic">${ic(ICON[modIcon(a[1])] || ICON.dots)}</span><span>${esc(a[0])}</span></button>`).join("")}</div></section>

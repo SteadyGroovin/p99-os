@@ -119,7 +119,7 @@ function viewStock() {
     <button class="btn primary" onclick="go('#/count')">${ic("grid-01", "sm")}${draft && dn ? `Continue count · ${dn}/${scoped.length}` : "Count tonight"}</button>
     ${["lead", "master"].includes(role()) ? `<button class="btn ${REORDER.some(r => r.order_now) ? "primary" : ""}" onclick="go('#/order')">${ic("list", "sm")}Order today${REORDER.filter(r => r.order_now).length ? ` <span class="bdg" style="position:static;margin-left:6px">${REORDER.filter(r => r.order_now).length}</span>` : ""}</button>` : ""}
     <button class="btn" onclick="go('#/receive')">${ic("package", "sm")}Receive</button>
-    ${["lead", "master"].includes(role()) && ITEMS.some(i => i.sizeUnknown) ? `<button class="btn" onclick="go('#/sizes')">${ic("grid-01", "sm")}Pack sizes <span class="bdg" style="position:static;margin-left:6px">${ITEMS.filter(i => i.sizeUnknown).length}</span></button>` : ""}
+    ${["lead", "master", "officer"].includes(role()) && szMissing() > 0 ? `<button class="btn" onclick="go('#/sizes')">${ic("grid-01", "sm")}Pack sizes <span class="bdg" style="position:static;margin-left:6px">${szMissing()}</span></button>` : ""}
     <button class="btn" onclick="go('#/transfers')">${ic("package", "sm")}Stock in / out${trWait.length ? ` <span class="bdg" style="position:static;margin-left:6px">${trWait.length}</span>` : ""}</button></div>`
     + (trWait.length ? `<div class="alert warn" style="margin-top:8px">⇄ ${trWait.length} transfer${trWait.length > 1 ? "s" : ""} waiting for your confirmation — <a href="#/transfers">open</a></div>` : "");
   const tiles = `<div class="grid2">

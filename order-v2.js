@@ -46,7 +46,7 @@ function viewOrder() {
     ${uncounted ? `<div class="tiny mut">${uncounted} item${uncounted === 1 ? "" : "s"} not counted yet: count them once so they can show up here.</div>` : ""}
     <div class="chips" style="margin:8px 0"><button class="chip ${odAll ? "" : "info"}" onclick="odAll=false;render()">Due now (${REORDER.filter(r => r.order_now).length})</button><button class="chip ${odAll ? "info" : ""}" onclick="odAll=true;render()">All items</button><button class="chip" onclick="odRefresh()">Refresh levels</button></div>
     ${sups.length ? sups.map(card).join("") : `<section class="card"><div class="mut">Nothing is due. Everything counted lasts past its next delivery.</div></section>`}
-    ${mine.length ? `<section class="card"><h2>Open orders</h2><div class="list">${mine.map(o => `<div class="row"><div class="main"><div class="name">${esc(o.supplier)} ${chip(o.status === "approved" ? "ok" : "warn", o.status === "draft" ? "sending" : o.status === "requested" ? "waiting for Mike" : "approved")}</div><div class="meta">${esc(dayName(o.day))} · ${o.lines.map(l => `${fmt(l.qty)} ${esc(l.unit || "")} ${esc((Store.item(l.item) || {}).name || l.item)}`).join(" · ")}${o.decision_note ? ` · “${esc(o.decision_note)}”` : ""}</div></div></div>`).join("")}</div><div class="tiny mut" style="margin-top:6px">Receive the delivery with the order: Stock → Receive, pick the supplier, tap the order.</div></section>` : ""}`, { back: "#/stock" });
+    ${mine.length ? `<section class="card"><h2>Open orders</h2><div class="list">${mine.map(o => `<div class="row"><div class="main"><div class="name">${esc(o.supplier)} ${chip(o.status === "approved" ? "ok" : "warn", o.status === "draft" ? "sending" : o.status === "requested" ? "waiting for Mike" : "approved")}</div><div class="meta">${esc(dayName(o.day))} · ${o.lines.map(l => `${fmt(l.qty)} ${esc(l.unit || "")} ${esc((Store.item(l.item) || {}).name || l.item)}`).join(" · ")}${o.decision_note ? ` · “${esc(o.decision_note)}”` : ""}</div></div>${odDelBtn(o)}</div>`).join("")}</div><div class="tiny mut" style="margin-top:6px">Receive the delivery with the order: Stock → Receive, pick the supplier, tap the order.</div></section>` : ""}`, { back: "#/stock" });
 }
 function odSend(sup) {
   const rs = REORDER.filter(r => (r.supplier || "") === sup && odItem(r) && (odAll || r.order_now) && odQty(r) > 0);
@@ -60,6 +60,21 @@ function odSend(sup) {
   render();
 }
 
+/* v0.23.5 (Stefan, 16 Nov: "I should also be able to delete orders"; migration 044): owners delete an order outright.
+   A delivery recorded against it stays; only the link goes. An order still in the outbox is dropped before it is sent. */
+function odDelBtn(o) { return role() === "master" ? `<div class="right"><button class="btn ghost danger sm" onclick="odDelete('${esc(o.id)}')" aria-label="Delete this order">Delete</button></div>` : ""; }
+async function odDelete(id) {
+  const o = (S.orders || []).find(x => x.id === id); if (!o) return;
+  if (!confirm(`Delete the order to ${o.supplier} from ${dayName(o.day)}? This cannot be undone.`)) return;
+  if (typeof Sync !== "undefined" && Sync.outbox) { Sync.outbox = Sync.outbox.filter(x => !(["po", "po_approve"].includes(x.kind) && x.rec && x.rec.id === id)); try { Sync.put(Sync.K.outbox, Sync.outbox); } catch (e) { } }
+  if (!(window.OS_LOADED && window.OS_LOADED.dev) && typeof sb !== "undefined") {
+    const r = await sb.rpc("os_delete_order", { p_id: id }); if (r.error) return toast("Not deleted: " + r.error.message);
+  }
+  S.orders = S.orders.filter(x => x.id !== id); S.approvals = (S.approvals || []).filter(a => a.id !== id);
+  if (typeof Sync !== "undefined" && Sync.snap) { delete Sync.snap["po:" + id]; try { Sync.put(Sync.K.snap, Sync.snap); } catch (e) { } }
+  save(); toast("Order deleted."); render();
+}
+
 /* ---------- APPROVE (master) ---------- */
 function viewApprove() {
   if (role() !== "master") return shell("Approve orders", "", `<div class="alert info">Only Mike or Stefan approve orders.</div>`, { back: "#/today" });
@@ -69,7 +84,7 @@ function viewApprove() {
       <div class="list">${o.lines.map(l => { const it = Store.item(l.item) || { name: l.item }; const rr = REORDER.find(r => r.item === l.item); const left = rr ? odLeft(rr) : null;
         return `<div class="row"><div class="main"><div class="name">${fmt(l.qty)} ${esc(l.unit || "")} ${esc(it.name)}</div><div class="meta">${left != null ? `${odQ(left)} ${esc(it.unit)} left` : "no count"}${rr && rr.cover != null ? ` · ${odQ(rr.cover)} days of cover` : ""}${l.price != null ? ` · about ${peso(l.price * l.qty)}` : ""}</div></div></div>`; }).join("")}</div>
       ${est ? `<div class="small" style="margin-top:6px">Estimate <b>${peso(est)}</b> from the last prices.</div>` : ""}
-      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn primary" style="flex:1" onclick="apDecide('${o.id}','approve')">Approve</button><button class="btn ghost danger" onclick="apDecide('${o.id}','reject')">Reject</button></div></section>`; }).join("");
+      <div style="display:flex;gap:8px;margin-top:10px"><button class="btn primary" style="flex:1" onclick="apDecide('${o.id}','approve')">Approve</button><button class="btn ghost danger" onclick="apDecide('${o.id}','reject')">Reject</button><button class="btn ghost danger" onclick="odDelete('${o.id}')">Delete</button></div></section>`; }).join("");
   return shell("Approve orders", open.length ? `${open.length} waiting` : "nothing waiting", list || `<section class="card"><div class="mut">No order is waiting for approval.</div></section>`, { back: "#/today" });
 }
 function apDecide(id, decision) {
@@ -140,32 +155,53 @@ async function pushOn() {
 }
 function pushState() { try { return localStorage.getItem("p99os_push") === "on"; } catch (e) { return false; } }
 
-/* ---------- PACK SIZES (v0.13, migration 021) ---------- */
-/* Stefan, 2026-11-08: no photo reading; the team writes the size down. Receive asks for it when an item without a size arrives;
-   here the lead or a master types the rest. The first size converts what was recorded in counted units, once (os_set_pack_size). */
-let szEdit = {};
+/* ---------- PACK SIZES (v0.13, migration 021; v0.23.5, migration 044) ---------- */
+/* Stefan, 2026-11-08: no photo reading; the team writes the size down. Receive asks for it when an item without a size arrives.
+   v0.23.5 (Stefan, 16 Nov: "The pack sizes category is not right clear"): the screen asked only "1 block = ? pc" (4 butter rows) while
+   ~200 rows counted in a jar, bottle, pack, gallon, tub, can, box, bag or sack had no label content. Now one question per line:
+   "one <unit> holds ___ g / ml / pc". Label content saves through os_set_net_content (owners and the Admin officer fill every store
+   that counts the item the same way; a lead the own store). The old count-unit size still goes through os_submit 'pack_size'. */
+const SZ_CONT = ["pack", "btl", "jar", "gal", "tub", "can", "box", "bag", "sack", "container"];
+const SZ_NAME = { btl: "bottle", gal: "gallon", pc: "piece" };
+const szUnitName = u => SZ_NAME[u] || u;
+const szNeedsNet = it => SZ_CONT.includes(it.base) && !(it.net > 0) && !it.sizeUnknown;
+function szNeeds(it) { return !!it && (it.sizeUnknown || szNeedsNet(it)); }
+function szMissing() { return ITEMS.filter(szNeeds).length; }
+const szGuess = it => ["btl", "gal"].includes(it.base) ? "ml" : it.base === "box" ? "pc" : "g";
+const szOK = () => ["lead", "master", "officer"].includes(role());
+let szEdit = {}, szUnit = {}, szBusy = false;
 function viewSizes() {
-  if (!["lead", "master"].includes(role())) return shell("Pack sizes", "", `<div class="alert info">For the store lead and the owners.</div>`, { back: "#/stock" });
-  const unknown = ITEMS.filter(i => i.sizeUnknown).sort((a, b) => (typeof skCatKey === "function" ? skCatKey(a) - skCatKey(b) : 0) || a.name.localeCompare(b.name));
-  /* v0.19.3: a fill-in table, one line per item, Tab or Enter moves down, one button saves everything typed */
-  const rows = unknown.map((it, i) => `<tr><td class="nm">${esc(it.name)}<div class="sub2">${esc(it.supplier || "no supplier")}</div></td><td class="h1 mut">${typeof skGrp === "function" ? esc(skGrp(it)) : ""}</td><td class="h1 mut">${typeof skSupLink === "function" ? skSupLink(it.supplier) || "—" : esc(it.supplier || "—")}</td><td class="mut">1 ${esc(it.unit)} =</td>
-    <td class="n szc"><input class="in num szin" inputmode="decimal" data-i="${i}" placeholder="${esc(it.base)}" aria-label="${esc(it.base)} in one ${esc(it.unit)} of ${esc(it.name)}" value="${szEdit[it.id] != null ? szEdit[it.id] : ""}" oninput="szEdit['${it.id}']=this.value===''?null:parseFloat(this.value);szCount()" onkeydown="if(event.key==='Enter'){const n=document.querySelector('.szin[data-i=&quot;${i + 1}&quot;]');if(n)n.focus();else szSaveAll()}"> <small>${esc(it.base)}</small></td></tr>`).join("");
+  if (!szOK()) return shell("Pack sizes", "", `<div class="alert info">For the store lead, the Admin officer and the owners.</div>`, { back: "#/stock" });
+  const list = ITEMS.filter(szNeeds).sort((a, b) => (typeof skCatKey === "function" ? skCatKey(a) - skCatKey(b) : 0) || a.name.localeCompare(b.name));
+  const all = role() !== "lead";
+  const rows = list.map((it, i) => {
+    const net = szNeedsNet(it), u = net ? (szUnit[it.id] || szGuess(it)) : it.base;
+    const unitCell = net ? `<select class="in szu" style="width:4.6em;display:inline-block;padding-left:6px;padding-right:4px" aria-label="unit for ${esc(it.name)}" onchange="szUnit['${it.id}']=this.value">${["g", "ml", "pc"].map(x => `<option ${x === u ? "selected" : ""}>${x}</option>`).join("")}</select>` : `<small>${esc(it.base)}</small>`;
+    return `<tr><td class="nm">${esc(it.name)}<div class="sub2">${esc(it.supplier || "no supplier")}</div></td><td class="h1 mut">${typeof skGrp === "function" ? esc(skGrp(it)) : ""}</td><td class="mut">1 ${esc(szUnitName(net ? it.base : it.unit))} holds</td>
+    <td class="n szc" style="white-space:nowrap"><input class="in num szin" style="width:6em" inputmode="decimal" data-i="${i}" placeholder="${net ? (u === "ml" ? "750" : u === "pc" ? "100" : "500") : ""}" aria-label="what one ${esc(szUnitName(net ? it.base : it.unit))} of ${esc(it.name)} holds" value="${szEdit[it.id] != null ? szEdit[it.id] : ""}" oninput="szEdit['${it.id}']=this.value===''?null:parseFloat(this.value.replace(',','.'));szCount()" onkeydown="if(event.key==='Enter'){const n=document.querySelector('.szin[data-i=&quot;${i + 1}&quot;]');if(n)n.focus();else szSaveAll()}"> ${unitCell}</td></tr>`; }).join("");
   const n = Object.values(szEdit).filter(v => v > 0).length;
-  return shell("Pack sizes", `${unknown.length} without a size`, `
-    <div class="tiny mut">Write how much ONE counted unit holds, as printed on the label (one can of tuna = ? g). Receive also asks for it when one of these arrives. Weigh it once if the label does not say. Enter jumps to the next line.</div>
-    ${unknown.length ? `<div class="itwrap"><table class="itbl sz"><thead><tr><th>Item</th><th class="h1">Category</th><th class="h1">Supplier</th><th>Counted as</th><th class="n">Holds</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <div class="bottom-act"><button class="btn primary full" id="szall" onclick="szSaveAll()" ${n ? "" : "disabled"}>Save ${n || ""} size${n === 1 ? "" : "s"}</button></div>` : `<section class="card"><div class="mut">Every item has a size.</div></section>`}`, { back: "#/stock" });
+  return shell("Pack sizes", list.length ? `${list.length} without a size` : "all done", `
+    <section class="card"><h2>What goes here</h2><div class="small">For each item, write what <b>one</b> of it holds, as printed on the label:</div>
+      <div class="tiny mut" style="margin:6px 0">1 jar of peanut butter = <b>340 g</b> · 1 bottle of caramel syrup = <b>750 ml</b> · 1 gallon of bleach = <b>3,785 ml</b> · 1 box of gloves = <b>100 pc</b></div>
+      <div class="tiny mut">The app needs it to work out recipe costs and the price per kg or litre. No label: weigh it once. Pick g, ml or pc on the right. Enter jumps to the next line.${all ? " What you save fills every store that uses the same item." : ""}</div></section>
+    ${list.length ? `<div class="itwrap"><table class="itbl sz"><thead><tr><th>Item</th><th class="h1">Category</th><th>One</th><th class="n">Holds</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="bottom-act"><button class="btn primary full" id="szall" onclick="szSaveAll()" ${n && !szBusy ? "" : "disabled"}>${szBusy ? "Saving…" : `Save ${n || ""} size${n === 1 ? "" : "s"}`}</button></div>` : `<section class="card"><div class="mut">Every item has a size.</div></section>`}`, { back: "#/stock" });
 }
 function szCount() { const n = Object.values(szEdit).filter(v => v > 0).length; const b = document.getElementById("szall"); if (b) { b.disabled = !n; b.textContent = `Save ${n || ""} size${n === 1 ? "" : "s"}`; } }
-function szSaveAll() {
+async function szSaveAll() {
   const ids = Object.keys(szEdit).filter(k => szEdit[k] > 0); if (!ids.length) return toast("Type a size first.");
-  S.sizeDecisions = S.sizeDecisions || [];
-  ids.forEach(code => { S.sizeDecisions.push({ id: "sz-" + code + "-" + Date.now(), item: code, qty: szEdit[code], synced: false }); const it = Store.item(code); if (it) { it.per = szEdit[code]; it.sizeUnknown = false; } delete szEdit[code]; });
-  save(); toast(ids.length + (ids.length === 1 ? " size saved." : " sizes saved.")); render();
-}
-function szSave(code) {
-  const qty = szEdit[code]; if (!(qty > 0)) return toast("Type the size first.");
-  S.sizeDecisions = S.sizeDecisions || []; S.sizeDecisions.push({ id: "sz-" + code + "-" + Date.now(), item: code, qty, synced: false });
-  const it = Store.item(code); if (it) { it.per = qty; it.sizeUnknown = false; }
-  delete szEdit[code]; save(); toast("Size saved."); render();
+  const nets = ids.filter(id => szNeedsNet(Store.item(id) || {})), olds = ids.filter(id => !nets.includes(id));
+  if (olds.length) { S.sizeDecisions = S.sizeDecisions || [];
+    olds.forEach(code => { S.sizeDecisions.push({ id: "sz-" + code + "-" + Date.now(), item: code, qty: szEdit[code], synced: false }); const it = Store.item(code); if (it) { it.per = szEdit[code]; it.sizeUnknown = false; } delete szEdit[code]; });
+    save(); }
+  if (nets.length) {
+    const items = nets.map(code => ({ code, net: szEdit[code], unit: szUnit[code] || szGuess(Store.item(code)) }));
+    if (!(window.OS_LOADED && window.OS_LOADED.dev) && typeof sb !== "undefined") {
+      szBusy = true; render();
+      const r = await sb.rpc("os_set_net_content", { p: { store: curStore(), items } }); szBusy = false;
+      if (r.error) { render(); return toast("Not saved: " + r.error.message); }
+    }
+    items.forEach(x => { const it = Store.item(x.code); if (it) { it.net = x.net; it.netUnit = x.unit; } delete szEdit[x.code]; delete szUnit[x.code]; });
+  }
+  toast(ids.length + (ids.length === 1 ? " size saved." : " sizes saved.")); render();
 }

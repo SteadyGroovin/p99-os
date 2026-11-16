@@ -93,7 +93,17 @@ function viewTransfer(id) {
   return shell(`${esc(locName(t.from))} → ${esc(locName(t.to))}`, `${esc(dayName(t.day))} · ${trStatusChip(t)}${trNotSaved(t) ? ' <span class="chip warn"><i class="dot"></i>not saved yet</span>' : ""}`, `
     <section class="card"><div class="grid2"><div><div class="lab">Released by ${esc(locName(t.from))}</div><div class="small">${posted("release")}</div></div><div><div class="lab">Received by ${esc(locName(t.to))}</div><div class="small">${posted("receive")}</div></div></div></section>
     <section class="card">${tbl}${t.status === "mismatch" ? `<div class="alert warn" style="margin-top:10px">▲ The two sides differ. Owners see this on Today; the store's stock counts what arrived, the sender's what left.</div>` : ""}${t.photo ? thumb(t.photo, "big") : ""}</section>
-    ${confirm}${padHTML()}`, { back: "#/transfers" });
+    ${confirm}${role() === "master" ? `<section class="card"><button class="btn ghost danger full" onclick="trDelete('${esc(id)}')">Delete this transfer</button><div class="tiny mut" style="margin-top:6px">For a transfer recorded by mistake. Both sides disappear and stock no longer counts it.</div></section>` : ""}${padHTML()}`, { back: "#/transfers" });
+}
+/* v0.23.5 (Stefan, 16 Nov: a wrong "Pull-out arrived" he could not fix, edit or delete; migration 045): owners delete a transfer outright. */
+async function trDelete(id) {
+  const t = S.transfers.find(x => x.id === id); if (!t) return;
+  if (!confirm(`Delete ${locName(t.from)} → ${locName(t.to)} from ${dayName(t.day)}? This cannot be undone.`)) return;
+  if (typeof Sync !== "undefined" && Sync.outbox) { Sync.outbox = Sync.outbox.filter(x => !(x.kind === "transfer" && x.rec && x.rec.id === id)); try { Sync.put(Sync.K.outbox, Sync.outbox); } catch (e) { } }
+  if (!(window.OS_LOADED && window.OS_LOADED.dev) && typeof sb !== "undefined") { const r = await sb.rpc("os_delete_transfer", { p_id: id }); if (r.error) return toast("Not deleted: " + r.error.message); }
+  S.transfers = S.transfers.filter(x => x.id !== id); tr = null;
+  if (typeof Sync !== "undefined" && Sync.snap) { delete Sync.snap["transfer:" + id]; try { Sync.put(Sync.K.snap, Sync.snap); } catch (e) { } }
+  save(); toast("Transfer deleted."); go("#/transfers");
 }
 function trEditLine(i) { const l = tr.lines[i]; openPad(l.item, "receive", (qty, text) => { if (!qty) return; l.qty = qty; l.text = text; }); }
 function trConfirm(id) {

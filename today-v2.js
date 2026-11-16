@@ -117,7 +117,7 @@ function viewMore() {
   const group = (title, rows) => `<section class="card mg"><h3>${title}</h3><div class="list">${rows.join("")}</div></section>`;
   const daily = group("Every day", [row("Store walk", "Cherry's morning run, the old form", "go('#/walk')"), row("Morning run results", "from the database, with the cash gap", "salesTab='run';go('#/sales')"), row("Receive a delivery", "at the store or at Head Office", "go('#/receive')"), row("Stock in / out", "Head Office releases, the store confirms", "go('#/transfers')"),
     ...(["lead", "master"].includes(role()) ? [row("Order today", `${REORDER.filter(r => r.order_now).length} item${REORDER.filter(r => r.order_now).length === 1 ? "" : "s"} due`, "go('#/order')")] : []),
-    ...(["lead", "master"].includes(role()) ? [row("Pack sizes", `${ITEMS.filter(i => i.sizeUnknown).length} items without a size yet`, "go('#/sizes')")] : []),
+    ...(["lead", "master", "officer"].includes(role()) ? [row("Pack sizes", `${szMissing()} items without a size yet`, "go('#/sizes')")] : []),
     ...(role() === "master" ? [row("Approve orders", `${(S.orders || []).filter(o => o.status === "requested" && o.approval_needed).length} waiting`, "go('#/approve')")] : []),
     ...(canOpen("suppliers") ? [row("Suppliers", "terms, delivery days, what we buy, prices", "go('#/suppliers')")] : []),
     ...(moneyOK() ? [row("Stores & places", "where stock is sent and received", "go('#/stores')")] : []),
