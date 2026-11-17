@@ -134,7 +134,7 @@ function viewRecipe(id) {
       <input class="in num" id="rcqty-${i}" style="width:86px" inputmode="decimal" value="${l.qty || ""}" onchange="rcEdit.lines[${i}].qty=parseFloat(this.value)||0;render()" aria-label="Amount"><span class="tiny mut" style="width:28px">${esc(it ? (it.base || it.unit) : "")}</span>
       <button class="btn ghost danger rx" onclick="rcEdit.lines.splice(${i},1);render()" aria-label="Remove">${ic("x-close")}</button></div>`; }).join("");
   const parts = (e.parts || []).map(l => { const pr = RECIPES.find(x => x.id === l.part); return `<div class="row"><div class="main"><div class="name">uses batch: ${esc(pr ? pr.pos : "a batch")}</div><div class="meta">${fmt(+l.qty)}</div></div></div>`; }).join("");
-  return shell(e.id ? esc(e.pos) : "New recipe", e.id ? esc(e.cat) : "", `
+  return shell(e.id ? esc(e.pos) : "New recipe", e.id ? esc(e.cat) : "", `${typeof itSheetHTML === "function" ? itSheetHTML() : ""}
     ${e.portion_of ? `<div class="alert info">This is a portion (1/${fmt(+e.div || 1)}) of ${esc((RECIPES.find(x => x.id === e.portion_of) || {}).pos || "another recipe")}; its ingredients come from there.</div>` : ""}
     ${e.id ? "" : `<section class="card"><div class="field"><label>Name as on the till (UTAK)</label><input class="in" value="${esc(e.pos)}" oninput="rcEdit.pos=this.value"></div>
       <div class="field"><label>Category</label><input class="in" value="${esc(e.cat)}" oninput="rcEdit.cat=this.value"></div>
@@ -156,8 +156,15 @@ function rcAddFind(q) {
   const have = new Set((rcEdit && rcEdit.lines || []).map(l => l.item));
   const hits = ITEMS.filter(i => { const t = (i.name + " " + i.id).toLowerCase(); return words.every(w => t.includes(w)); })
     .sort((a, b) => (a.name.toLowerCase().startsWith(words[0]) ? 0 : 1) - (b.name.toLowerCase().startsWith(words[0]) ? 0 : 1) || a.name.localeCompare(b.name)).slice(0, 12);
-  box.innerHTML = hits.length ? hits.map(i => `<button type="button" class="row tap" style="width:100%;text-align:left" onclick="rcAddPick('${esc(i.id).replace(/'/g, "\\'")}')"><div class="main"><div class="name">${esc(i.name)}</div><div class="meta">${esc(i.base || i.unit)}${i.cat ? " · " + esc(i.cat) : ""}${have.has(i.id) ? " · already in this recipe" : ""}</div></div></button>`).join("")
-    : `<div class="small mut">No item matches "${esc(q)}". Check the spelling, or add the item under Items first.</div>`;
+  const canNew = typeof itEditOK === "function" && itEditOK();
+  const add = canNew ? `<button type="button" class="btn sm" style="margin-top:6px" onclick="rcNewItem()">+ New item "${esc(String(q).trim())}"</button><div class="tiny mut" style="margin-top:4px">Not in the list? Add it to the items here; it goes straight into this recipe.</div>`
+    : `<div class="tiny mut" style="margin-top:4px">Not in the list? The office or the Admin officer adds new items.</div>`;
+  box.innerHTML = (hits.length ? hits.map(i => `<button type="button" class="row tap" style="width:100%;text-align:left" onclick="rcAddPick('${esc(i.id).replace(/'/g, "\\'")}')"><div class="main"><div class="name">${esc(i.name)}</div><div class="meta">${esc(i.base || i.unit)}${i.cat ? " · " + esc(i.cat) : ""}${have.has(i.id) ? " · already in this recipe" : ""}</div></div></button>`).join("")
+    : `<div class="small mut">No item matches "${esc(q)}". Check the spelling.</div>`) + add;
+}
+function rcNewItem() {   /* v0.27.3 (Stefan, 17 Nov: "add an ingredient/item from the recipes section. If it's not yet in the data bank"): the Items form, name filled in */
+  const q = (document.getElementById("rcAddQ") || {}).value || ""; const name = q.trim().replace(/^./, c => c.toUpperCase());
+  itOpen(null, name); itAfterSave = code => rcAddPick(code);
 }
 function rcAddPick(id) {
   rcEdit.lines.push({ item: id, qty: 0 }); const n = rcEdit.lines.length - 1; render();

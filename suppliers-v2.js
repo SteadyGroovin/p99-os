@@ -175,16 +175,16 @@ const IT_MEASURE = [["g", "grams (g)"], ["ml", "millilitres (ml)"], ["pc", "piec
 const IT_COUNT = ["pack", "btl", "can", "jar", "box", "bag", "tub", "gal", "sack", "tank", "roll", "pad", "block", "tray", "jug", "container"];
 const IT_BUY = ["case", "box", "bundle", "sack", "pack", "tray", "carton"];
 const IT_EXP_CATS = ["Drink", "Canned & jar", "Sauce & oil", "Dry & baking", "Dairy & eggs", "Cheese", "Ice cream"];
-let itSheet = null, itBusy = false;
+let itSheet = null, itBusy = false, itAfterSave = null;   /* v0.27.3: the recipe editor opens this sheet and takes the new item back */
 function itNewBtn() { return itEditOK() ? `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn sm" onclick="itOpen(null)">+ New item</button></div>${itSheetHTML()}` : ""; }
 function itEditBtn(it) { return itEditOK() ? `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn sm" onclick="itOpen('${esc(it.id)}')">Edit item</button></div>${itSheetHTML()}` : ""; }
-function itOpen(id) {
-  const it = id ? Store.item(id) : null;
+function itOpen(id, preName) {
+  itAfterSave = null; const it = id ? Store.item(id) : null;
   const packed = it && it.unit && it.base && it.unit !== it.base;
   itSheet = it ? { code: it.id, name: it.name, category: IT_CATS.find(c => c.toLowerCase() === it.cat) || it.cat, place: it.place || "", unit: ["g", "ml", "pc"].includes(it.base) ? it.base : "pc",
       pack_unit: packed ? it.unit : "", pack_qty: packed && it.per ? it.per : "", case_unit: it.packUnit || "", case_qty: it.pack || "",
       par: it.par == null ? "" : it.par, supplier: it.supplier || "", brand: it.brand || "", nightly: !!it.nightly, active: true, expiry: !!it.expiry }
-    : { code: null, name: "", category: "", place: "", unit: "g", pack_unit: "", pack_qty: "", case_unit: "", case_qty: "", par: "", supplier: "", brand: "", nightly: false, active: true, expiry: null };
+    : { code: null, name: preName || "", category: "", place: "", unit: "g", pack_unit: "", pack_qty: "", case_unit: "", case_qty: "", par: "", supplier: "", brand: "", nightly: false, active: true, expiry: null };
   render();
 }
 function itRead() {   /* keep what was typed when the sheet redraws */
@@ -238,6 +238,7 @@ async function itSave() {
     code = r.data.code;
     const L = await loadRecords(); if (!L.error) { window.OS_LOADED = L.data; dbCatalogue(L.data); }
   }
+  if (itAfterSave) { const f = itAfterSave; itAfterSave = null; itBusy = false; itSheet = null; toast("Item saved and added."); return f(code); }
   itBusy = false; itSheet = null; toast("Item saved."); go(p.active === false ? "#/items" : "#/item/" + encodeURIComponent(code));
 }
 
