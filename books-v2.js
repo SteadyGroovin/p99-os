@@ -130,9 +130,8 @@ function viewRecipe(id) {
   const r = RECIPES.find(x => x.id === id);
   if (!rcEdit || rcEdit.id !== (r ? r.id : null)) rcEdit = r ? { id: r.id, pos: r.pos, cat: r.cat, rkind: r.kind, lines: r.lines.filter(l => !l.part).map(l => ({ item: l.item, qty: +l.qty, note: l.note || "" })), parts: r.lines.filter(l => l.part), notes: r.notes || "", confirmed: !!r.confirmed, portion_of: r.portion_of, div: r.div } : (rcEdit || { id: null, pos: "", cat: "Pizza", rkind: "menu", lines: [], notes: "", confirmed: false });
   const e = rcEdit;
-  const opts = ITEMS.slice().sort((a, b) => a.name.localeCompare(b.name)).map(i => `<option value="${esc(i.id)}">${esc(i.name)} (${esc(i.base || i.unit)})</option>`).join("");
   const lines = e.lines.map((l, i) => { const it = rcItem(l.item); return `<div class="rline"><div class="main"><div class="name">${esc(it ? it.name : l.item)}</div></div>
-      <input class="in num" style="width:86px" inputmode="decimal" value="${l.qty || ""}" onchange="rcEdit.lines[${i}].qty=parseFloat(this.value)||0;render()" aria-label="Amount"><span class="tiny mut" style="width:28px">${esc(it ? (it.base || it.unit) : "")}</span>
+      <input class="in num" id="rcqty-${i}" style="width:86px" inputmode="decimal" value="${l.qty || ""}" onchange="rcEdit.lines[${i}].qty=parseFloat(this.value)||0;render()" aria-label="Amount"><span class="tiny mut" style="width:28px">${esc(it ? (it.base || it.unit) : "")}</span>
       <button class="btn ghost danger rx" onclick="rcEdit.lines.splice(${i},1);render()" aria-label="Remove">${ic("x-close")}</button></div>`; }).join("");
   const parts = (e.parts || []).map(l => { const pr = RECIPES.find(x => x.id === l.part); return `<div class="row"><div class="main"><div class="name">uses batch: ${esc(pr ? pr.pos : "a batch")}</div><div class="meta">${fmt(+l.qty)}</div></div></div>`; }).join("");
   return shell(e.id ? esc(e.pos) : "New recipe", e.id ? esc(e.cat) : "", `
@@ -142,10 +141,27 @@ function viewRecipe(id) {
       <div class="field"><label>Kind</label><div class="chips">${[["menu", "Menu item"], ["prep", "Batch (dough, sauce)"], ["combo", "Combo"], ["promo", "Promo"], ["addon", "Add-on"]].map(([k, l]) => `<button class="chip ${e.rkind === k ? "info" : ""}" onclick="rcEdit.rkind='${k}';render()">${l}</button>`).join("")}</div></div></section>`}
     <section class="card"><h2>Ingredients <span class="tiny mut">per one ${e.rkind === "prep" ? "batch" : "whole item"}, in grams / ml / pieces</span></h2>
       ${lines || `<div class="mut small">No ingredients yet.</div>`}${parts}
-      <div class="field" style="margin-top:10px"><select class="in" onchange="if(this.value){rcEdit.lines.push({item:this.value,qty:0});render()}"><option value="">+ Add an ingredient</option>${opts}</select></div></section>
+      <div class="field rcadd" style="margin-top:10px"><label for="rcAddQ">Add an ingredient</label><input class="in" type="search" id="rcAddQ" autocomplete="off" placeholder="Type to search, e.g. mozza, flour, box" oninput="rcAddFind(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();const b=document.querySelector('#rcAddRes button');if(b)b.click()}">
+        <div id="rcAddRes" class="list" style="margin-top:6px"></div></div></section>
     <section class="card"><div class="field"><label>Notes</label><textarea class="in" oninput="rcEdit.notes=this.value" placeholder="e.g. weighed by Erica on 10 Nov">${esc(e.notes)}</textarea></div>
       <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" ${e.confirmed ? "checked" : ""} onchange="rcEdit.confirmed=this.checked" style="width:22px;height:22px"> Confirmed by the store (weighed or checked)</label></section>
     <div class="bottom-act"><button class="btn primary full" onclick="rcpSave()">Save recipe</button></div>`, { back: "#/recipes" });
+}
+/* v0.27.2 (Stefan, 17 Nov: "she should also be able to search for something, not only use a drop-down list"):
+   type part of a name or code, every word must match; tap or Enter adds it and jumps to its amount */
+function rcAddFind(q) {
+  const box = document.getElementById("rcAddRes"); if (!box) return;
+  const words = String(q || "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) { box.innerHTML = ""; return; }
+  const have = new Set((rcEdit && rcEdit.lines || []).map(l => l.item));
+  const hits = ITEMS.filter(i => { const t = (i.name + " " + i.id).toLowerCase(); return words.every(w => t.includes(w)); })
+    .sort((a, b) => (a.name.toLowerCase().startsWith(words[0]) ? 0 : 1) - (b.name.toLowerCase().startsWith(words[0]) ? 0 : 1) || a.name.localeCompare(b.name)).slice(0, 12);
+  box.innerHTML = hits.length ? hits.map(i => `<button type="button" class="row tap" style="width:100%;text-align:left" onclick="rcAddPick('${esc(i.id).replace(/'/g, "\\'")}')"><div class="main"><div class="name">${esc(i.name)}</div><div class="meta">${esc(i.base || i.unit)}${i.cat ? " · " + esc(i.cat) : ""}${have.has(i.id) ? " · already in this recipe" : ""}</div></div></button>`).join("")
+    : `<div class="small mut">No item matches "${esc(q)}". Check the spelling, or add the item under Items first.</div>`;
+}
+function rcAddPick(id) {
+  rcEdit.lines.push({ item: id, qty: 0 }); const n = rcEdit.lines.length - 1; render();
+  setTimeout(() => { const el = document.getElementById("rcqty-" + n); if (el) { el.focus(); el.select(); } }, 30);
 }
 function rcpSave() {
   const e = rcEdit; if (!e.id && (e.pos || "").trim().length < 2) return toast("Type the name as on the till.");
