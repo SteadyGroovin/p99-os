@@ -21,7 +21,7 @@ const MODULES = [
   ["stock", "Stock", "#/stock", "grid", "Inventory"], ["count", "Count", "#/count", "grid", "Inventory"], ["receive", "Receive", "#/receive", "box", "Inventory"], ["transfers", "Transfers", "#/transfers", "box", "Inventory"], ["variance", "Variance", "#/variance", "grid", "Inventory"],
   ["order", "Order", "#/order", "coins", "Buying"], ["approve", "Approve", "#/approve", "check", "Buying"], ["bills", "Bills", "#/bills", "coins", "Buying"], ["purchases", "Purchases", "#/purchases", "coins", "Buying"], ["suppliers", "Suppliers", "#/suppliers", "coins", "Buying"],
   ["money", "Funds", "#/money", "finance", "Money"], ["finance", "P&L", "#/finance", "finance", "Money"], ["books", "Month close", "#/books", "finance", "Money"], ["accounts", "Accounts", "#/accounts", "finance", "Money"],
-  ["tasks", "Tasks", "#/tasks", "list", "Team"], ["report", "Tickets", "#/report", "alert", "Team"], ["clean", "Clean", "#/clean", "check", "Team"],
+  ["tasks", "Tasks", "#/tasks", "list", "Team"], ["questions", "Questions", "#/questions", "list", "Team"], ["report", "Tickets", "#/report", "alert", "Team"], ["clean", "Clean", "#/clean", "check", "Team"],
   ["papers", "Papers", "#/papers", "list", "Office"],
   ["items", "Items", "#/items", "box", "Catalogue"], ["recipes", "Recipes", "#/recipes", "list", "Catalogue"], ["sizes", "Pack sizes", "#/sizes", "box", "Catalogue"],
   ["users", "Users", "#/users", "dots", "Settings"], ["stores", "Stores", "#/stores", "dots", "Settings"], ["rules", "Rules", "#/rules", "dots", "Settings"], ["more", "Device", "#/more", "dots", "Settings"],
@@ -51,7 +51,8 @@ function canOpen(s0) {
   const r = role(), adm = officeLogin(), fin = financeLogin(), m = r === "master";
   /* v0.22 (Stefan, 15 Nov, Burger Kong access for Cath): the store lead sees tasks, inventory (stock, count, receive) and ordering for her own store */
   /* v0.23 (Stefan, 15 Nov: Hannah gets inventory, buying and the team): every store and D'Mall Storage, the all-stores stock, Papers. v0.23.2 (16 Nov): plus the morning run and the cash count (migration 040). Not sales, funds, bills, approving or roles. v0.23.3 (16 Nov, migration 043): plus recipes */
-  if (r === "officer") return ["", "today", "walk", "cash", "stock", "stock-all", "count", "receive", "receipts", "transfers", "transfer", "variance", "items", "item", "sizes", "order", "suppliers", "supplier", "recipes", "recipe", "tasks", "task", "report", "clean", "papers", "more", "settings", "who", "password", "modules"].includes(s0);
+  if (r === "officer") return ["", "today", "walk", "cash", "stock", "stock-all", "count", "receive", "receipts", "transfers", "transfer", "variance", "items", "item", "sizes", "order", "suppliers", "supplier", "recipes", "recipe", "tasks", "task", "report", "clean", "papers", "questions", "more", "settings", "who", "password", "modules"].includes(s0);
+  if (s0 === "questions") return m || adm;   /* v0.28 (migration 052): open questions for the officer, the office and the owners */
   if (s0 === "papers") return m || adm;   /* the office (admin, finance) and the owners */
   if (r === "lead") return ["", "today", "tasks", "task", "stock", "count", "receive", "receipts", "items", "item", "order", "sizes", "suppliers", "supplier", "more", "settings", "who", "password", "modules"].includes(s0);
   if (["sales", "finance", "approve", "users", "rules"].includes(s0)) return m;
@@ -110,6 +111,7 @@ function homeStripHTML() {
   if (canOpen("bills")) cards.push(["Bills open", MONEY.filter(m => m.mode === "bill" && !m.paid_on).length, "#/bills"]);
   if (canOpen("sizes")) cards.push(["Pack sizes missing", szMissing(), "#/sizes"]);
   if (canOpen("recipes")) cards.push(["Recipes not confirmed", (typeof RECIPES !== "undefined" ? RECIPES : []).filter(r => !r.confirmed).length, "#/recipes"]);
+  if (canOpen("questions") && typeof qLoad === "function") { qLoad(); cards.push(["Questions to answer", QQ.state === "ok" ? qOpenN() : "…", "#/questions"]); }   /* v0.28 */
   if (canOpen("report")) cards.push(["Tickets open", S.tickets.filter(t => t.status !== "done").length, "#/report"]);
   return `<section class="card qa"><h3>Quick actions</h3><div class="qa-row">${acts.map(a => `<button onclick="${a[2]}"><span class="qa-ic">${ic(ICON[modIcon(a[1])] || ICON.dots)}</span><span>${esc(a[0])}</span></button>`).join("")}</div></section>
     <div class="grid2 hcards">${cards.map(c => `<button class="card tap hcard" onclick="go('${c[2]}')"><div class="lab">${esc(c[0])}</div><div class="val num">${c[1]}</div></button>`).join("")}</div>`;
