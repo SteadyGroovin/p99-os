@@ -60,12 +60,13 @@ function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split(
 /* ---------- shell ---------- */
 function shell(title, sub, body, { back } = {}) {   /* v0.17: Home + three pinned modules + More (nav-v2.js) */
   const p = me(); const seg = (location.hash.slice(1) || "/today").split("/")[1] || "today";
+  const menuPage = (location.hash.slice(2) || "today").split("/").filter(Boolean).length <= 1 && typeof MODULES !== "undefined" && MODULES.some(x => x[0] === seg && x[4] !== "Settings");   /* v0.29: a menu page needs no back arrow where the menu is on screen (styles.css hides .menuback from 1100 px) */
   const two = ["today", "item", "supplier"].includes(seg) ? " two" : "";   /* v0.26.0: detail pages in two columns on a wide screen (styles.css, layout block) */
   return `
   <div class="navscrim" onclick="toggleNav(false)"></div>
   <nav class="sidebar"><div class="brand"><img class="rb-line rb-light" src="brand/rb-lockup-line-light.svg" alt="Rocket Boracay"><img class="rb-line rb-dark" src="brand/rb-lockup-line-dark.svg" alt="Rocket Boracay"></div>${sidebarHTML(seg)}</nav>
   <div class="page">
-    <header class="top"><button class="navbtn" onclick="toggleNav()" aria-label="Menu"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>${back ? `<button class="back" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
+    <header class="top"><button class="navbtn" onclick="toggleNav()" aria-label="Menu"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>${back ? `<button class="back${menuPage ? " menuback" : ""}" onclick="go('${back}')" aria-label="Back">${ic("chevron-left")}</button>` : ""}
       <div class="ttl"><h1>${title}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
       ${storeChip()}<button class="me" onclick="go('#/settings')" aria-label="Settings"><span class="av">${p ? esc(p.short[0]) : "?"}</span></button>
     </header>
@@ -215,12 +216,18 @@ function viewReceive_v1() {
 }
 function rcAdd() { const id = $("#rcitem").value; openPad(id, "receive", (qty, text) => { if (!qty) return; let price = null; if (rc.kind !== "pullout") { const p = prompt("Price per " + Store.item(id).unit + " (₱) — leave empty if not on the invoice", Store.lastPrice(id) ? Store.lastPrice(id).price : ""); price = p ? parseFloat(p) : null; } rc.lines.push({ item: id, qty, text, price }); }); }
 function rcSave() { const total = rc.total !== "" && rc.total != null ? parseFloat(rc.total) : null;   /* v0.12: total, paid now / bill and the order it fills */
-  S.receipts.push({ id: "r-" + Date.now(), day: today(), kind: rc.kind, supplier: rc.supplier, by: S.me, photo: rc.photo, amount: rc.pay_mode === "paid_now" ? total : null, total, pay_mode: rc.pay_mode || null, pay_source: rc.pay_mode === "paid_now" ? rc.pay_source || "store_fund" : null, invoice: (rc.invoice || "").trim() || null, po: rc.po || null,
-    location: rc.location && rc.location !== "P99" ? rc.location : null, synced: false, lines: rc.lines.map(l => ({ item: l.item, qty: l.qty, text: l.text, price: l.price, size: l.size > 0 ? l.size : null })) });
+  const here = typeof skStore === "function" ? skStore() : "P99", loc = rc.location && rc.location !== here ? rc.location : null, day = rc.day || today();   /* v0.29: the store's own code means "here"; the office may date a receipt */
+  if (rc.edit) { const r = S.receipts.find(x => x.id === rc.edit);   /* v0.29: the office adds the items to a photo-only delivery (same id, the server replaces the lines) */
+    if (r) Object.assign(r, { day, supplier: rc.supplier, total, amount: rc.pay_mode === "paid_now" ? total : null, pay_mode: rc.pay_mode || null, pay_source: rc.pay_mode === "paid_now" ? rc.pay_source || "store_fund" : null, invoice: (rc.invoice || "").trim() || null, location: loc, synced: false,
+      lines: rc.lines.map(l => ({ item: l.item, qty: l.qty, text: l.text, price: l.price, size: l.size > 0 ? l.size : null, exp: l.exp || null })) });
+    rc = null; save(); toast(r ? "Items added." : "That receipt is gone — reload."); go("#/receive"); return; }
+  const photoOnly = !rc.lines.length;
+  S.receipts.push({ id: "r-" + Date.now(), day, kind: rc.kind, supplier: rc.supplier, by: S.me, photo: rc.photo, amount: rc.pay_mode === "paid_now" ? total : null, total, pay_mode: rc.pay_mode || null, pay_source: rc.pay_mode === "paid_now" ? rc.pay_source || "store_fund" : null, invoice: (rc.invoice || "").trim() || null, po: rc.po || null,
+    location: loc, synced: false, lines: rc.lines.map(l => ({ item: l.item, qty: l.qty, text: l.text, price: l.price, size: l.size > 0 ? l.size : null, exp: l.exp || null })) });   /* v0.29: the expiry typed at Receive was dropped here since v0.24 */
   rc.lines.forEach(l => { const it = Store.item(l.item); if (it && it.sizeUnknown && l.size > 0) { it.per = l.size; it.sizeUnknown = false; } });   /* v0.13 */
   if (rc.po) { const o = (S.orders || []).find(x => x.id === rc.po); if (o) o.status = "received"; }
   const toHO = role() === "walk" && (!financeLogin() || rc.location === "HO");   /* v0.18: Finance receives anywhere; Head Office deliveries go on to the transfers */
-  rc = null; save(); toast(toHO ? "Saved at Head Office." : "Saved — stock updated."); go(role() === "crew" ? "#/today" : toHO ? "#/transfers" : "#/stock"); }
+  rc = null; save(); toast(photoOnly ? "Saved — the office adds the items." : toHO ? "Saved at Head Office." : "Saved — stock updated."); go(role() === "crew" ? "#/today" : toHO ? "#/transfers" : "#/stock"); }
 
 /* ---------- ITEMS ---------- */
 let itemQ = "";

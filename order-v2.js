@@ -41,7 +41,7 @@ function viewOrder() {
     return `<section class="card"><h2>${esc(sup || "No supplier set")} <span class="tiny mut">${info.lead ? `${fmt(info.lead)} day${+info.lead === 1 ? "" : "s"} to arrive` : ""}${info.order_days ? ` · orders ${esc(info.order_days)}` : ""}</span></h2><div class="list">${lines}</div><div style="margin-top:10px">${btn}</div></section>`;
   };
   const mine = (S.orders || []).filter(o => o.status !== "cancelled" && o.status !== "received").sort((a, b) => a.day < b.day ? 1 : -1);
-  return shell("Order today", dayLong(today()), `
+  return shell("Order", dayLong(today()), `
     <div class="alert info">The list shows what drops under its reorder point before the next delivery can arrive. Quantities are in the unit you buy. Change them with − and +, then send per supplier.</div>
     ${uncounted ? `<div class="tiny mut">${uncounted} item${uncounted === 1 ? "" : "s"} not counted yet: count them once so they can show up here.</div>` : ""}
     <div class="chips" style="margin:8px 0"><button class="chip ${odAll ? "" : "info"}" onclick="odAll=false;render()">Due now (${REORDER.filter(r => r.order_now).length})</button><button class="chip ${odAll ? "info" : ""}" onclick="odAll=true;render()">All items</button><button class="chip" onclick="odRefresh()">Refresh levels</button></div>
@@ -77,7 +77,7 @@ async function odDelete(id) {
 
 /* ---------- APPROVE (master) ---------- */
 function viewApprove() {
-  if (role() !== "master") return shell("Approve orders", "", `<div class="alert info">Only Mike or Stefan approve orders.</div>`, { back: "#/today" });
+  if (role() !== "master") return shell("Approve", "", `<div class="alert info">Only Mike or Stefan approve orders.</div>`, { back: "#/today" });
   const open = (S.orders || []).filter(o => o.status === "requested" && o.approval_needed);
   const list = open.map(o => { const est = o.lines.reduce((a, l) => a + (l.price != null ? l.price * l.qty : 0), 0);
     return `<section class="card"><h2>${esc(o.supplier)} <span class="tiny mut">${esc(dayName(o.day))}${o.by_email ? " · " + esc(o.by_email) : ""}</span></h2>
@@ -85,7 +85,7 @@ function viewApprove() {
         return `<div class="row"><div class="main"><div class="name">${fmt(l.qty)} ${esc(l.unit || "")} ${esc(it.name)}</div><div class="meta">${left != null ? `${odQ(left)} ${esc(it.unit)} left` : "no count"}${rr && rr.cover != null ? ` · ${odQ(rr.cover)} days of cover` : ""}${l.price != null ? ` · about ${peso(l.price * l.qty)}` : ""}</div></div></div>`; }).join("")}</div>
       ${est ? `<div class="small" style="margin-top:6px">Estimate <b>${peso(est)}</b> from the last prices.</div>` : ""}
       <div style="display:flex;gap:8px;margin-top:10px"><button class="btn primary" style="flex:1" onclick="apDecide('${o.id}','approve')">Approve</button><button class="btn ghost danger" onclick="apDecide('${o.id}','reject')">Reject</button><button class="btn ghost danger" onclick="odDelete('${o.id}')">Delete</button></div></section>`; }).join("");
-  return shell("Approve orders", open.length ? `${open.length} waiting` : "nothing waiting", list || `<section class="card"><div class="mut">No order is waiting for approval.</div></section>`, { back: "#/today" });
+  return shell("Approve", open.length ? `${open.length} waiting` : "nothing waiting", list || `<section class="card"><div class="mut">No order is waiting for approval.</div></section>`, { back: "#/today" });
 }
 function apDecide(id, decision) {
   const o = (S.orders || []).find(x => x.id === id); if (!o) return;
@@ -111,7 +111,7 @@ function viewBills() {
   const expTot = exps.reduce((a, b) => a + (+b.total || 0), 0);
   const src = Object.fromEntries(PAY_SOURCES);
   return shell("Bills", "deliveries, expenses, bills", `
-    <div class="alert info">Every delivery recorded in the app lands here. Bills wait for their run (1–15 paid on the 15th, 16–end paid at month end). The Google Sheets stay the books: download and paste, or tick bills once they are paid.</div>
+    <div class="alert info">Every delivery recorded in the app lands here. Bills wait for their run (1–15 paid on the 15th, 16–end paid at month end). From 1 December the app is the book: the sheets come from the download below. Tick bills once they are paid.</div>
     <div class="chips" style="margin:8px 0">${[["open", "Open bills"], ["30", "30 days"], ["90", "90 days"]].map(([k, l]) => `<button class="chip ${bpRange === k ? "info" : ""}" onclick="bpRange='${k}';render()">${l}</button>`).join("")}</div>
     ${billCards || `<section class="card"><div class="mut">No ${bpRange === "open" ? "open " : ""}bills.</div></section>`}
     ${ticked.length ? `<div class="bottom-act"><button class="btn primary full" onclick="bpMarkPaid()">Mark ${ticked.length} bill${ticked.length === 1 ? "" : "s"} paid</button></div>` : ""}

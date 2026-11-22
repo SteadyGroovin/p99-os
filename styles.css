@@ -483,3 +483,10 @@ svg.chart.trend .hit{fill:transparent; cursor:pointer; touch-action:pan-y}
 /* v0.27.1 (Stefan, 16 Nov: "the S is not centered"): the account button shows only the round initial, so no room is kept for a name */
 .top .me{padding:4px; gap:0; min-height:0}
 .top .me .av{width:32px; height:32px; line-height:1; text-align:center}
+
+/* v0.29 page standard (launch audit 2026-11-22): a menu page has no back arrow where the menu is on screen;
+   an explanation is a neutral note, orange/red stays for problems; Home quick actions wrap on a phone instead of clipping */
+@media (min-width:1100px){ .top .back.menuback{display:none} }
+.alert.info{background:var(--surf2); color:var(--ink2); border-color:var(--line); border-left:3px solid var(--line2)}
+@media (max-width:699px){ .qa-row{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); row-gap:12px; overflow:visible} .qa-row button{width:auto} }
+@media (max-width:699px){ .rsteps{display:none} }   /* v0.29: the step strip cost a screen row on a phone; "Needed: …" under Save says the same */

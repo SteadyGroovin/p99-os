@@ -104,7 +104,7 @@ function finSrc(which) {
 
 /* ---------- shared pieces ---------- */
 function finNav(cur) {
-  const T = [["", "Overview"], ["book", "Book"], ["expenses", "Expenses"], ["payables", "Payables"], ["pl", "P&L"]];
+  const T = [["", "Overview"], ["book", "Book"], ["expenses", "Expenses"], ["payables", "Payables"], ["pl", "Statement"]];
   return `<div class="rng fnav" role="tablist">${T.map(([k, l]) => `<button class="${cur === k ? "on" : ""}" role="tab" aria-selected="${cur === k}" onclick="go('#/finance${k ? "/" + k : ""}')">${l}</button>`).join("")}<button onclick="go('#/bills')" title="Deliveries recorded in the app: open bills, paid-now expenses, CSV for the sheets">From the app</button></div>`;   /* v0.12 */
 }
 function finMonthChips(sel, list, fn) {
@@ -151,13 +151,13 @@ function finMonth(m) {
 
 /* ---------- entry ---------- */
 function viewFinance(sub, id) {
-  if (role() !== "master") return shell("Finance", "", `<section class="card"><h2>Finance is for the owners</h2><div class="small mut">Expenses, payables, the book and the P&L are visible to Stefan and Mike only. Ask one of them if you need a figure.</div><div style="margin-top:12px"><button class="btn" onclick="go('#/more')">Back to More</button></div></section>`, { back: "#/more" });
+  if (role() !== "master") return shell("P&L", "", `<section class="card"><h2>Finance is for the owners</h2><div class="small mut">Expenses, payables, the book and the P&L are visible to Stefan and Mike only. Ask one of them if you need a figure.</div><div style="margin-top:12px"><button class="btn" onclick="go('#/more')">Back to More</button></div></section>`, { back: "#/more" });
   const sb2 = ["", "book", "expenses", "payables", "pl"].includes(sub || "") ? (sub || "") : "";
   if (!FIN.data) {
     if (!FIN.loading && !FIN.err) setTimeout(finLoad, 0);
     const body = FIN.err ? `<section class="card"><h2>Could not load the finance data</h2><div class="small"><span class="band-bad">${esc(FIN.err)}</span></div><div class="tiny mut" style="margin-top:6px">The sheets are untouched; the OS could not read its copy of them. Check the connection and try again.</div><div style="margin-top:10px"><button class="btn primary" onclick="finReload()">Try again</button></div></section>`
       : `<section class="card mut" style="text-align:center">Loading the expense file, payables, the book and overhead…</section>`;
-    return shell("Finance", "", finNav(sb2) + body, { back: "#/more" });
+    return shell("P&L", "", finNav(sb2) + body, { back: "#/more" });
   }
   const dec = s => { try { return decodeURIComponent(s); } catch (e) { return s; } };
   if (sub === "book") return viewFinBook();
@@ -182,7 +182,7 @@ function finDayChart(id, days, rows) {
 }
 function viewFinOverview() {
   const D = FIN.data, m = FIN.month;
-  if (!m) return shell("Finance", "", finNav("") + `<section class="card"><h2>No finance rows yet</h2><div class="small mut">The mirror of the expense file, payables and the book is empty. Once the loader has run, this fills itself.</div><div style="margin-top:10px"><button class="btn" onclick="finReload()">Reload</button></div></section>`, { back: "#/more" });
+  if (!m) return shell("P&L", "", finNav("") + `<section class="card"><h2>No finance rows yet</h2><div class="small mut">The mirror of the expense file, payables and the book is empty. Once the loader has run, this fills itself.</div><div style="margin-top:10px"><button class="btn" onclick="finReload()">Reload</button></div></section>`, { back: "#/more" });
   const A = finMonth(m), today0 = bizToday();
   const coverTxt = A.lastBook ? `1 – ${new Date(A.lastBook + "T00:00:00").toLocaleDateString("en-PH", { day: "numeric", month: "short" })}` : "no book days yet";
   const parts = FIN_GROUPS.map(([k, c]) => ({ name: k === "Payables" ? "Payables (book line)" : k, v: A.g[k], c }));
@@ -221,7 +221,7 @@ function viewFinOverview() {
   if (A.oh.length === 0) att.push(["–", `No overhead block for ${esc(monthName(m))} in the book yet.`]);
   const attention = `<section class="card"><h2>Needs attention</h2>${att.length ? `<ul class="ins">${att.map(([i, t]) => `<li><span>${i}</span><div>${t}</div></li>`).join("")}</ul>` : '<div class="small mut">Nothing open for this month.</div>'}</section>`;
   const links = `<section class="card flinks">${[["book", "Book", "day × category, like the accounting sheet"], ["expenses", "Expenses", "every line, what was bought, price history"], ["payables", "Payables", "by run, what is pending"], ["pl", "Month P&L", "estimate, food cost vs 30–34%"]].map(([k, t, s]) => `<button class="row tap" onclick="go('#/finance/${k}')"><div class="main"><div class="name">${t}</div><div class="meta">${s}</div></div><span class="chev">${ic("chevron-right")}</span></button>`).join("")}</section>`;
-  return shell("Finance", esc(monthName(m)), `<div class="pbar">${finNav("")}${finMonthChips(m, D.months, "finPickMonth")}</div>` + finAugNote(m) + hero + tiles + attention + chart + links + finSrc(["book", "ex", "pay", "oh"]) + `<div class="tiny mut">UTAK sales: ${esc(SALES_HISTORY.source)}. Management view, not the accounts.</div>`, { back: "#/more" });
+  return shell("P&L", esc(monthName(m)), `<div class="pbar">${finNav("")}${finMonthChips(m, D.months, "finPickMonth")}</div>` + finAugNote(m) + hero + tiles + attention + chart + links + finSrc(["book", "ex", "pay", "oh"]) + `<div class="tiny mut">UTAK sales: ${esc(SALES_HISTORY.source)}. Management view, not the accounts.</div>`, { back: "#/more" });
 }
 
 /* ---------- 2. Book: day × category ---------- */
@@ -273,7 +273,7 @@ function viewFinBook() {
   const tog = `<div class="split"><h2>Day × category <span class="tiny mut">${esc(finSpan(days))}</span></h2><div class="seg sm"><button class="btn ${FIN.bRows === "days" ? "on" : ""}" onclick="FIN.bRows='days';render()">Days</button><button class="btn ${FIN.bRows === "cats" ? "on" : ""}" onclick="FIN.bRows='cats';render()">Categories</button></div></div>`;
   const tbl = finTable([["Category"], ["₱", 1], ["Share", 1]], cats.map(c => `<tr><td>${esc(c)}</td><td class="n num">${peso(catTot(c))}</td><td class="n num">${all ? Math.round(100 * catTot(c) / all) : 0}%</td></tr>`).concat([`<tr><td><b>Total</b></td><td class="n num"><b>${peso(all)}</b></td><td></td></tr>`]));
   const body = `<section class="card fbook">${tog}${rows.length ? `<div class="fgw">${grid}</div><div class="hl"><span>less</span><i></i><span>more</span><span class="mut">tap a cell for its lines · "Due" = fixed overhead on its usual due day, not in the total</span></div>${tbl}` : '<div class="small mut">No book rows in this range.</div>'}</section>`;
-  return shell("Finance", "Book · " + esc(finSpan(days)), `<div class="pbar">${finNav("book")}${finRangeChips("b")}</div>` + (FIN.bRange === "month" ? finAugNote(FIN.month) : "") + `<div class="txsum"><b class="num">${peso(all)}</b> in the book · ${[...new Set(rows.map(r => r.day))].length} of ${days.length} days with entries</div>` + body + ohBlock + finSrc(["book", "oh", "ex"]) + finCellSheet(), { back: "#/finance" });
+  return shell("P&L", "Book · " + esc(finSpan(days)), `<div class="pbar">${finNav("book")}${finRangeChips("b")}</div>` + (FIN.bRange === "month" ? finAugNote(FIN.month) : "") + `<div class="txsum"><b class="num">${peso(all)}</b> in the book · ${[...new Set(rows.map(r => r.day))].length} of ${days.length} days with entries</div>` + body + ohBlock + finSrc(["book", "oh", "ex"]) + finCellSheet(), { back: "#/finance" });
 }
 
 /* ---------- 3. Expenses ---------- */
@@ -304,14 +304,14 @@ function viewFinExpenses() {
     return `<div class="fday"><div class="fdh"><b>${esc(dayLong(d))}</b><span class="num"><b>${peso(dt)}</b>${s ? ` <span class="mut">· ${finPct(dt / s)} of sales</span>` : ""}</span></div>${L.map(r => `<div class="frow tap" onclick="go('#/finance/expenses/${finId(r.k)}')" role="button" tabindex="0"><span class="mut num">${esc(r.time_text || "")}</span><div><b>${esc(r.item || "—")}</b><div class="tiny mut">${[r.qty_text, r.supplier, r.si_no ? "SI " + r.si_no : ""].filter(Boolean).map(esc).join(" · ")}</div></div><span class="num">${peso(r.amount)}</span></div>`).join("")}</div>`; }).join("");
   const more = dset.length > shown.length ? `<button class="btn full" style="margin-top:8px" onclick="FIN.eDays+=15;render()">Show ${Math.min(15, dset.length - shown.length)} more days (${dset.length - shown.length} left)</button>` : "";
   const noLines = days.filter(d => SD[d] && !inR.some(r => r.day === d));
-  return shell("Finance", "Expenses · " + esc(finSpan(days)), `<div class="pbar">${finNav("expenses")}${finRangeChips("e")}</div>` + ctl +
+  return shell("P&L", "Expenses · " + esc(finSpan(days)), `<div class="pbar">${finNav("expenses")}${finRangeChips("e")}</div>` + ctl +
     `<div class="txsum"><b class="num">${f.length}</b> line${f.length === 1 ? "" : "s"} · <b class="num">${peso(tot)}</b> · ${dset.length} day${dset.length === 1 ? "" : "s"}${f.length !== inR.length ? ` <span class="mut">(filtered from ${inR.length})</span>` : ""}</div>` +
     (noLines.length && FIN.eSup === "all" && !q ? `<div class="tiny mut">No expense lines on ${noLines.length} day${noLines.length === 1 ? "" : "s"} with sales: ${finRuns(noLines).map(esc).join(", ")}.</div>` : "") +
     supChart + itemChart + `<section class="card txlist">${list || '<div class="mut" style="text-align:center;padding:12px 0">Nothing in this range matches.</div>'}${more}</section>` + finSrc(["ex"]) + `<div class="tiny mut">Every line is paid on the spot from Cherry's expense fund. Payables runs are on the Payables screen.</div>`, { back: "#/finance" });
 }
 function viewFinItem(k) {
   const D = FIN.data, L = D.ex.filter(r => r.k === k).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : (a.seq || 0) - (b.seq || 0));
-  if (!L.length) return shell("Finance", "Item", finNav("expenses") + `<section class="card"><div class="small mut">No lines for this item.</div></section>`, { back: "#/finance/expenses" });
+  if (!L.length) return shell("P&L", "Item", finNav("expenses") + `<section class="card"><div class="small mut">No lines for this item.</div></section>`, { back: "#/finance/expenses" });
   const name = L[L.length - 1].item;
   const P = L.map(r => ({ ...r, qq: finQty(r.qty_text) }));
   const units = {}; P.forEach(r => { if (r.qq) units[r.qq.u] = (units[r.qq.u] || 0) + 1; });
@@ -330,7 +330,7 @@ function viewFinItem(k) {
   const bySup = {}; P.forEach(r => { const s = r.supplier || "(no supplier)"; const o = bySup[s] = bySup[s] || { n: 0, v: 0, q: 0 }; o.n++; o.v += r.amount; if (u && r.qq && r.qq.u === u) o.q += r.qq.q; });
   const totQ = u ? sum(P.filter(r => r.qq && r.qq.u === u).map(r => r.qq.q)) : null;
   const tiles = `<div class="grid2">${tile("Last price", peso(last), `${esc(lab)} · ${esc(dayName(usable[usable.length - 1].r.day))}`, "")}${tile("Since first", usable.length > 1 ? delta(last, first) : "—", usable.length > 1 ? `first ${peso(first)} on ${esc(dayName(usable[0].r.day))}` : "one line so far", "")}${tile("Range", `${finShort(mn)}–${finShort(mx)}`, esc(lab), "")}${tile("Bought", peso(sum(L.map(r => r.amount))), `${L.length} lines${totQ ? ` · ${fmt(totQ)} ${u}` : ""}`, "")}</div>`;
-  return shell("Finance", esc(name), finNav("expenses") + tiles + `<section class="card"><h2>Price history <span class="tiny mut">${esc(lab)}${u && usable.length < L.length ? ` · ${L.length - usable.length} line(s) without a usable quantity left out` : ""}${!u ? " · quantities not parseable, so whole-line amounts" : ""}</span></h2>${usable.length ? chart : '<div class="small mut">No line with a usable quantity.</div>'}
+  return shell("P&L", esc(name), finNav("expenses") + tiles + `<section class="card"><h2>Price history <span class="tiny mut">${esc(lab)}${u && usable.length < L.length ? ` · ${L.length - usable.length} line(s) without a usable quantity left out` : ""}${!u ? " · quantities not parseable, so whole-line amounts" : ""}</span></h2>${usable.length ? chart : '<div class="small mut">No line with a usable quantity.</div>'}
     ${finTable([["Day"], ["Qty"], ["Supplier"], ["₱", 1], [u ? "₱/" + u : "", 1]], P.slice().reverse().map(r => `<tr><td>${esc(dayName(r.day))}</td><td>${esc(r.qty_text || "—")}</td><td>${esc(r.supplier || "—")}</td><td class="n num">${peso(r.amount)}</td><td class="n num">${u && r.qq && r.qq.u === u ? peso(r.amount / r.qq.q) : '<span class="mut">—</span>'}</td></tr>`), false)}</section>
     <section class="card"><h2>Who sold it</h2><div class="fscroll"><table class="t"><thead><tr><th>Supplier</th><th class="n">Lines</th><th class="n">₱</th>${u ? `<th class="n">Avg ₱/${u}</th>` : ""}</tr></thead><tbody>${Object.entries(bySup).sort((a, b) => b[1].v - a[1].v).map(([s, o]) => `<tr><td>${esc(s)}</td><td class="n num">${o.n}</td><td class="n num">${peso(o.v)}</td>${u ? `<td class="n num">${o.q ? peso(P.filter(r => (r.supplier || "(no supplier)") === s && r.qq && r.qq.u === u).reduce((a, r) => a + r.amount, 0) / o.q) : "—"}</td>` : ""}</tr>`).join("")}</tbody></table></div></section>` + finSrc(["ex"]), { back: "#/finance/expenses" });
 }
@@ -345,7 +345,7 @@ function finRunState(o, t0) { if (o.to && o.to >= t0) return "running"; return o
 function finUsualPay(o) { if (!o.to) return null; const d = +o.to.slice(8); return d <= 16 ? o.to.slice(0, 8) + "15" : finEom(o.to.slice(0, 7)); }
 function viewFinPayables() {
   const D = FIN.data, t0 = bizToday(), runs = finRunList();
-  if (!runs.length) return shell("Finance", "Payables", finNav("payables") + `<section class="card"><div class="small mut">No payables rows in the mirror yet.</div></section>` + finSrc(["pay"]), { back: "#/finance" });
+  if (!runs.length) return shell("P&L", "Payables", finNav("payables") + `<section class="card"><div class="small mut">No payables rows in the mirror yet.</div></section>` + finSrc(["pay"]), { back: "#/finance" });
   const pend = sum(runs.map(o => o.pending)), after = sum(runs.filter(o => o.to < t0).map(o => o.pending)), npend = D.pay.filter(r => r.pending > .5).length;
   const lastClosed = runs.find(o => o.to < t0);
   const tiles = `<div class="grid2">${tile("Pending, all runs", peso(pend), `${npend} line${npend === 1 ? "" : "s"}`, "")}${tile("Pending after its run closed", peso(after), `${runs.filter(o => o.to < t0 && o.pending > .5).length} closed run(s) not fully paid`, "")}${lastClosed ? tile("Last closed run", esc(lastClosed.label || finSpan([lastClosed.from, lastClosed.to])), `${peso(lastClosed.paid)} paid of ${peso(lastClosed.billed)}`, "") : ""}${tile("Billed in the mirror", peso(sum(runs.map(o => o.billed))), `${runs.length} runs since ${esc(monthName(FIN_FROM.slice(0, 7)))}`, "")}</div>`;
@@ -359,22 +359,22 @@ function viewFinPayables() {
       <div class="fsup">${sl.map(s => { const k = s.pending < .5 ? "paid" : s.paid > .5 ? "part" : "open";
         return `<button class="frow tap" onclick="go('#/finance/payables/${finId(s.s)}')"><div><b>${esc(s.s)}</b><div class="tiny mut">${s.n} line${s.n === 1 ? "" : "s"} · billed ${peso(s.billed)}${s.paid > .5 && s.pending > .5 ? " · paid " + peso(s.paid) : ""}</div></div>${finSt(k)}<span class="num">${s.pending > .5 ? peso(s.pending) : '<span class="mut">—</span>'}</span></button>`; }).join("")}</div></section>`; }).join("");
   const tbl = `<section class="card"><h2>All runs</h2>${finTable([["Run"], ["Billed", 1], ["Paid", 1], ["Pending", 1]], runs.map(o => `<tr><td>${esc(o.label)}<div class="tiny mut">${esc(finSpan([o.from, o.to]))}</div></td><td class="n num">${peso(o.billed)}</td><td class="n num">${peso(o.paid)}</td><td class="n num">${peso(o.pending)}</td></tr>`), false)}</section>`;
-  return shell("Finance", "Payables", finNav("payables") + tiles + `<div class="tiny mut">Payables count as spend only once paid. Pending is what is still waiting for Stefan's release; a run being a little behind is the normal state of this cycle. The run label is a cutoff, not a due date; the usual pay day is the 15th for 1–15 and month end for 16–end, a few days after is normal.</div>` + cards + tbl + finSrc(["pay"]), { back: "#/finance" });
+  return shell("P&L", "Payables", finNav("payables") + tiles + `<div class="tiny mut">Payables count as spend only once paid. Pending is what is still waiting for Stefan's release; a run being a little behind is the normal state of this cycle. The run label is a cutoff, not a due date; the usual pay day is the 15th for 1–15 and month end for 16–end, a few days after is normal.</div>` + cards + tbl + finSrc(["pay"]), { back: "#/finance" });
 }
 function viewFinSupplier(s) {
   const D = FIN.data, L = D.pay.filter(r => (r.supplier || "—") === s).sort((a, b) => (b.line_date || "") < (a.line_date || "") ? -1 : 1);
-  if (!L.length) return shell("Finance", esc(s), finNav("payables") + `<section class="card"><div class="small mut">No payables lines for this supplier.</div></section>`, { back: "#/finance/payables" });
+  if (!L.length) return shell("P&L", esc(s), finNav("payables") + `<section class="card"><div class="small mut">No payables lines for this supplier.</div></section>`, { back: "#/finance/payables" });
   const billed = sum(L.map(r => r.amount)), paid = sum(L.map(r => r.paid)), pending = sum(L.map(r => r.pending));
   const runs = [...new Set(L.map(r => r.run_label))];
   const tiles = `<div class="grid2">${tile("Pending", peso(pending), `${L.filter(r => r.pending > .5).length} lines`, "")}${tile("Paid", peso(paid), `of ${peso(billed)} billed`, "")}</div>`;
   const body = runs.map(rl => { const R = L.filter(r => r.run_label === rl); return `<section class="card"><h2>${esc(rl)} <span class="tiny mut">${esc(finSpan([R[0].run_from, R[0].run_to]))}</span></h2><div class="fscroll"><table class="t"><thead><tr><th>Date</th><th>SI · particulars</th><th class="n">₱</th><th>Status</th></tr></thead><tbody>${R.map(r => `<tr><td class="mut">${esc(r.line_date ? dayName(r.line_date) : "—")}</td><td>${esc(r.si_no || "—")}<div class="tiny mut">${esc(r.particulars || "")}</div></td><td class="n num">${peso(r.amount)}${r.status === "part" ? `<div class="tiny mut">paid ${peso(r.paid)}</div>` : ""}</td><td>${finSt(r.status === "paid" ? "paid" : r.status === "part" ? "part" : "open")}</td></tr>`).join("")}</tbody></table></div></section>`; }).join("");
-  return shell("Finance", esc(s), finNav("payables") + tiles + body + finSrc(["pay"]), { back: "#/finance/payables" });
+  return shell("P&L", esc(s), finNav("payables") + tiles + body + finSrc(["pay"]), { back: "#/finance/payables" });
 }
 
 /* ---------- 5. Month P&L (management estimate) ---------- */
 function viewFinPL() {
   const D = FIN.data; const months = D.months.filter(m => m >= FIN_RELIABLE);
-  if (!months.length) return shell("Finance", "Month P&L", finNav("pl") + `<section class="card"><div class="small mut">No month from September 2026 on has book rows yet.</div></section>`, { back: "#/finance" });
+  if (!months.length) return shell("P&L", "Month P&L", finNav("pl") + `<section class="card"><div class="small mut">No month from September 2026 on has book rows yet.</div></section>`, { back: "#/finance" });
   if (!FIN.plMonth || !months.includes(FIN.plMonth)) FIN.plMonth = months.includes(FIN.month) ? FIN.month : months[months.length - 1];
   const m = FIN.plMonth, A = finMonth(m), pm = months[months.indexOf(m) - 1], P = pm ? finMonth(pm) : null;
   const full = A.lastBook === finEom(m);
@@ -413,7 +413,7 @@ function viewFinPL() {
   if (!full) notes.push(`The book for ${monthName(m)} runs only to ${A.lastBook ? dayName(A.lastBook) : "—"}, while sales cover the whole month — purchases are understated until the book is complete.`);
   if (pendPay > .5) notes.push(`${peso(pendPay)} of ${monthName(m)} payables is still pending and is not in this P&L (paid-only rule); it enters through the book's PAYABLES line once paid.`);
   if (ohNa.length) notes.push(`${ohNa.length} line${ohNa.length === 1 ? "" : "s"} marked not applicable this month.`);
-  return shell("Finance", "Month P&L · " + esc(monthName(m)), `<div class="pbar">${finNav("pl")}${finMonthChips(m, months, "finPickPL")}</div>` + `<div class="card fwarnline"><span class="chip fst info"><i aria-hidden="true">≈</i>Management view</span> <span class="small">An estimate from UTAK sales and the book, not the accounts. Months before September 2026 are not compared.</span></div>` + tiles + fc +
+  return shell("P&L", "Month P&L · " + esc(monthName(m)), `<div class="pbar">${finNav("pl")}${finMonthChips(m, months, "finPickPL")}</div>` + `<div class="card fwarnline"><span class="chip fst info"><i aria-hidden="true">≈</i>Management view</span> <span class="small">An estimate from UTAK sales and the book, not the accounts. Months before September 2026 are not compared.</span></div>` + tiles + fc +
     `<section class="card"><h2>Statement</h2><div class="fscroll"><table class="t fpl"><thead>${head}</thead><tbody>${rows.join("")}</tbody></table></div>${notes.length ? `<ul class="ins" style="margin-top:12px">${notes.map(n => `<li><span>○</span><div>${esc(n)}</div></li>`).join("")}</ul>` : ""}</section>` + finSrc(["book", "oh", "pay"]) + `<div class="tiny mut">UTAK sales: ${esc(SALES_HISTORY.source)}.</div>`, { back: "#/finance" });
 }
 function finPickPL(m) { FIN.plMonth = m; render(); }

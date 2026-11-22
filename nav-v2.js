@@ -108,6 +108,7 @@ function homeStripHTML() {
   const cards = [];
   if (canOpen("approve")) { const n = (S.orders || []).filter(o => o.status === "requested" && o.approval_needed).length; cards.push(["Orders to approve", n, "#/approve"]); }
   if (canOpen("order")) cards.push(["Items to order", REORDER.filter(r => r.order_now).length, "#/order"]);
+  if (canOpen("receive") && typeof skDesk === "function" && skDesk()) cards.push(["Receipts to itemise", skToItemise().length, "#/receive"]);   /* v0.29 quick receipt */
   if (canOpen("bills")) cards.push(["Bills open", MONEY.filter(m => m.mode === "bill" && !m.paid_on).length, "#/bills"]);
   if (canOpen("sizes")) cards.push(["Pack sizes missing", szMissing(), "#/sizes"]);
   if (canOpen("recipes")) cards.push(["Recipes not confirmed", (typeof RECIPES !== "undefined" ? RECIPES : []).filter(r => !r.confirmed).length, "#/recipes"]);

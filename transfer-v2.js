@@ -28,7 +28,7 @@ function viewTransfers() {
   const held = Object.keys(byLoc).length ? `<section class="card"><h2>Held for Pizza 99 elsewhere <span class="tiny mut">from deliveries and transfers recorded here</span></h2>${Object.keys(byLoc).map(code => `<div class="txday">${esc(locName(code))}</div><div class="list">${byLoc[code].sort((a, b) => b.on_hand - a.on_hand).map(h => { const it = Store.item(h.item); const q = h.count_units != null ? h.count_units : h.on_hand; return `<div class="row"><div class="main"><div class="name">${esc(it ? it.name : h.item)}</div></div><div class="right"><div class="v num ${q < 0 ? "band-bad" : ""}">${fmt(q)}</div><div class="l">${esc(it ? it.unit : "")}${q < 0 ? " · more released than delivered" : ""}</div></div></div>`; }).join("")}</div>`).join("")}</section>` : "";
   const r = role();
   const acts = `<div class="skact">${r === "walk" || r === "master" ? `<button class="btn primary" onclick="trStart('release','HO','P99')">${ic("package", "sm")}Release from Head Office</button>` : ""}${r !== "walk" ? `<button class="btn primary" onclick="trStart('receive','STO',myLoc() === 'HO' ? 'P99' : myLoc())">${ic("package", "sm")}Take from storage room</button><button class="btn" onclick="trStart('receive','HO',myLoc() === 'HO' ? 'P99' : myLoc())">${ic("package", "sm")}Pull-out arrived</button>` : ""}</div>`;
-  return shell("Stock in / out", "storage room, Head Office and the stores", acts
+  return shell("Transfers", "storage room, Head Office and the stores", acts
     + sec("Waiting for you", mine, "Nothing to confirm.")
     + sec("Waiting for the other side", other, "Nothing open.")
     + (diff.length ? sec("Differences", diff, "") : "")
