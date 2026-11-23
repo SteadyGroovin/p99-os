@@ -9,7 +9,7 @@ const bootEl = document.getElementById("app");
 const bootEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /* every release loads as one matching set: GitHub Pages caches files for 10 minutes, and a stale db.js next to a new app.js left Tasks blank (v0.10.0, 2026-11-07) */
-const APP_V = "0.29.0";
+const APP_V = "0.30.0";
 function loadScript(src) {
   return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src + (src.includes("?") ? "&" : "?") + "v=" + APP_V; s.onload = ok; s.onerror = () => no(new Error("could not load " + src)); document.body.appendChild(s); });
 }
@@ -21,7 +21,7 @@ function bootScreen(html) {
    and a virus scanner opening the mail cannot use up a code the way it used up the one-time links ("Email link is invalid or has expired").
    The mail still carries the link too, so it works before the code is added to the Supabase template. Password stays as an option;
    "forgot it" = sign in with a code, then More → Change password. */
-const SI = { step: "email", email: "", mode: "code", busy: false };
+const SI = { step: "email", email: "", mode: /[?&]pw\b/.test(location.search) ? "password" : "code", busy: false };   /* v0.30: store logins get a link with ?pw that opens on the password form */
 try { SI.email = localStorage.getItem("p99os_last_email") || ""; } catch (e) { }
 function signInForm(msg) {
   const note = msg ? `<div class="small" style="margin-top:4px">${msg}</div>` : "";

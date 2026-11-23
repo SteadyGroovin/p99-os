@@ -21,7 +21,7 @@ const MODULES = [
   ["stock", "Stock", "#/stock", "grid", "Inventory"], ["count", "Count", "#/count", "grid", "Inventory"], ["receive", "Receive", "#/receive", "box", "Inventory"], ["transfers", "Transfers", "#/transfers", "box", "Inventory"], ["variance", "Variance", "#/variance", "grid", "Inventory"],
   ["order", "Order", "#/order", "coins", "Buying"], ["approve", "Approve", "#/approve", "check", "Buying"], ["bills", "Bills", "#/bills", "coins", "Buying"], ["purchases", "Purchases", "#/purchases", "coins", "Buying"], ["suppliers", "Suppliers", "#/suppliers", "coins", "Buying"],
   ["money", "Funds", "#/money", "finance", "Money"], ["finance", "P&L", "#/finance", "finance", "Money"], ["books", "Month close", "#/books", "finance", "Money"], ["accounts", "Accounts", "#/accounts", "finance", "Money"],
-  ["tasks", "Tasks", "#/tasks", "list", "Team"], ["questions", "Questions", "#/questions", "list", "Team"], ["report", "Tickets", "#/report", "alert", "Team"], ["clean", "Clean", "#/clean", "check", "Team"],
+  ["tasks", "Tasks", "#/tasks", "list", "Team"], ["questions", "Questions", "#/questions", "list", "Team"], ["report", "Tickets", "#/report", "alert", "Team"], ["clean", "Clean", "#/clean", "check", "Team"], ["logins", "Logins", "#/logins", "dots", "Team"],
   ["papers", "Papers", "#/papers", "list", "Office"],
   ["items", "Items", "#/items", "box", "Catalogue"], ["recipes", "Recipes", "#/recipes", "list", "Catalogue"], ["sizes", "Pack sizes", "#/sizes", "box", "Catalogue"],
   ["users", "Users", "#/users", "dots", "Settings"], ["stores", "Stores", "#/stores", "dots", "Settings"], ["rules", "Rules", "#/rules", "dots", "Settings"], ["more", "Device", "#/more", "dots", "Settings"],
@@ -51,6 +51,7 @@ function canOpen(s0) {
   const r = role(), adm = officeLogin(), fin = financeLogin(), m = r === "master";
   /* v0.22 (Stefan, 15 Nov, Burger Kong access for Cath): the store lead sees tasks, inventory (stock, count, receive) and ordering for her own store */
   /* v0.23 (Stefan, 15 Nov: Hannah gets inventory, buying and the team): every store and D'Mall Storage, the all-stores stock, Papers. v0.23.2 (16 Nov): plus the morning run and the cash count (migration 040). Not sales, funds, bills, approving or roles. v0.23.3 (16 Nov, migration 043): plus recipes */
+  if (s0 === "logins") return m || r === "officer";   /* v0.30: Hannah creates and resets the store logins (edge function store-login) */
   if (r === "officer") return ["", "today", "walk", "cash", "stock", "stock-all", "count", "receive", "receipts", "transfers", "transfer", "variance", "items", "item", "sizes", "order", "suppliers", "supplier", "recipes", "recipe", "tasks", "task", "report", "clean", "papers", "questions", "more", "settings", "who", "password", "modules"].includes(s0);
   if (s0 === "questions") return m || adm;   /* v0.28 (migration 052): open questions for the officer, the office and the owners */
   if (s0 === "papers") return m || adm;   /* the office (admin, finance) and the owners */
@@ -190,4 +191,47 @@ function ruSave() {
   const rec = { approval_peso: g("r-ap"), default_safety_days: g("r-sd"), order_cover_days: g("r-oc") };
   if (Object.values(rec).some(x => x != null && !(x >= 0))) return toast("Numbers only.");
   supQueue("setting", rec); Object.assign(OS_SETTINGS, rec); toast("Rules saved."); render();
+}
+
+/* ---------- Logins (v0.30, 2026-11-23): the Admin officer and the owners create and reset STORE logins ----------
+   Stefan: "Hannah is setting up the accounts and the app with the stores." The browser never creates users: the edge
+   function store-login does (service role), refuses anything but store logins, and returns a password shown once. */
+const LG = { state: "idle", rows: [], stores: {}, err: null, busy: false, form: { email: "", store: "", name: "" }, shown: null };
+const LG_STORES = { P99: "Pizza 99", BK: "Burger Kong", DC: "Dragon Crepe", MCC: "My Crepes Cafe", MCBC: "MyCrepes Beach Club" };
+async function lgCall(body) {
+  const { data, error } = await sb.functions.invoke("store-login", { body });
+  if (error) { let m = error.message; try { const j = await error.context.json(); if (j && j.error) m = j.error; } catch (e) { } return { ok: false, error: m }; }
+  return data || { ok: false, error: "no answer" };
+}
+async function lgLoad() { LG.state = "loading"; const r = await lgCall({ action: "list" }); if (r.ok) { LG.rows = r.logins || []; LG.state = "ok"; } else { LG.state = "err"; LG.err = r.error; } if (location.hash.startsWith("#/logins")) render(); }
+async function lgCreate() {
+  const f = LG.form; if (LG.busy) return; if (!f.email || !f.store) { toast("E-mail and store first."); return; }
+  LG.busy = true; render(); const r = await lgCall({ action: "create", email: f.email, store: f.store, name: f.name }); LG.busy = false;
+  if (r.ok) { LG.shown = { email: r.email, store: r.store, password: r.password, kind: "new" }; LG.form = { email: "", store: "", name: "" }; lgLoad(); } else toast(r.error || "Could not create the login.");
+  render(); }
+async function lgReset(email) {
+  if (!confirm("Make a new password for " + email + "? The old one stops working.")) return;
+  const r = await lgCall({ action: "reset", email }); if (r.ok) { LG.shown = { email, password: r.password, kind: "reset" }; render(); } else toast(r.error || "Could not reset."); }
+function viewLogins() {
+  if (!(role() === "master" || (typeof officerLogin === "function" && officerLogin()))) return shell("Logins", "", `<div class="alert info">For the Admin officer and the owners.</div>`, { back: "#/today" });
+  if (LG.state === "idle") lgLoad();
+  const link = location.origin + location.pathname.replace(/index\.html$/, "") + "?pw";
+  const shown = LG.shown ? `<section class="card"><h2>${LG.shown.kind === "new" ? "Login created" : "New password"}</h2>
+      <div class="list"><div class="row"><div class="main"><div class="meta">E-mail</div><div class="name">${esc(LG.shown.email)}</div></div></div>
+      <div class="row"><div class="main"><div class="meta">Password</div><div class="name num" style="font-size:22px;letter-spacing:.04em">${esc(LG.shown.password)}</div></div></div></div>
+      <div class="tiny mut" style="margin-top:8px">Shown only once. Give it to the store now, in person or by message. The store opens <b>${esc(link)}</b>, signs in with this e-mail and password, then adds the app to the home screen.</div>
+      <button class="btn" style="margin-top:8px" onclick="LG.shown=null;render()">Done</button></section>` : "";
+  const st = LG.stores && Object.keys(LG.stores).length ? LG.stores : LG_STORES;
+  const form = `<section class="card"><h2>New store login</h2>
+      <div class="field"><label>Store</label><select class="in" onchange="LG.form.store=this.value"><option value="">— choose —</option>${Object.entries(st).map(([c, n]) => `<option value="${c}" ${LG.form.store === c ? "selected" : ""}>${esc(n)}</option>`).join("")}</select></div>
+      <div class="field"><label>E-mail the store uses</label><input class="in" type="email" placeholder="store e-mail" value="${esc(LG.form.email)}" oninput="LG.form.email=this.value.trim()"></div>
+      <div class="field"><label>Name on the login (optional)</label><input class="in" placeholder="e.g. MCC store" value="${esc(LG.form.name)}" oninput="LG.form.name=this.value"></div>
+      <button class="btn primary full" ${LG.busy ? "disabled" : ""} onclick="lgCreate()">${LG.busy ? "Creating…" : "Create login"}</button>
+      <div class="tiny mut" style="margin-top:6px">A store login sees only its own store: tasks, stock, count, receive and ordering. No sales, no money.</div></section>`;
+  const byStore = {}; LG.rows.forEach(r => { (byStore[r.store || "?"] = byStore[r.store || "?"] || []).push(r); });
+  const list = LG.state === "loading" ? `<div class="mut small">Loading…</div>` : LG.state === "err" ? `<div class="alert bad">${esc(LG.err || "Could not load the logins.")}</div>`
+    : Object.keys(st).map(c => { const rs = byStore[c] || []; return `<div class="row"><div class="main"><div class="name">${esc(st[c])}</div><div class="meta">${rs.length ? rs.map(r => `${esc(r.email)} · ${r.last_sign_in ? "last in " + esc(dayName(String(r.last_sign_in).slice(0, 10))) : "never signed in"}`).join("<br>") : `<span class="band-warn">no login yet</span>`}</div></div>${rs.map(r => `<button class="btn ghost" onclick="lgReset(${esc(JSON.stringify(r.email))})">New password</button>`).join("")}</div>`; }).join("");
+  const missing = Object.keys(st).filter(c => !(byStore[c] || []).length).length;
+  return shell("Logins", LG.state === "ok" ? (missing ? `${missing} store${missing === 1 ? "" : "s"} without a login` : "every store has a login") : "store logins", `${shown}
+    <section class="card"><h2>Stores</h2><div class="list">${list}</div></section>${form}`, { back: "#/today" });
 }

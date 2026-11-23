@@ -438,6 +438,7 @@ function render() {
     case "modules": html = viewModules(); break;            /* v0.17: More = every module in groups, Customize the bar */
     case "settings": html = viewSettings(); break;          /* v0.16: Settings behind the name badge */
     case "users": html = viewUsers(); break;
+    case "logins": html = viewLogins(); break;
     case "rules": html = viewRules(); break;
     case "purchases": html = viewPurchases(); break;        /* v0.16: things bought that are not stock */
     case "accounts": html = viewAccounts(); break;          /* v0.16: chart of accounts */
