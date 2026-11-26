@@ -110,6 +110,7 @@ function dbCatalogue(L) {
       verify: !d.confirmed || (!!d.packUnit && per == null), sizeUnknown: !!d.packUnit && per == null,
       brand: d.brand || null, net: n(d.net), netUnit: d.netUnit || null, container: d.container || null, specOk: !!d.specOk, specNote: d.specNote || null, expiry: !!d.expiry };   /* v0.24: track_expiry (migration 047) */   /* v0.19.9: product facts (migration 029/030) */   /* v0.13: Receive asks the crew to write the size off the label */
     if (d.caseUnit && n(d.case)) { it.buyUnit = d.caseUnit; it.buyQty = n(d.case); }   /* v0.31: the supplier's case is for ordering only. Count and Receive use the sealed pack inside (carton, jar, can, bottle); a supplier can change what goes in a box (Stefan, 2026-11-26) */
+    if (per > 0 && Array.isArray(d.packs) && d.packs.length) it.packs = d.packs.map(p => ({ unit: p.unit, per: n(p.qty) })).filter(p => p.unit && p.per > 0);   /* v0.32: other pack sizes of the same item (item.alt_packs, migration 056) */
     if (d.pos) it.pos = d.pos;
     return it; }));
   const sups = (L.suppliers || []).map(s => s.name).filter(s => s !== "Made here");

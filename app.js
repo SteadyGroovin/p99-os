@@ -148,11 +148,25 @@ function viewCountPlace_v1(placeId) {
     <div class="bottom-act">${nextPl ? `<button class="btn primary full" onclick="go('#/count/${nextPl.id}')">Next: ${nextPl.name} ›</button>` : `<button class="btn primary full" onclick="go('#/count/summary')">Review and send ›</button>`}</div>${padHTML()}`, { back: "#/count" });
 }
 let pad = null;
-function openPad(itemId, mode = "count", onDone) { const it = Store.item(itemId); pad = { itemId, mode, onDone, field: it.pack ? "packs" : "loose", packs: "", loose: "" }; render(); }
+/* v0.32 (2026-11-26): one item, several pack sizes. Nutella comes as a 3 kg pail and, when the supplier has none, as 900 g and 680 g jars
+   that go into the same recipes (Hannah). it.packs = [{unit, per}] are the other sealed packs of the same item (per = base units in one).
+   The pad takes them next to the main count unit and saves the sum in the main unit (2 jars of 900 g = 0.6 pail),
+   so stock, recipes and prices stay on one item and the database needs no new arithmetic. */
+function padAlt(it) { return it && !it.pack && it.per > 0 && Array.isArray(it.packs) ? it.packs : []; }
+function altLabel(it, p) { return `${p.unit} ${fmt(p.per)} ${it.base}`; }
+function padTabs(it) { const alts = padAlt(it); if (!alts.length) return "";
+  const b = (f, lab) => `<button class="btn ${pad.field === f ? "on" : ""}" onclick="pad.field='${f}';render()"><span>${esc(lab)}</span> <b class="num">${pad[f] || "0"}</b></button>`;
+  return `<div class="units alt">${b("loose", `${it.unit} ${fmt(it.per)} ${it.base}`)}${alts.map((a, i) => b("a" + i, altLabel(it, a))).join("")}</div>`; }
+function padUnit(it) { const m = /^a(\d+)$/.exec(pad.field); return m ? altLabel(it, padAlt(it)[+m[1]]) : pad.field === "packs" ? it.packUnit : it.unit; }
+function padText() { const it = Store.item(pad.itemId); const p = parseFloat(pad.packs) || 0, l = parseFloat(pad.loose) || 0;
+  const alts = padAlt(it).map((a, i) => [parseFloat(pad["a" + i]) || 0, a]).filter(x => x[0]); if (!alts.length) return qtyText(it, p, l);
+  return (l ? [`${fmt(l)} ${it.unit}`] : []).concat(alts.map(([n, a]) => `${fmt(n)} ${altLabel(it, a)}`)).join(" + "); }
+function openPad(itemId, mode = "count", onDone) { const it = Store.item(itemId); pad = { itemId, mode, onDone, field: it.pack ? "packs" : "loose", packs: "", loose: "" }; padAlt(it).forEach((a, i) => { pad["a" + i] = ""; }); render(); }
 function padKey(k) { if (!pad) return; const f = pad.field; if (k === "⌫") pad[f] = pad[f].slice(0, -1); else if (k === ".") { if (!pad[f].includes(".")) pad[f] = (pad[f] || "0") + "."; } else if (pad[f].length < 6) pad[f] = (pad[f] === "0" ? "" : pad[f]) + k; render(); }
-function padTotal() { const it = Store.item(pad.itemId); const p = parseFloat(pad.packs) || 0, l = parseFloat(pad.loose) || 0; return it.pack ? p * it.pack + l : l; }
+function padTotal() { const it = Store.item(pad.itemId); const p = parseFloat(pad.packs) || 0, l = parseFloat(pad.loose) || 0; const main = it.pack ? p * it.pack + l : l;
+  const alt = padAlt(it).reduce((s, a, i) => s + (parseFloat(pad["a" + i]) || 0) * a.per / it.per, 0); return alt ? Math.round((main + alt) * 1e4) / 1e4 : main; }
 function padEnter() {
-  const it = Store.item(pad.itemId); const total = padTotal(); const txt = qtyText(it, parseFloat(pad.packs) || 0, parseFloat(pad.loose) || 0);
+  const it = Store.item(pad.itemId); const total = padTotal(); const txt = padText();
   if (pad.mode === "receive") { const cb = pad.onDone; pad = null; cb(total, txt); render(); return; }
   S.draft.lines[it.id] = total; S.draft.text[it.id] = txt; save();
   const its = itemsIn(it.place); const i = its.findIndex(x => x.id === it.id); const next = its.slice(i + 1).find(x => S.draft.lines[x.id] == null) || its.find(x => S.draft.lines[x.id] == null);
@@ -163,8 +177,8 @@ function padHTML() {
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"].map(k => `<button class="${k === "." || k === "⌫" ? "fn" : ""}" onclick="padKey('${k}')">${k}</button>`).join("");
   return `<div class="sheet-bg" onclick="if(event.target===this){pad=null;render()}"><div class="sheet" role="dialog">
     <div class="head"><div><div class="nm">${esc(it.name)}</div><div class="tiny mut">${ex ? `last ${fmt(ex.base.qty)} ${it.unit}${ex.value != null ? ` · expected ${fmt(ex.value)}` : ""}` : (pad.mode === "receive" ? "how much arrived" : "first count")}</div></div><button class="btn ghost" onclick="pad=null;render()">${ic("x-close")}</button></div>
-    ${it.pack ? `<div class="units"><button class="btn ${pad.field === "packs" ? "on" : ""}" onclick="pad.field='packs';render()">${esc(it.packUnit)}s <span class="tiny">×${it.pack}${it.verify ? " ?" : ""}</span></button><button class="btn ${pad.field === "loose" ? "on" : ""}" onclick="pad.field='loose';render()">loose ${esc(it.unit)}</button></div>` : ""}
-    <div class="disp"><div><span class="big num">${pad[pad.field] || "0"}</span> <span class="unit">${pad.field === "packs" ? it.packUnit : it.unit}</span></div><div class="eq num">${it.pack ? `= ${fmt(total)} ${it.unit}` : ""}</div></div>
+    ${it.pack ? `<div class="units"><button class="btn ${pad.field === "packs" ? "on" : ""}" onclick="pad.field='packs';render()">${esc(it.packUnit)}s <span class="tiny">×${it.pack}${it.verify ? " ?" : ""}</span></button><button class="btn ${pad.field === "loose" ? "on" : ""}" onclick="pad.field='loose';render()">loose ${esc(it.unit)}</button></div>` : padTabs(it)}
+    <div class="disp"><div><span class="big num">${pad[pad.field] || "0"}</span> <span class="unit">${esc(padUnit(it))}</span></div><div class="eq num">${it.pack || padAlt(it).length ? `= ${fmt(total)} ${esc(it.unit)}${padAlt(it).length ? ` · ${fmt(Math.round(total * it.per))} ${esc(it.base)}` : ""}` : ""}</div></div>
     <div class="pad">${keys}</div>
     <button class="btn primary full" style="margin-top:10px" onclick="padEnter()">${pad.mode === "receive" ? "Add" : "Save and next"}</button></div></div>`;
 }

@@ -42,6 +42,9 @@
 .crow button.chip{border:0; min-height:36px; cursor:pointer}
 .btn.sm{min-height:40px; padding:0 14px; font-size:14px}
 .skpad .units .btn{min-height:52px; flex-direction:column; gap:0; line-height:18px} .skpad .units .btn b{font-size:18px}
+/* v0.32: several pack sizes of one item. The tabs wrap (three or more), and Receive asks which pack the line came in */
+.units.alt{flex-wrap:wrap} .units.alt .btn{flex:1 1 30%; min-height:48px; flex-direction:column; gap:0; line-height:18px; font-size:13px} .units.alt .btn b{font-size:17px}
+.rpk{grid-column:1/-1; display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:6px}
 .skpad .pad button{min-height:60px; font-size:28px}
 .skpad .disp .big{font-size:36px; line-height:44px}
 .padact{display:grid; grid-template-columns:1fr 1.6fr; gap:8px; margin-top:10px} .padact .btn{min-height:52px}

@@ -182,16 +182,20 @@ function itOpen(id, preName) {
   itAfterSave = null; const it = id ? Store.item(id) : null;
   const packed = it && it.unit && it.base && it.unit !== it.base;
   itSheet = it ? { code: it.id, name: it.name, category: IT_CATS.find(c => c.toLowerCase() === it.cat) || it.cat, place: it.place || "", unit: ["g", "ml", "pc"].includes(it.base) ? it.base : "pc",
-      pack_unit: packed ? it.unit : "", pack_qty: packed && it.per ? it.per : "", case_unit: it.packUnit || "", case_qty: it.pack || "",
+      pack_unit: packed ? it.unit : "", pack_qty: packed && it.per ? it.per : "", case_unit: it.buyUnit || it.packUnit || "", case_qty: it.buyQty || it.pack || "",   /* v0.32: the buy unit lives in buyUnit/buyQty since v0.31; reading only packUnit dropped it on every edit */
+      packs: (it.packs || []).map(a => ({ unit: a.unit, qty: a.per })),
       par: it.par == null ? "" : it.par, supplier: it.supplier || "", brand: it.brand || "", nightly: !!it.nightly, active: true, expiry: !!it.expiry }
-    : { code: null, name: preName || "", category: "", place: "", unit: "g", pack_unit: "", pack_qty: "", case_unit: "", case_qty: "", par: "", supplier: "", brand: "", nightly: false, active: true, expiry: null };
+    : { code: null, name: preName || "", category: "", place: "", unit: "g", pack_unit: "", pack_qty: "", case_unit: "", case_qty: "", packs: [], par: "", supplier: "", brand: "", nightly: false, active: true, expiry: null };
   render();
 }
 function itRead() {   /* keep what was typed when the sheet redraws */
   const v = id => { const e = document.getElementById(id); return e ? (e.type === "checkbox" ? e.checked : e.value) : undefined; };
   const map = { "it-name": "name", "it-cat": "category", "it-place": "place", "it-unit": "unit", "it-sup": "supplier", "it-pu": "pack_unit", "it-pq": "pack_qty", "it-cu": "case_unit", "it-cq": "case_qty", "it-par": "par", "it-brand": "brand", "it-night": "nightly" };
   Object.keys(map).forEach(k => { const x = v(k); if (x !== undefined) itSheet[map[k]] = x; });
+  (itSheet.packs || []).forEach((a, i) => { const u = v("it-apu-" + i), q = v("it-apq-" + i); if (u !== undefined) a.unit = u; if (q !== undefined) a.qty = q; });
 }
+function itPackAdd() { itRead(); itSheet.packs = (itSheet.packs || []).concat({ unit: "", qty: "" }); render(); }
+function itPackDel(i) { itRead(); itSheet.packs.splice(i, 1); render(); }
 function itSheetHTML() {
   if (!itSheet) return "";
   const s = itSheet, opt = (list, v) => list.map(x => Array.isArray(x) ? `<option value="${x[0]}" ${x[0] === v ? "selected" : ""}>${esc(x[1])}</option>` : `<option ${x === v ? "selected" : ""}>${esc(x)}</option>`).join("");
@@ -205,6 +209,11 @@ function itSheetHTML() {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">${sel("it-cat", "Category", IT_CATS, s.category, "Pick one", true)}<div class="field"><label for="it-place">Place</label><select class="in" id="it-place"><option value="">No place yet</option>${PLACES.map(p => `<option value="${esc(p.id)}" ${p.id === s.place || p.name === s.place ? "selected" : ""}>${esc(p.name)}</option>`).join("")}</select></div>
     ${step(1, "Measured in", "what recipes and usage count")}${sel("it-unit", "Unit", IT_MEASURE, s.unit, "", true)}<div></div>
     ${step(2, "Counted as", "what sits on the shelf")}${sel("it-pu", "Container", IT_COUNT, s.pack_unit, "No container: count " + (s.unit === "pc" ? "pieces" : s.unit), true)}${s.pack_unit ? inp("it-pq", `One ${esc(s.pack_unit)} holds (${esc(s.unit)})`, s.pack_qty, 'inputmode="decimal" placeholder="from the label"') : "<div></div>"}
+    ${s.pack_unit ? `<div style="grid-column:1/-1;margin:2px 0 6px"><div class="tiny mut" style="margin-bottom:6px">The same item in another pack size? It is counted and received on this one item. Example: Nutella, 3 kg pail and 900 g jar.</div>
+      ${(s.packs || []).map((a, i) => `<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:8px;align-items:end;margin-bottom:6px"><div class="field" style="margin:0"><label for="it-apu-${i}">Other pack</label><select class="in" id="it-apu-${i}" onchange="itRead();render()"><option value="">Pick one</option>${opt(IT_COUNT, a.unit)}</select></div>
+        <div class="field" style="margin:0"><label for="it-apq-${i}">One holds (${esc(s.unit)})</label><input class="in" id="it-apq-${i}" inputmode="decimal" placeholder="from the label" value="${esc(a.qty == null ? "" : a.qty)}"></div>
+        <button class="btn ghost danger" onclick="itPackDel(${i})" aria-label="Remove this pack size">${ic("x-close")}</button></div>`).join("")}
+      <button class="chip" onclick="itPackAdd()">+ Another pack size</button></div>` : ""}
     ${step(3, "Bought as", "optional")}${sel("it-cu", "Buy unit", IT_BUY, s.case_unit, "Same as counted", true)}${s.case_unit ? inp("it-cq", `One ${esc(s.case_unit)} holds (${esc(cnt)})`, s.case_qty, 'inputmode="decimal"') : "<div></div>"}
     ${step(4, "Stock rules", "")}${inp("it-par", `Par (${esc(cnt)})`, s.par, 'inputmode="decimal"')}${sel("it-sup", "Main supplier", SUPPLIERS.slice().sort(), s.supplier, "None")}${inp("it-brand", "Brand", s.brand)}<div></div></div>
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="it-exp" ${exp ? "checked" : ""} onchange="itSheet.expiry=this.checked" style="width:20px;height:20px"> Track expiry dates <span class="tiny mut">(asked when a delivery is received)</span></label>
@@ -223,16 +232,20 @@ async function itSave() {
   if (pq != null && !(pq > 0)) return toast("What one " + pu + " holds: a number above 0.");
   if (cu && !(cq > 0)) return toast("How many " + (pu || s.unit) + " are in one " + cu + "?");
   if (par != null && !(par >= 0)) return toast("Par: a number.");
+  const packs = pu ? (s.packs || []).map(a => ({ unit: String(a.unit || "").trim(), qty: num(a.qty) })).filter(a => a.unit || a.qty != null) : [];   /* v0.32: other pack sizes of the same item */
+  if (packs.length && !(pq > 0)) return toast("First write what one " + pu + " holds.");
+  if (packs.some(a => !a.unit || !(a.qty > 0))) return toast("Other pack size: pick the pack and write what one holds.");
+  if (packs.some((a, i) => (a.unit === pu && a.qty === pq) || packs.findIndex(b => b.unit === a.unit && b.qty === a.qty) !== i)) return toast("That pack size is on the item twice.");
   const exp = document.getElementById("it-exp") ? document.getElementById("it-exp").checked : !!s.expiry;
   const p = { store: curStore(), code: s.code, name: String(s.name).trim(), category: s.category, place: ((PLACES.find(x => x.id === placeId) || {}).name) || placeId, unit: s.unit, pack_unit: pu || null, pack_qty: pu ? pq : null,
-    case_unit: cu || null, case_qty: cu ? cq : null, par: par == null ? null : pu && pq ? par * pq : par, supplier: s.supplier || null, brand: String(s.brand || "").trim() || null, nightly: !!s.nightly,
+    case_unit: cu || null, case_qty: cu ? cq : null, packs, par: par == null ? null : pu && pq ? par * pq : par, supplier: s.supplier || null, brand: String(s.brand || "").trim() || null, nightly: !!s.nightly,
     track_expiry: exp, active: s.code ? v("it-active") : true };
   itBusy = true; render();
   let code = p.code;
   if (window.OS_LOADED && window.OS_LOADED.dev || typeof sb === "undefined") {   /* dev page: in memory only */
     code = code || p.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const it = Store.item(code) || (ITEMS.push({ id: code }), ITEMS[ITEMS.length - 1]);
-    Object.assign(it, { name: p.name, cat: p.category.toLowerCase(), place: placeId, base: p.unit, unit: pu || p.unit, per: pu ? pq : 1, sizeUnknown: !!pu && pq == null, packUnit: cu || undefined, pack: cu ? cq : undefined, par: par, supplier: p.supplier || undefined, brand: p.brand, nightly: p.nightly, expiry: exp });
+    Object.assign(it, { name: p.name, cat: p.category.toLowerCase(), place: placeId, base: p.unit, unit: pu || p.unit, per: pu ? pq : 1, sizeUnknown: !!pu && pq == null, packUnit: undefined, pack: undefined, buyUnit: cu || undefined, buyQty: cu ? cq : undefined, packs: packs.map(a => ({ unit: a.unit, per: a.qty })), par: par, supplier: p.supplier || undefined, brand: p.brand, nightly: p.nightly, expiry: exp });
   } else {
     const r = await sb.rpc("os_save_item", { p }); if (r.error) { itBusy = false; toast("Not saved: " + r.error.message); return render(); }
     code = r.data.code;
