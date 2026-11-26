@@ -26,7 +26,7 @@ function skLevel(it) {
 }
 function skToPar(L) {
   const it = L.it; if (L.s == null || L.s < 0 || !it.par || L.s >= it.par) return null;   /* below zero is a counting or receiving gap, not an order quantity */ const need = it.par - Math.max(0, L.s);
-  if (it.pack) { const n = Math.ceil(need / it.pack); return { qty: n * it.pack, txt: `${n} ${it.packUnit}${n > 1 ? "s" : ""}` }; }
+  if (it.buyQty) { const n = Math.ceil(need / it.buyQty); return { qty: n * it.buyQty, txt: `${n} ${it.buyUnit}${n > 1 ? "s" : ""}` }; }
   const q = Math.ceil(need * 10) / 10; return { qty: q, txt: `${fmt(q)} ${it.unit}` };
 }
 const skCoverChip = L => L.cover == null ? "" : L.cover < 2 ? chip("bad", `${L.cover.toFixed(1)} d left`) : L.cover < 4 ? chip("warn", `${L.cover.toFixed(1)} d left`) : `<span class="chip">${L.cover >= 30 ? "30+" : L.cover.toFixed(0)} d left</span>`;
@@ -230,17 +230,40 @@ function skPriceFlag(id, price, base) {
   if (Math.abs(p) < SK_PRICE_TOL) return `<span class="pf flat" data-tt="${esc(tt)}"><i>▬</i>same as ${esc(dayName(lp.day))}</span>`;
   return `<span class="pf ${p > 0 ? "up" : "down"} ${Math.abs(p) >= .1 ? "big" : ""}" data-tt="${esc(tt)}"><i>${p > 0 ? "▲" : "▼"}</i>${Math.round(Math.abs(p) * 100)}% vs ${esc(dayName(lp.day))} (${skP(lp.price)})</span>`;
 }
-function skRcPad(id) { openPad(id, "receive", (qty, text) => { if (!qty) return; const lp = Store.lastPrice(id); rc.lines.push({ item: id, qty, text, price: null, _last: lp ? lp.price : null }); }); }
+/* v0.31 (2026-11-26) Receive copies the invoice line as printed: invoice qty × inside each, and the line amount.
+   The app works out the units and the price per unit, so the crew never divides (Stefan: they must stay inside the app).
+   "Inside each" is typed per delivery from the invoice ("CASE X 12") and never stored on the item: a supplier can change its box.
+   Then the crew counts what came and ticks it; the lines are checked against the total on the receipt (with or without 12 % VAT). */
+function skLastInside(id, sup) {   /* last delivery of this item from this supplier: the ×N in its text */
+  const rs = (S.receipts || []).filter(r => r.supplier === sup && (r.lines || []).some(l => l.item === id)).sort((a, b) => a.day < b.day ? 1 : -1);
+  for (const r of rs) { const l = r.lines.find(x => x.item === id); const m = /×\s*([\d.]+)/.exec((l && l.text) || ""); if (m) return +m[1]; } return null; }
+function skInv(l) { const o = parseFloat(l.outer), e = parseFloat(l.inside); return o > 0 && e > 0 ? Math.round(o * e * 1000) / 1000 : null; }
+function skAmt(l) { return l.amt === "" || l.amt == null || isNaN(parseFloat(l.amt)) ? null : parseFloat(l.amt); }
+function skRcCalc(l) {   /* fields → qty (what came, count units), price (per count unit as billed), text (kept on the receipt line) */
+  const it = Store.item(l.item), inv = skInv(l), amt = skAmt(l);
+  if (!l.gotEdited) l.qty = inv; l.price = amt != null && inv ? amt / inv : null;
+  l.text = inv ? `${fmt(parseFloat(l.outer))} × ${fmt(parseFloat(l.inside))} ${it.unit} on invoice${l.qty != null && l.qty !== inv ? ` · came ${fmt(l.qty)}` : ""}` : ""; }
+function skRcSet(i, k, v) { const l = rc.lines[i]; if (!l) return; l[k] = v; if (k === "inside") l.insideAuto = false; if (k === "got") { const g = parseFloat(v); l.gotEdited = v !== "" && !isNaN(g); l.qty = l.gotEdited ? g : skInv(l); l.counted = l.gotEdited || l.counted; } if (k === "outer" || k === "inside") l.counted = false; skRcCalc(l); render(); }
+function skRcLine(id, extra) { const ins = rc.supplier ? skLastInside(id, rc.supplier) : null;
+  return Object.assign({ item: id, outer: "", inside: ins != null ? String(ins) : "", insideAuto: ins != null, amt: "", qty: null, price: null, text: "", counted: false, gotEdited: false }, extra || {}); }
+function skRcPad(id) { if (!id || !Store.item(id)) return; if (rc.lines.some(l => l.item === id)) { toast("Already on the list."); return; } rc.lines.push(skRcLine(id)); render(); }
+function skRcCheck(lines, total) {   /* the line amounts against the total on the receipt: same, or same plus 12 % VAT */
+  const priced = lines.filter(l => skAmt(l) != null); if (!lines.length || priced.length < lines.length || isNaN(total)) return null;
+  const sum = Math.round(skSum(priced.map(skAmt)) * 100) / 100, vat = Math.round(sum * 12) / 100;
+  if (Math.abs(sum - total) <= 0.05) return { ok: true, txt: `Lines ${skP(sum)} = total on the receipt ✓` };
+  if (Math.abs(sum + vat - total) <= 0.5) return { ok: true, txt: `Lines ${skP(sum)} + 12% VAT ${skP(vat)} = ${skP(total)} ✓` };
+  return { ok: false, txt: `Lines add up to ${skP(sum)} (${skP(sum + vat)} with 12% VAT), but the total is ${skP(total)}. Check each line amount and the total.` }; }
 /* v0.12 money side of a delivery: paid now (expense, from which fund) or bill (supplier on terms → 1–15 / 16–end run) */
 function skDefaultPay(sup, kind) { if (kind === "purchase") return "paid_now"; const i = SUPPLIER_INFO[sup]; return i && i.pay_mode === "terms" ? "bill" : i && i.pay_mode === "paid_now" ? "paid_now" : null; }
 function skPickSupplier(s) { rc.supplier = s; rc.pay_mode = skDefaultPay(s, rc.kind) || rc.pay_mode; rc.po = null; render(); }
 function skOrdToCount(it, qty, unit) {   /* an order line (buy units) → the count units the pad and the stock use */
-  if (unit == null || unit === it.unit) return qty; if (unit === it.packUnit && it.pack) return qty * it.pack;
+  if (unit == null || unit === it.unit) return qty; if (unit === it.buyUnit && it.buyQty) return qty * it.buyQty;
   const b = (it.buys || []).find(x => x.unit === unit && x.qty); if (b && it.per) return qty * b.qty / it.per; return null; }   /* unknown size: the crew counts what came */
 function skRcFix(i) { const l = rc.lines[i]; openPad(l.item, "receive", (qty, text) => { if (!qty) return; l.qty = qty; l.text = (l.text || "").split(" · ")[0] + " · came " + text; }); }
 function skOpenOrders(sup) { return (S.orders || []).filter(o => o.supplier === sup && (o.status === "approved" || o.status === "requested")); }
 function skLoadOrder(id) { const o = (S.orders || []).find(x => x.id === id); if (!o) return; rc.po = id;
-  o.lines.forEach(l => { const it = Store.item(l.item); if (!it || rc.lines.some(x => x.item === l.item)) return; const q = skOrdToCount(it, l.qty, l.unit); rc.lines.push({ item: l.item, qty: q, text: `${fmt(l.qty)} ${l.unit || it.unit} ordered${q == null ? ` · count the ${it.unit}s that came` : ""}`, price: null, _ordered: q }); });
+  o.lines.forEach(l => { const it = Store.item(l.item); if (!it || rc.lines.some(x => x.item === l.item)) return; const q = skOrdToCount(it, l.qty, l.unit); const single = l.unit == null || l.unit === it.unit;
+    const x = skRcLine(l.item, { outer: String(l.qty), _ordered: q }); if (single) { x.inside = "1"; x.insideAuto = false; } skRcCalc(x); rc.lines.push(x); });   /* v0.31: the order fills the invoice qty; "inside each" comes from the last delivery and is checked against the invoice */
   render(); }
 function skShort() { if (!rc.po) return []; const o = (S.orders || []).find(x => x.id === rc.po); if (!o) return [];
   return o.lines.map(l => { const it = Store.item(l.item); if (!it) return null; const want = skOrdToCount(it, l.qty, l.unit); if (want == null) return null; const got = rc.lines.filter(x => x.item === l.item).reduce((a, x) => a + x.qty, 0); return got < want ? { it, want, got } : null; }).filter(Boolean); }
@@ -255,15 +278,26 @@ function viewReceive() {
   const freq = {}; S.receipts.filter(r => r.supplier === rc.supplier).forEach(r => r.lines.forEach(l => freq[l.item] = (freq[l.item] || 0) + 1));
   const usual = Object.keys(freq).sort((a, b) => freq[b] - freq[a]).filter(id => Store.item(id) && !rc.lines.some(l => l.item === id)).slice(0, 8);
   const itemOpts = ITEMS.filter(i => !rc.supplier || !i.supplier || i.supplier === rc.supplier || rc.kind !== "delivery").map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join("");
-  const lines = rc.lines.map((l, i) => { const it = Store.item(l.item); const lp = Store.lastPrice(l.item);
-    return `<div class="rline"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">${esc(l.text || fmt(l.qty) + " " + it.unit)} = ${l.qty == null ? `<button class="btn primary" style="padding:2px 10px" onclick="skRcFix(${i})">Qty</button>` : fmt(l.qty) + " " + esc(it.unit)}${l.price != null ? ` · <b class="ink2">${peso(l.price * l.qty)}</b>` : ""}</div></div>
+  const lines = rc.lines.map((l, i) => { const it = Store.item(l.item); const lp = Store.lastPrice(l.item); const inv = skInv(l), amt = skAmt(l); const u = esc(it.unit);
+    const base = inv && it.per && it.per !== 1 ? ` <span class="mut">(${fmt(inv * it.per)} ${esc(it.base)})</span>` : "";
+    const countRow = inv ? `<div class="rcount ${l.counted ? "ok" : ""}"><label class="rtick"><input type="checkbox" ${l.counted ? "checked" : ""} onchange="rc.lines[${i}].counted=this.checked;render()"> <span>Counted</span></label>
+        <label class="rpin"><span>came</span><input class="in num" inputmode="decimal" aria-label="${u}s that came" value="${l.qty != null ? l.qty : ""}" onchange="skRcSet(${i},'got',this.value)"><span class="tiny mut">${u}</span></label>
+        ${l.qty != null && l.qty < inv ? `<span class="band-warn tiny">${fmt(inv - l.qty)} ${u} short of the invoice</span>` : l.qty > inv ? `<span class="band-warn tiny">${fmt(l.qty - inv)} ${u} more than the invoice</span>` : `<span class="tiny mut">count the ${u}s, then tick</span>`}</div>` : "";
+    return `<div class="rline"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">${inv ? `= <b class="ink2">${fmt(inv)} ${u}</b>${base}${l.price != null ? ` · ${skP(l.price)} per ${u}` : ""}` : `Copy the line from the invoice`}</div></div>
       <button class="btn ghost danger rx" onclick="rc.lines.splice(${i},1);render()" aria-label="Remove ${esc(it.name)}">${ic("x-close")}</button>
+      ${rc.kind !== "pullout" ? `<div class="rinv"><label class="rpin"><span>Invoice qty</span><input class="in num" inputmode="decimal" aria-label="Quantity on the invoice for ${esc(it.name)}" placeholder="e.g. 2" value="${esc(l.outer)}" onchange="skRcSet(${i},'outer',this.value)"></label>
+        <span class="rx2">×</span><label class="rpin ${l.insideAuto ? "auto" : ""}"><span>inside each</span><input class="in num" inputmode="decimal" aria-label="${u}s inside each on the invoice" placeholder="1" value="${esc(l.inside)}" onchange="skRcSet(${i},'inside',this.value)"><span class="tiny mut">${u}</span></label>
+        <div class="tiny mut rhint">${l.insideAuto ? `×${esc(l.inside)} from the last delivery: check the invoice` : `Invoice says CASE X 12 → type 12 · single ${u}s → 1`}</div>
+        <label class="rpin"><span>Line amount ₱</span><input class="in num ramt" inputmode="decimal" aria-label="Amount column for ${esc(it.name)}" placeholder="${lp && inv ? fmt(Math.round(lp.price * inv * 100) / 100) : "amount"}" value="${esc(l.amt)}" onchange="skRcSet(${i},'amt',this.value)"></label>
+        <div class="pflag">${l.price != null ? skPriceFlag(l.item, l.price) : lp ? `<span class="tiny mut">last ${skP(lp.price)} per ${u} on ${esc(dayName(lp.day))}</span>` : `<span class="tiny mut">no earlier price</span>`}</div></div>` : ""}
+      ${rc.kind !== "pullout" && !rc.edit ? countRow : ""}
       ${it.sizeUnknown ? `<div class="tiny" style="grid-column:1/-1;margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="${l.size > 0 || l.noSize ? "band-ok" : "band-warn"}">One ${esc(it.unit)} holds</span><input class="in num" inputmode="decimal" style="width:96px" aria-label="Size of one ${esc(it.unit)} in ${esc(it.base)}" placeholder="size" value="${l.size > 0 ? l.size : ""}" onchange="rc.lines[${i}].size=this.value===''?null:parseFloat(this.value);rc.lines[${i}].noSize=false;render()"><span>${esc(it.base)}</span><label style="display:flex;gap:4px;align-items:center"><input type="checkbox" ${l.noSize ? "checked" : ""} onchange="rc.lines[${i}].noSize=this.checked;render()"> not printed</label></div>` : ""}
       ${it.expiry && rc.kind !== "pullout" ? `<div class="tiny" style="grid-column:1/-1;margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="${l.exp ? "band-ok" : "mut"}">Expires</span><input class="in" type="date" style="width:170px" aria-label="Expiry date of ${esc(it.name)}" value="${esc(l.exp || "")}" onchange="rc.lines[${i}].exp=this.value||null;render()"><span class="mut">from the label (optional)</span></div>` : ""}
-      ${rc.kind !== "pullout" ? `<div class="rprice"><label class="rpin"><span>₱</span><input class="in num" inputmode="decimal" aria-label="Price per ${esc(it.unit)}" placeholder="${lp ? fmt(lp.price) : "price"}" value="${l.price != null ? l.price : ""}" onchange="rc.lines[${i}].price=this.value===''?null:parseFloat(this.value);render()"><span class="tiny mut">per ${esc(it.unit)}</span></label><div class="pflag">${l.price != null ? skPriceFlag(l.item, l.price) : lp ? `<span class="tiny mut">last ${skP(lp.price)} on ${esc(dayName(lp.day))}</span>` : `<span class="tiny mut">no earlier price</span>`}</div></div>` : ""}</div>`; }).join("");
-  const priced = rc.lines.filter(l => l.price != null); const tot = skSum(priced.map(l => l.price * l.qty)); const flags = priced.filter(l => { const lp = Store.lastPrice(l.item); return lp && Math.abs((l.price - lp.price) / lp.price) >= SK_PRICE_TOL; });
+</div>`; }).join("");
+  const priced = rc.lines.filter(l => l.price != null); const tot = skSum(priced.map(l => skAmt(l) != null ? skAmt(l) : l.price * l.qty)); const flags = priced.filter(l => { const lp = Store.lastPrice(l.item); return lp && Math.abs((l.price - lp.price) / lp.price) >= SK_PRICE_TOL; });
   const short = skShort(); const totOk = rc.total !== "" && !isNaN(parseFloat(rc.total)) && parseFloat(rc.total) >= 0;
-  const need = []; if (!rc.supplier) need.push(rc.kind === "pullout" ? "where from" : "supplier"); if (!rc.lines.length && (rc.kind !== "delivery" || !rc.photo || rc.edit)) need.push(rc.kind === "delivery" ? "at least one item, or the photo" : "at least one item"); if (rc.lines.some(l => !(l.qty > 0))) need.push("a quantity on every line");
+  const need = []; if (!rc.supplier) need.push(rc.kind === "pullout" ? "where from" : "supplier"); if (!rc.lines.length && (rc.kind !== "delivery" || !rc.photo || rc.edit)) need.push(rc.kind === "delivery" ? "at least one item, or the photo" : "at least one item"); if (rc.lines.some(l => !(skInv(l) > 0) && !(l.qty > 0))) need.push("invoice qty × inside each on every line"); else if (rc.lines.some(l => !(l.qty > 0))) need.push("what came on every line");
+  if (!rc.edit && rc.lines.some(l => skInv(l) > 0 && !l.counted)) need.push("count every line and tick Counted");
   if (rc.lines.some(l => { const it = Store.item(l.item); return it && it.sizeUnknown && !(l.size > 0) && !l.noSize; })) need.push("the size from the label (or tick not printed)");
   if (!totOk) need.push("total ₱"); if (!rc.pay_mode) need.push("paid now or bill"); if (rc.kind !== "pullout" && !rc.photo) need.push("photo");
   const steps = [[!!rc.supplier, rc.kind === "pullout" ? "From" : "Supplier"], [rc.lines.length > 0, "Items"], [totOk && !!rc.pay_mode, "Money"], [rc.kind === "pullout" || !!rc.photo, "Photo"]];
@@ -287,7 +321,8 @@ function viewReceive() {
     ${short.length ? `<div class="alert warn">Short against the order: ${short.map(x => `${esc(x.it.name)} ${fmt(x.got)} of ${fmt(x.want)} ${esc(x.it.unit)}`).join(" · ")}. Save anyway if that is what came; the rest stays open.</div>` : ""}
     <section class="card"><h2>Money</h2>
       ${desk ? `<div class="field"><label>Day on the receipt</label><input class="in" type="date" max="${today()}" value="${esc(rc.day || today())}" onchange="rc.day=this.value||today();render()"></div>` : ""}
-      <div class="field"><label>Total on the receipt (₱, required)</label><input class="in num" inputmode="decimal" value="${esc(rc.total)}" placeholder="${priced.length ? fmt(Math.round(tot * 100) / 100) : "e.g. 1250"}" oninput="rc.total=this.value" onchange="render()"></div>
+      <div class="field"><label>Total on the receipt (₱, required)</label><input class="in num" inputmode="decimal" value="${esc(rc.total)}" placeholder="${priced.length ? fmt(Math.round(tot * 100) / 100) : "e.g. 1250"}" oninput="rc.total=this.value" onchange="render()"><div class="tiny mut" style="margin-top:4px">The grand total at the bottom of the invoice (Total amount due).</div></div>
+      ${(() => { const c = totOk ? skRcCheck(rc.lines, parseFloat(rc.total)) : null; return c ? `<div class="alert ${c.ok ? "ok" : "warn"}">${esc(c.txt)}</div>` : ""; })()}
       <div class="field"><label>Invoice / SI / DR number</label><input class="in" value="${esc(rc.invoice)}" placeholder="if the paper has one" oninput="rc.invoice=this.value"></div>
       <div class="field"><label>Payment (required)</label><div class="seg"><button class="btn ${rc.pay_mode === "paid_now" ? "on" : ""}" onclick="rc.pay_mode='paid_now';render()">Paid now</button><button class="btn ${rc.pay_mode === "bill" ? "on" : ""}" ${rc.kind === "purchase" ? "disabled" : ""} onclick="rc.pay_mode='bill';render()">Bill (pay later)</button></div>
         ${rc.pay_mode === "paid_now" ? `<div class="chips" style="margin-top:8px">${PAY_SOURCES.map(([k, l]) => `<button class="chip ${rc.pay_source === k ? "info" : ""}" onclick="rc.pay_source='${k}';render()">${l}</button>`).join("")}</div><div class="tiny mut" style="margin-top:4px">Who paid. It becomes an expense of that fund.</div>`
@@ -300,7 +335,8 @@ function viewReceive() {
 function skDesk() { return role() === "master" || (typeof officeLogin === "function" && officeLogin()) || (typeof officerLogin === "function" && officerLogin()); }
 function skToItemise() { return (S.receipts || []).filter(r => r.kind === "delivery" && !(r.lines || []).length).sort((a, b) => a.day < b.day ? -1 : a.day > b.day ? 1 : 0); }
 function skRcEdit(id) { const r = (S.receipts || []).find(x => x.id === id); if (!r) return;
-  rc = { edit: id, kind: r.kind, supplier: r.supplier || "", lines: (r.lines || []).map(l => Object.assign({}, l)), photo: r.photo || null, amount: "", total: r.total != null ? String(r.total) : r.amount != null ? String(r.amount) : "", invoice: r.invoice || "", pay_mode: r.pay_mode || (r.amount != null ? "paid_now" : null), pay_source: r.pay_source || "store_fund", po: r.po || null, location: r.location || skStore(), day: r.day };
+  rc = { edit: id, kind: r.kind, supplier: r.supplier || "", lines: (r.lines || []).map(l => { const m = /^([\d.]+) × ([\d.]+) /.exec(l.text || "");   /* v0.31: lines saved before have only qty and price */
+      return Object.assign({ outer: m ? m[1] : String(l.qty), inside: m ? m[2] : "1", insideAuto: false, amt: l.price != null && l.qty ? String(Math.round(l.price * (m ? m[1] * m[2] : l.qty) * 100) / 100) : "", counted: true, gotEdited: !!m && +m[1] * +m[2] !== l.qty }, l); }), photo: r.photo || null, amount: "", total: r.total != null ? String(r.total) : r.amount != null ? String(r.amount) : "", invoice: r.invoice || "", pay_mode: r.pay_mode || (r.amount != null ? "paid_now" : null), pay_source: r.pay_source || "store_fund", po: r.po || null, location: r.location || skStore(), day: r.day };
   go("#/receive"); render(); }
 
 function skPullout() {   /* v0.13.1: stock from Head Office or another store, without leaving Receive */

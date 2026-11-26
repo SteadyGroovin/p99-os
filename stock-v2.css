@@ -74,6 +74,14 @@
 .rprice{grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px}
 .rpin{display:flex; align-items:center; gap:6px} .rpin .in{width:96px; min-height:44px; text-align:right; padding:0 10px}
 .pflag{margin-top:2px; min-height:18px}
+/* v0.31 Receive copies the invoice line: invoice qty × inside each, line amount; then counted */
+.rinv{grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-top:6px}
+.rinv .rpin > span:first-child{font-size:13px; color:var(--mut)} .rinv .rx2{font-weight:600; color:var(--mut)}
+.rinv .rpin.auto .in{border-color:var(--warn); background:var(--warn-bg)}
+.rinv .rhint{flex-basis:100%; margin-top:-2px} .rinv .ramt{width:120px}
+.rcount{grid-column:1/-1; display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:8px; padding:8px 10px; border-radius:var(--r-card); background:var(--warn-bg)}
+.rcount.ok{background:var(--ok-bg)} .rcount .rpin > span:first-child{font-size:13px; color:var(--mut)}
+.rtick{display:flex; align-items:center; gap:8px; min-height:44px; font-weight:600} .rtick input{width:22px; height:22px}
 .pf{font-size:13px; font-weight:600; white-space:nowrap; cursor:default} .pf i{font-style:normal; font-size:11px; margin-right:3px}
 .pf.up{color:var(--bad)} .pf.down{color:var(--ok)} .pf.flat{color:var(--mut); font-weight:500} .pf.big{text-decoration:underline; text-underline-offset:3px}
 

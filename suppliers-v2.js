@@ -172,7 +172,7 @@ const IT_CATS = ["Vegetable & fruit", "Meat & fish", "Cheese", "Dairy & eggs", "
 /* v0.24 (Stefan, 16 Nov: "We need to be able to measure everything"; migration 047): three plain questions.
    Measured in (g, ml, pc — what recipes and usage use) · Counted as (the container on the shelf) and what one holds · Bought as and how many. */
 const IT_MEASURE = [["g", "grams (g)"], ["ml", "millilitres (ml)"], ["pc", "pieces (pc) — also slices"]];
-const IT_COUNT = ["pack", "btl", "can", "jar", "box", "bag", "tub", "gal", "sack", "tank", "roll", "pad", "block", "tray", "jug", "container"];
+const IT_COUNT = ["pack", "carton", "btl", "can", "jar", "pail", "bag", "tub", "gal", "sack", "tank", "roll", "pad", "block", "tray", "jug", "container"];   /* v0.31: no "box": count the sealed pack inside it, a supplier can change what a box holds (Stefan, 2026-11-26) */
 const IT_BUY = ["case", "box", "bundle", "sack", "pack", "tray", "carton"];
 const IT_EXP_CATS = ["Drink", "Canned & jar", "Sauce & oil", "Dry & baking", "Dairy & eggs", "Cheese", "Ice cream"];
 let itSheet = null, itBusy = false, itAfterSave = null;   /* v0.27.3: the recipe editor opens this sheet and takes the new item back */
