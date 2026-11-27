@@ -18,7 +18,7 @@ const officerLogin = () => window.DB_ROLE === "officer";   /* v0.23 (migration 0
    what is bought (order → approve → bills), the money, the team; the catalogue is set up once and sits last. Settings are behind the account button only. */
 const MODULES = [
   ["sales", "Sales", "#/sales", "cash", "Till"], ["cash", "Cash count", "#/cash", "cash", "Till"], ["walk", "Morning run", "#/walk", "sun", "Till"],
-  ["stock", "Stock", "#/stock", "grid", "Inventory"], ["count", "Count", "#/count", "grid", "Inventory"], ["receive", "Receive", "#/receive", "box", "Inventory"], ["transfers", "Transfers", "#/transfers", "box", "Inventory"], ["variance", "Variance", "#/variance", "grid", "Inventory"],
+  ["stock", "Stock", "#/stock", "grid", "Inventory"], ["count", "Count", "#/count", "grid", "Inventory"], ["receive", "Receive", "#/receive", "box", "Inventory"], ["transfers", "Transfers", "#/transfers", "box", "Inventory"], ["variance", "Variance", "#/variance", "grid", "Inventory"], ["minimums", "Minimums", "#/minimums", "grid", "Inventory"],
   ["order", "Order", "#/order", "coins", "Buying"], ["approve", "Approve", "#/approve", "check", "Buying"], ["bills", "Bills", "#/bills", "coins", "Buying"], ["purchases", "Purchases", "#/purchases", "coins", "Buying"], ["suppliers", "Suppliers", "#/suppliers", "coins", "Buying"],
   ["money", "Funds", "#/money", "finance", "Money"], ["finance", "P&L", "#/finance", "finance", "Money"], ["books", "Month close", "#/books", "finance", "Money"], ["accounts", "Accounts", "#/accounts", "finance", "Money"],
   ["tasks", "Tasks", "#/tasks", "list", "Team"], ["questions", "Questions", "#/questions", "list", "Team"], ["report", "Tickets", "#/report", "alert", "Team"], ["clean", "Clean", "#/clean", "check", "Team"], ["logins", "Logins", "#/logins", "dots", "Team"],
@@ -52,10 +52,11 @@ function canOpen(s0) {
   /* v0.22 (Stefan, 15 Nov, Burger Kong access for Cath): the store lead sees tasks, inventory (stock, count, receive) and ordering for her own store */
   /* v0.23 (Stefan, 15 Nov: Hannah gets inventory, buying and the team): every store and D'Mall Storage, the all-stores stock, Papers. v0.23.2 (16 Nov): plus the morning run and the cash count (migration 040). Not sales, funds, bills, approving or roles. v0.23.3 (16 Nov, migration 043): plus recipes */
   if (s0 === "logins") return m || r === "officer";   /* v0.30: Hannah creates and resets the store logins (edge function store-login) */
-  if (r === "officer") return ["", "today", "walk", "cash", "stock", "stock-all", "count", "receive", "receipts", "transfers", "transfer", "variance", "items", "item", "sizes", "order", "suppliers", "supplier", "recipes", "recipe", "tasks", "task", "report", "clean", "papers", "questions", "more", "settings", "who", "password", "modules"].includes(s0);
+  if (r === "officer") return ["", "today", "walk", "cash", "stock", "stock-all", "count", "receive", "receipts", "transfers", "transfer", "variance", "minimums", "items", "item", "sizes", "order", "suppliers", "supplier", "recipes", "recipe", "tasks", "task", "report", "clean", "papers", "questions", "more", "settings", "who", "password", "modules"].includes(s0);
   if (s0 === "questions") return m || adm;   /* v0.28 (migration 052): open questions for the officer, the office and the owners */
   if (s0 === "papers") return m || adm;   /* the office (admin, finance) and the owners */
-  if (r === "lead") return ["", "today", "tasks", "task", "stock", "count", "receive", "receipts", "items", "item", "order", "sizes", "suppliers", "supplier", "more", "settings", "who", "password", "modules"].includes(s0);
+  if (r === "lead") return ["", "today", "tasks", "task", "stock", "count", "receive", "receipts", "items", "item", "order", "minimums", "sizes", "suppliers", "supplier", "more", "settings", "who", "password", "modules"].includes(s0);
+  if (s0 === "minimums") return m;   /* v0.36 (migration 061): the lead, the admin officer and the owners set "order below" / "fill up to" */
   if (["sales", "finance", "approve", "users", "rules"].includes(s0)) return m;
   if (s0 === "books") return m || (adm && !fin);                 /* month close and opening balances: not Finance (Stefan, 2026-11-08) */
   if (["bills", "money", "stores", "accounts"].includes(s0)) return m || adm;
@@ -108,7 +109,7 @@ function homeStripHTML() {
   const acts = plusActions();
   const cards = [];
   if (canOpen("approve")) { const n = (S.orders || []).filter(o => o.status === "requested" && o.approval_needed).length; cards.push(["Orders to approve", n, "#/approve"]); }
-  if (canOpen("order")) cards.push(["Items to order", REORDER.filter(r => r.order_now).length, "#/order"]);
+  if (canOpen("order")) cards.push(["Items to order", REORDER.filter(r => r.order_now && !odStale(r)).length + (REORDER.some(r => r.order_now && odStale(r)) ? `<div class="tiny mut">+ ${REORDER.filter(r => r.order_now && odStale(r)).length} to count first</div>` : ""), "#/order"]);
   if (canOpen("receive") && typeof skDesk === "function" && skDesk()) cards.push(["Receipts to itemise", skToItemise().length, "#/receive"]);   /* v0.29 quick receipt */
   if (canOpen("bills")) cards.push(["Bills open", (typeof bpRows === "function" ? bpRows() : MONEY.filter(m => m.mode === "bill")).filter(m => !m.paid_on).length, "#/bills"]);   /* v0.35: every store once os_bills_office has loaded */
   if (canOpen("bills") && typeof bpToCheck === "function") { if (typeof bpLoad === "function" && !BP.all) setTimeout(() => bpLoad(), 0); const tc = bpToCheck(); cards.push(["Bills to check", `${tc.length}<div class="tiny mut">${peso(tc.reduce((a, m) => a + (+m.total || 0), 0))}</div>`, "#/bills"]); }   /* v0.34 (migration 059) */
@@ -116,7 +117,7 @@ function homeStripHTML() {
   if (canOpen("recipes")) cards.push(["Recipes not confirmed", (typeof RECIPES !== "undefined" ? RECIPES : []).filter(r => !r.confirmed).length, "#/recipes"]);
   if (canOpen("questions") && typeof qLoad === "function") { qLoad(); cards.push(["Questions to answer", QQ.state === "ok" ? qOpenN() : "…", "#/questions"]); }   /* v0.28 */
   if (canOpen("report")) cards.push(["Tickets open", S.tickets.filter(t => t.status !== "done").length, "#/report"]);
-  return `<section class="card qa"><h3>Quick actions</h3><div class="qa-row">${acts.map(a => `<button onclick="${a[2]}"><span class="qa-ic">${ic(ICON[modIcon(a[1])] || ICON.dots)}</span><span>${esc(a[0])}</span></button>`).join("")}</div></section>
+  return `${typeof pushNudge === "function" ? pushNudge() : ""}<section class="card qa"><h3>Quick actions</h3><div class="qa-row">${acts.map(a => `<button onclick="${a[2]}"><span class="qa-ic">${ic(ICON[modIcon(a[1])] || ICON.dots)}</span><span>${esc(a[0])}</span></button>`).join("")}</div></section>
     <div class="grid2 hcards">${cards.map(c => `<button class="card tap hcard" onclick="go('${c[2]}')"><div class="lab">${esc(c[0])}</div><div class="val num">${c[1]}</div></button>`).join("")}</div>`;
 }
 

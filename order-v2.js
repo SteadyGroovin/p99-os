@@ -15,14 +15,18 @@ const odQ = v => v == null || isNaN(v) ? "—" : fmt(Math.round(v * 10) / 10);
 function odItem(r) { return Store.item(r.item); }
 function odLeft(r) { const it = odItem(r); if (!it || r.expected == null) return null; return it.per ? r.expected / it.per : r.expected; }   /* base → count units */
 function odKey(sup, item) { return sup + "|" + item; }
-function odQty(r) { const k = odKey(r.supplier || "", r.item); return odEdit[k] != null ? odEdit[k] : (r.suggest != null ? r.suggest : 0); }
+function odQty(r) { const k = odKey(r.supplier || "", r.item); if (odEdit[k] != null) return odEdit[k]; const it = odItem(r);
+  if (it && it.sizeUnknown) return r.order_now ? 1 : 0;   /* v0.36: the size of one pack is unknown, so the suggestion (in grams) is not a pack count */
+  return r.suggest != null ? r.suggest : 0; }
+const odStale = r => r.order_now && (r.count_age == null || +r.count_age > 10);   /* v0.36: a level from a count older than 10 days is a guess: count first (same rule as the alerts) */
 function odOpenFor(item) { return (S.orders || []).filter(o => (o.status === "approved" || o.status === "requested" || o.status === "draft") && o.lines.some(l => l.item === item)); }
 
 async function odRefresh() { if (typeof Sync !== "undefined" && Sync.reload) { await Sync.reload(); toast("Levels refreshed."); } }
 
 /* ---------- ORDER TODAY (lead, master) ---------- */
 function viewOrder() {
-  const r0 = role(); if (!["lead", "master"].includes(r0)) return shell("Order", "", `<div class="alert info">Orders are placed by the store lead.</div>`, { back: "#/stock" });
+  const r0 = role(); if (!["lead", "master", "officer"].includes(r0) && !officeLogin()) return shell("Order", "", `<div class="alert info">Orders are placed by the store lead.</div>`, { back: "#/stock" });   /* v0.36: the admin officer and the office order too (their menu listed Order already) */
+  bpStyle();
   const rows = REORDER.filter(r => odItem(r) && (odAll || r.order_now));
   const groups = {}; rows.forEach(r => { const g = r.supplier || ""; (groups[g] = groups[g] || []).push(r); });
   const uncounted = REORDER.filter(r => r.status === "not counted yet").length;
@@ -31,7 +35,7 @@ function viewOrder() {
     const info = SUPPLIER_INFO[sup] || {}; const rs = groups[sup].sort((a, b) => (a.cover == null ? 99 : a.cover) - (b.cover == null ? 99 : b.cover));
     const lines = rs.map(r => { const it = odItem(r); const left = odLeft(r); const q = odQty(r); const open = odOpenFor(r.item);
       return `<div class="row"><div class="main"><div class="name">${esc(it.name)}${r.needs_approval ? ` <span class="chip warn">Mike approves</span>` : ""}</div>
-        <div class="meta">${left == null ? "not counted yet" : `${odQ(left)} ${esc(it.unit)} left`}${r.cover != null ? ` · ${skCoverChip({ cover: r.cover })}` : ""}${r.lead ? ` · arrives in ${fmt(r.lead)} d` : ""}${open.length ? ` · <span class="band-warn">already ordered ${esc(dayName(open[0].day))}</span>` : ""}</div></div>
+        <div class="meta">${odStale(r) ? `<span class="band-warn">count first${r.count_day ? ` (counted ${esc(dayName(r.count_day))})` : ""}</span> · ` : ""}${left == null ? "not counted yet" : left < 0 ? "below zero: deliveries or a count are missing" : `${odQ(left)} ${esc(it.unit)} left`}${r.cover != null ? ` · ${skCoverChip({ cover: r.cover })}` : ""}${r.lead ? ` · arrives in ${fmt(r.lead)} d` : ""}${open.length ? ` · <span class="band-warn">already ordered ${esc(dayName(open[0].day))}</span>` : ""}${it.sizeUnknown ? ` · <span class="mut">size of one ${esc(it.unit)} unknown: check the quantity</span>` : ""}${r.spare ? `<div class="bpspare">${ic("package", "sm")} <b>${esc(r.spare)}</b> in stock. <a href="#/transfers" onclick="event.stopPropagation()">Transfer it</a> before buying.</div>` : ""}</div></div>
         <div class="right" style="display:flex;align-items:center;gap:6px"><button class="btn ghost" onclick="odEdit['${esc(odKey(sup, r.item))}']=Math.max(0,${q}-1);render()" aria-label="less">−</button>
           <div class="v num" style="min-width:2.5em;text-align:center">${fmt(q)}</div><button class="btn ghost" onclick="odEdit['${esc(odKey(sup, r.item))}']=${q}+1;render()" aria-label="more">+</button>
           <div class="l" style="min-width:3em">${esc(r.buy_unit || it.unit)}</div></div></div>`; }).join("");
@@ -44,7 +48,7 @@ function viewOrder() {
   return shell("Order", dayLong(today()), `
     <div class="alert info">The list shows what drops under its reorder point before the next delivery can arrive. Quantities are in the unit you buy. Change them with − and +, then send per supplier.</div>
     ${uncounted ? `<div class="tiny mut">${uncounted} item${uncounted === 1 ? "" : "s"} not counted yet: count them once so they can show up here.</div>` : ""}
-    <div class="chips" style="margin:8px 0"><button class="chip ${odAll ? "" : "info"}" onclick="odAll=false;render()">Due now (${REORDER.filter(r => r.order_now).length})</button><button class="chip ${odAll ? "info" : ""}" onclick="odAll=true;render()">All items</button><button class="chip" onclick="odRefresh()">Refresh levels</button></div>
+    <div class="chips" style="margin:8px 0"><button class="chip ${odAll ? "" : "info"}" onclick="odAll=false;render()">Due now (${REORDER.filter(r => r.order_now).length})</button><button class="chip ${odAll ? "info" : ""}" onclick="odAll=true;render()">All items</button><button class="chip" onclick="odRefresh()">Refresh levels</button>${canOpen("minimums") ? `<button class="chip" onclick="go('#/minimums')">Minimums</button>` : ""}</div>
     ${sups.length ? sups.map(card).join("") : `<section class="card"><div class="mut">Nothing is due. Everything counted lasts past its next delivery.</div></section>`}
     ${mine.length ? `<section class="card"><h2>Open orders</h2><div class="list">${mine.map(o => `<div class="row"><div class="main"><div class="name">${esc(o.supplier)} ${chip(o.status === "approved" ? "ok" : "warn", o.status === "draft" ? "sending" : o.status === "requested" ? "waiting for Mike" : "approved")}</div><div class="meta">${esc(dayName(o.day))} · ${o.lines.map(l => `${fmt(l.qty)} ${esc(l.unit || "")} ${esc((Store.item(l.item) || {}).name || l.item)}`).join(" · ")}${o.decision_note ? ` · “${esc(o.decision_note)}”` : ""}</div></div>${odDelBtn(o)}</div>`).join("")}</div><div class="tiny mut" style="margin-top:6px">Receive the delivery with the order: Stock → Receive, pick the supplier, tap the order.</div></section>` : ""}`, { back: "#/stock" });
 }
@@ -254,6 +258,10 @@ function bpStyle() {
 .bptotal{font-size:28px;font-weight:700;margin:10px 0}
 .bpitems td,.bpitems th{height:auto}.bpact{margin-top:14px;display:grid;gap:8px}.bpbtns{display:flex;gap:8px;flex-wrap:wrap}.bpok{min-width:180px}
 .bpdiff{display:grid;gap:6px}.bpdiff input{font:inherit;padding:10px;border:1px solid var(--line2);border-radius:10px;background:var(--surf);color:var(--ink)}
+.bpspare{margin-top:4px;font-size:13px;color:var(--ink);background:var(--surf2);border-radius:8px;padding:4px 8px;display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
+.bpnudge{display:flex;align-items:center;justify-content:space-between;gap:12px;grid-column:1/-1;width:100%;max-width:none;box-sizing:border-box;border-left:4px solid var(--warn,#c80)}.wrap.two > section.card.bpnudge.bpnudge.bpnudge{column-span:all;display:flex}
+.mntool{display:grid;gap:8px;margin:8px 0}.mntool input[type=search]{font:inherit;padding:10px;border:1px solid var(--line2);border-radius:10px;background:var(--surf);color:var(--ink)}
+.mninp{width:84px;font:inherit;text-align:right;padding:6px 8px;border:1px solid var(--line2);border-radius:8px;background:var(--surf);color:var(--ink)}.mntbl td{white-space:normal}
 @media (max-width:640px){.bpkeys{display:none}.bpsheet{width:100vw;max-height:100vh;border-radius:0}.bpph img{max-height:42vh}.bpact{position:sticky;bottom:0;background:var(--surf);padding:8px 0 calc(4px + env(safe-area-inset-bottom));box-shadow:0 -10px 12px var(--surf)}}`;
   document.head.appendChild(s);
 }
@@ -305,9 +313,16 @@ async function pushOn() {
   const key = pushKey(); if (!key) return toast("Alerts are not switched on in the database yet.");
   const perm = await Notification.requestPermission(); if (perm !== "granted") return toast("Alerts were not allowed on this phone.");
   try { const reg = await navigator.serviceWorker.ready; const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(key) });
-    const j = sub.toJSON(); const { error } = await sb.rpc("os_submit", { p: { kind: "push_sub", store: "P99", rec: { id: "push", endpoint: j.endpoint, keys: j.keys } } });
+    const j = sub.toJSON(); const { error } = await sb.rpc("os_submit", { p: { kind: "push_sub", store: role() === "lead" ? storesOn().join(",") : curStore(), rec: { id: "push", endpoint: j.endpoint, keys: j.keys } } });   /* v0.36: the stores this phone shows, not always P99 */
     if (error) throw error; try { localStorage.setItem("p99os_push", "on"); } catch (e) { } toast("Order alerts are on for this phone."); render();
   } catch (e) { toast("Could not switch alerts on: " + (e.message || e)); }
+}
+/* v0.36: who gets order alerts — store leads (their stores), the admin officer and the office (all stores), the owners (mornings) */
+const pushWho = () => ["lead", "master", "officer"].includes(role()) || officeLogin();
+function pushNudge() {
+  if (!window.DB_USER || !pushWho() || typeof pushReady !== "function" || pushState()) return "";
+  bpStyle();
+  return `<section class="card bpnudge"><div><b>Turn on order alerts</b><div class="tiny mut">${role() === "lead" ? "A message on this phone at 6 am and 6 pm when something at your store must be ordered." : "A message on this phone when a store must order, with stock in the storage room or head office."}${pushReady() ? "" : " Install the app on the home screen first (Share → Add to Home Screen)."}</div></div><button class="btn primary" onclick="pushOn()">Turn on</button></section>`;
 }
 function pushState() { try { return localStorage.getItem("p99os_push") === "on"; } catch (e) { return false; } }
 
@@ -349,4 +364,63 @@ async function szSaveAll() {
   } else items.forEach(x => { const it = Store.item(x.code); if (it) { it.per = x.qty; it.base = x.unit; it.sizeUnknown = false; } });
   ids.forEach(c => { delete szEdit[c]; delete szUnit[c]; });
   toast(ids.length + (ids.length === 1 ? " size saved." : " sizes saved.")); render();
+}
+
+/* ---------- MINIMUMS (v0.36, migration 061) ----------
+   Stefan, 27 Nov: "fix the low-stock alerts and counting". No store but Pizza 99 had a level set, and the crepe shops have no item
+   sales, so nothing could ever be "order now" there. Per store and item: "Order below" (item.reorder_point) and "Fill up to" (item.par),
+   in the unit the store counts. Where the app knows the usage it proposes both (grey), and the order alerts use them from the next run. */
+let MN = { edit: {}, q: "", show: "all", busy: false, skipped: [] };
+function mnRows() {
+  return REORDER.map(r => ({ r, it: odItem(r) })).filter(x => x.it).map(x => {
+    const per = x.it.sizeUnknown ? null : (x.it.per || 1), c = v => v == null || per == null ? null : Math.round(v / per * 10) / 10;
+    return Object.assign(x, { per, now: c(x.r.expected), perDay: c(x.r.per_day), min: c(x.r.min), par: c(x.r.par_set),
+      sugMin: x.r.per_day ? c(x.r.rop) : null, sugPar: x.r.per_day ? c(x.r.target) : null });
+  });
+}
+function viewMinimums() {
+  if (!canOpen("minimums")) return shell("Minimums", "", `<div class="alert info">For the store lead, the admin officer and the owners.</div>`, { back: "#/stock" });
+  bpStyle();
+  const all = mnRows(), q = MN.q.trim().toLowerCase();
+  const rows = all.filter(x => (!q || x.it.name.toLowerCase().includes(q)) && (MN.show === "all" || (MN.show === "unset" ? x.min == null : x.r.order_now)))
+    .sort((a, b) => (a.it.cat || "").localeCompare(b.it.cat || "") || a.it.name.localeCompare(b.it.name));
+  const nSet = all.filter(x => x.min != null).length, changed = Object.keys(MN.edit);
+  const val = (x, k) => MN.edit[x.r.item] && MN.edit[x.r.item][k] !== undefined ? MN.edit[x.r.item][k] : (x[k] == null ? "" : x[k]);
+  const inp = (x, k, sug) => x.per == null ? "" : `<input class="mninp" type="number" inputmode="decimal" min="0" step="any" value="${esc(String(val(x, k)))}" placeholder="${sug == null ? "" : esc(String(sug))}" onchange="mnSet('${esc(x.r.item)}','${k}',this.value)">`;
+  let cat = null;
+  const body = rows.map(x => { const head = x.it.cat !== cat ? `<tr class="gh"><td colspan="5">${esc(x.it.cat || "Other")}</td></tr>` : ""; cat = x.it.cat;
+    return head + `<tr style="cursor:default"><td class="nm">${esc(x.it.name)}<div class="tiny mut" style="font-weight:400">${x.per == null ? `size of one ${esc(x.it.unit)} unknown: answer the pack size first` : `in ${esc(x.it.unit)}${x.r.spare ? ` · ${esc(x.r.spare)} in stock` : ""}`}</div></td>
+      <td class="n num">${x.now == null ? `<span class="mut">${x.r.expected == null ? "not counted" : "?"}</span>` : x.now < 0 ? `<span class="band-bad">below 0</span>` : fmt(x.now)}</td>
+      <td class="n num mut h1">${x.perDay == null ? "—" : fmt(x.perDay)}</td>
+      <td class="n">${inp(x, "min", x.sugMin)}</td><td class="n">${inp(x, "par", x.sugPar)}</td></tr>`; }).join("");
+  return shell("Minimums", `${esc(curStore())} · ${nSet} of ${all.length} items set`, `
+    <div class="alert info"><b>Order below</b>: when the stock drops to this, the item goes on the order list and the alert goes out. <b>Fill up to</b>: how much there should be after the delivery; the order quantity is the difference. Both in the unit you count. Grey numbers are what the app proposes from the usage; leave the field empty to keep them.</div>
+    ${MN.skipped.length ? `<div class="alert warn">Not saved: ${MN.skipped.map(k => esc(k.name) + " (" + esc(k.why) + ")").join(", ")}.</div>` : ""}
+    <div class="mntool"><input type="search" placeholder="Search items" value="${esc(MN.q)}" oninput="MN.q=this.value;clearTimeout(MN.t);MN.t=setTimeout(render,250)">
+      <div class="chips">${[["all", `All (${all.length})`], ["unset", `Not set (${all.length - nSet})`], ["due", `Due now (${all.filter(x => x.r.order_now).length})`]].map(([k, l]) => `<button class="chip ${MN.show === k ? "info" : ""}" onclick="MN.show='${k}';render()">${l}</button>`).join("")}</div></div>
+    ${rows.length ? `<div class="itwrap"><table class="itbl mntbl"><thead><tr><th>Item</th><th class="n">Now</th><th class="n h1">Uses a day</th><th class="n">Order below</th><th class="n">Fill up to</th></tr></thead><tbody>${body}</tbody></table></div>` : `<section class="card"><div class="mut">No items here.</div></section>`}
+    ${changed.length ? `<div class="bottom-act"><button class="btn primary full" ${MN.busy ? "disabled" : ""} onclick="mnSave()">Save ${changed.length} item${changed.length === 1 ? "" : "s"}</button></div>` : ""}`, { back: "#/stock" });
+}
+function mnSet(code, k, v) {
+  const x = mnRows().find(y => y.r.item === code); if (!x) return;
+  const n = v === "" ? null : +v; if (n != null && (isNaN(n) || n < 0)) return toast("A number, 0 or more");
+  const e = MN.edit[code] = MN.edit[code] || {}; e[k] = n;
+  if (Object.keys(e).every(f => e[f] === (x[f] == null ? null : x[f]))) delete MN.edit[code];   /* back to what is saved: nothing to save */
+  render();
+}
+async function mnSave() {
+  const rows = Object.keys(MN.edit).map(code => { const x = mnRows().find(y => y.r.item === code) || {}; const e = MN.edit[code];
+    return { code, min: e.min !== undefined ? e.min : (x.min == null ? null : x.min), par: e.par !== undefined ? e.par : (x.par == null ? null : x.par) }; });
+  const bad = rows.find(r => r.min != null && r.par != null && r.par < r.min);
+  if (bad) return toast(`${(Store.item(bad.code) || {}).name || bad.code}: "fill up to" must be at least "order below"`);
+  if (typeof sb === "undefined" || (window.OS_LOADED && window.OS_LOADED.dev)) {   /* dev page: keep it in memory */
+    rows.forEach(r => { const ro = REORDER.find(x => x.item === r.code), it = Store.item(r.code), per = it && it.per || 1; if (ro) Object.assign(ro, { min: r.min == null ? null : r.min * per, par_set: r.par == null ? null : r.par * per }); });
+    MN.edit = {}; MN.skipped = []; toast(`${rows.length} saved (dev).`); return render();
+  }
+  MN.busy = true; render();
+  const res = await sb.rpc("os_set_minimums", { p_store: curStore(), p_rows: rows }); MN.busy = false;
+  if (res.error) { toast("Not saved: " + res.error.message); return render(); }
+  MN.skipped = res.data.skipped || []; MN.edit = {};
+  toast(`${res.data.saved} saved. The order list and alerts use them now.`);
+  if (typeof Sync !== "undefined" && Sync.reload) await Sync.reload(); render();
 }

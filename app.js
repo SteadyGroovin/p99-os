@@ -56,7 +56,7 @@ const tabsFor = () => TABS[role() === "crew" ? "crew" : role() === "lead" ? "lea
 const SIDEBAR = [["today", "Today", "home", "#/today"], ["walk", "Morning run", "sun", "#/walk"], ["sales", "Sales", "cash", "#/sales"], ["stock", "Stock", "grid", "#/stock"], ["clean", "Clean", "check", "#/clean"], ["report", "Report", "alert", "#/report"], ["tasks", "Tasks", "list", "#/tasks"], ["finance", "Finance", "finance", "#/finance"], ["more", "More", "dots", "#/more"]];
 const sidebarFor = () => role() === "master" ? SIDEBAR : role() === "admin" ? SIDEBAR.filter(t => t[0] !== "finance") : tabsFor();   /* walk, lead and crew keep their short bars */
 function tabOf(route, ids = tabsFor().map(t => t[0])) { const seg = route.split("/")[1] || "today";
-  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", transfers: "stock", transfer: "stock", order: "stock", approve: "more", bills: "finance", money: "finance", sizes: "stock", suppliers: "more", supplier: "more", stores: "more", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
+  const map = { count: "stock", item: "stock", items: "stock", receive: "stock", receipts: "stock", variance: "stock", minimums: "stock", transfers: "stock", transfer: "stock", order: "stock", approve: "more", bills: "finance", money: "finance", sizes: "stock", suppliers: "more", supplier: "more", stores: "more", task: "tasks", tasks: "more", cash: "more", walk: "more", report: "more", tickets: "more" };
   if (seg === "finance") return role() === "master" ? "finance" : "more";
   if (seg === "tickets" && ids.includes("report")) return "report";
   if (ids.includes(seg)) return seg; const m = map[seg]; if (m && ids.includes(m)) return m; return "more"; }
@@ -445,6 +445,7 @@ function render() {
     case "order": html = viewOrder(); break;                 /* v0.12: order today (lead), approval and bills (office) */
     case "approve": html = viewApprove(); break;
     case "bills": html = viewBills(); break;
+    case "minimums": html = viewMinimums(); break;            /* v0.36 (migration 061) */
     case "sizes": html = viewSizes(); break;               /* v0.13: pack sizes written down by the team */
     case "money": html = viewMoney(); break;              /* v0.15: money moves */
     case "suppliers": html = viewSuppliers(); break;       /* v0.14: suppliers, stores, prices */

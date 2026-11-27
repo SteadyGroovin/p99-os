@@ -127,7 +127,7 @@ function viewMore() {
   const me2 = group("This device", [
     `<button class="row tap" onclick="S.theme=S.theme==='dark'?'light':'dark';save();applyTheme();render()"><div class="main"><div class="name">Dark theme</div><div class="meta">easier in a dim kitchen</div></div><span class="sw ${S.theme === "dark" ? "on" : ""}"><i></i></span></button>`,
     ...(window.DB_ME ? [] : [row("Put a name on my entries", `optional · ${esc(me().name)} now`, "go('#/who')")]),   /* signed in: the login is the name */
-    ...(window.DB_USER && ["lead", "master"].includes(role()) && typeof pushReady === "function" ? [row(pushState() ? "Order alerts: on" : "Turn on order alerts", "a message on this phone when something must be ordered", "pushOn()")] : []),
+    ...(window.DB_USER && typeof pushWho === "function" && pushWho() && typeof pushReady === "function" ? [row(pushState() ? "Order alerts: on" : "Turn on order alerts", "a message on this phone when something must be ordered", "pushOn()")] : []),
     ...(window.DB_USER ? [row("Change password", "for signing in with e-mail and password", "go('#/password')")] : []),
     ...(window.DB_USER ? [`<button class="row tap" onclick="signOut()"><div class="main"><div class="name">Sign out</div><div class="meta">signed in as ${esc(window.DB_USER)}</div></div></button>`] : []),
     `<button class="row tap" onclick="if(confirm('Reset everything typed on this device?')){Store.reset();location.hash='#/who';location.reload()}"><div class="main"><div class="name band-bad">Reset this device</div><div class="meta">clears counts, receipts, tickets and photos typed here</div></div></button>`]);
