@@ -2,7 +2,7 @@
    Stefan: "If I pay something with GCash and Mike gives it back to me … that needs to be recorded."
    One move = from · to · amount · cash / GCash / bank · day · reason · the deliveries it pays back.
    Balance per party = moved in − moved out − deliveries paid now from it (the database's v_party_balance, plus moves not saved yet).
-   A person below zero is owed that much by the company. The Google Sheets stay the books; the CSV carries the moves. */
+   A person below zero is owed that much by the company. The app is the book from 1 Dec 2026 (was: the Google Sheets); the CSV carries the moves. */
 let MOVE_BAL = (window.OS_LOADED && window.OS_LOADED.balances) || [];   /* from os_load: [{party, in, out, spent, net}] */
 let mvForm = null;
 const MOVE_METHODS = [["cash", "Cash"], ["gcash", "GCash"], ["bank", "Bank"]];
@@ -69,7 +69,7 @@ function viewMoney() {
   const moves = (S.moves || []).slice().sort((a, b) => a.day < b.day ? 1 : a.day > b.day ? -1 : 0);
   const list = moves.slice(0, 60).map(m => `<div class="row"><div class="main"><div class="name">${esc(mvName(m.from))} → ${esc(mvName(m.to))} · ${peso(+m.amount)} ${chip("", esc((Object.fromEntries(MOVE_METHODS)[m.method]) || m.method))}${m.synced === false ? " " + chip("warn", "not saved yet") : ""}</div><div class="meta">${esc(dayName(m.day))}${m.reason ? " · " + esc(m.reason) : ""}${(m.receipts || []).length ? ` · pays back ${m.receipts.length} deliver${m.receipts.length === 1 ? "y" : "ies"}` : ""}</div></div></div>`).join("");
   return shell("Funds", "cash, GCash, bank, who is owed", `
-    <div class="alert info">Every delivery paid now says who paid. Record here when money moves between people and funds, and the app keeps who is owed what. The Google Sheets stay the books.</div>
+    <div class="alert info">Every delivery paid now says who paid. Record here when money moves between people and funds, and the app keeps who is owed what. From 1 December the app is the book.</div>
     <section class="card"><h2>People</h2><div class="list">${people.map(mvCard).join("")}</div></section>
     ${mvFormHtml()}
     <section class="card"><h2>Funds</h2><div class="list">${funds.map(mvCard).join("")}</div><div class="tiny mut" style="margin-top:6px">Without an opening balance a fund shows the change since the app started recording. Set them under Month close.</div></section>
