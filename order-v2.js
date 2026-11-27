@@ -107,11 +107,11 @@ function viewBills() {
   /* v0.19.4: one table, a group row per supplier and run with its total, one line per bill */
   const sl = n => typeof skSupLink === "function" ? skSupLink(n) || "—" : esc(n || "—");
   const billCards = bills.length ? `<div class="itwrap"><table class="itbl"><thead><tr><th style="width:30px"></th><th>Day</th><th class="h1">Invoice</th><th class="h1">What</th><th class="n">Total</th><th class="st">Status</th></tr></thead><tbody>${Object.keys(bySup).sort().map(k => { const [sup, run] = k.split("|"); const bs = bySup[k]; const tot = bs.reduce((a, b) => a + (+b.total || 0), 0);
-    return `<tr class="gh"><td colspan="6">${sl(sup)} <span>· run ${esc(run || "—")} · paid around ${esc(bs[0].due ? dayName(bs[0].due) : "—")} · ${bs.length} bill${bs.length === 1 ? "" : "s"} · <b>${peso(tot)}</b></span></td></tr>` + bs.map(b => `<tr style="cursor:default"><td>${b.paid_on ? "" : `<input type="checkbox" aria-label="Tick to mark paid" ${bpSel[b.id] ? "checked" : ""} onchange="bpSel['${b.id}']=this.checked;render()" style="width:18px;height:18px">`}</td><td class="nm" style="font-weight:400">${esc(dayName(b.day))}<div class="sub2 wrap">${b.invoice ? esc(b.invoice) + " · " : ""}${esc(b.lines || "")}</div></td><td class="h1 mut">${esc(b.invoice || "—")}</td><td class="h1 wrapc mut">${esc(b.lines || "")}</td><td class="n num"><b>${peso(+b.total)}</b></td><td class="st">${b.paid_on ? chip("ok", "paid " + esc(dayName(b.paid_on))) : chip("", "open")}</td></tr>`).join(""); }).join("")}</tbody></table></div><div class="itfoot tiny mut">${bills.length} bill${bills.length === 1 ? "" : "s"} · ${peso(bills.reduce((a, b) => a + (+b.total || 0), 0))}</div>` : "";
+    return `<tr class="gh"><td colspan="6">${sl(sup)} <span>· run ${esc(run || "—")} · paid around ${esc(bs[0].due ? dayName(bs[0].due) : "—")} · ${bs.length} bill${bs.length === 1 ? "" : "s"} · <b>${peso(tot)}</b></span></td></tr>` + bs.map(b => `<tr style="cursor:default"><td>${b.paid_on || !b.checked_on ? "" : `<input type="checkbox" aria-label="Tick to mark paid" ${bpSel[b.id] ? "checked" : ""} onchange="bpSel['${b.id}']=this.checked;render()" style="width:18px;height:18px">`}</td><td class="nm" style="font-weight:400">${esc(dayName(b.day))}<div class="sub2 wrap">${b.invoice ? esc(b.invoice) + " · " : ""}${esc(b.lines || "")}</div></td><td class="h1 mut">${esc(b.invoice || "—")}</td><td class="h1 wrapc mut">${esc(b.lines || "")}</td><td class="n num"><b>${peso(+b.total)}</b></td><td class="st">${bpCheckCell(b)}</td></tr>`).join(""); }).join("")}</tbody></table></div><div class="itfoot tiny mut">${bills.length} bill${bills.length === 1 ? "" : "s"} · ${peso(bills.reduce((a, b) => a + (+b.total || 0), 0))}</div>` : "";
   const expTot = exps.reduce((a, b) => a + (+b.total || 0), 0);
   const src = Object.fromEntries(PAY_SOURCES);
   return shell("Bills", "deliveries, expenses, bills", `
-    <div class="alert info">Every delivery recorded in the app lands here. Bills wait for their run (1–15 paid on the 15th, 16–end paid at month end). From 1 December the app is the book: the sheets come from the download below. Tick bills once they are paid.</div>
+    <div class="alert info">Every delivery recorded in the app lands here. Bills wait for their run (1–15 paid on the 15th, 16–end paid at month end). From 1 December the app is the book: the sheets come from the download below. Tick bills once they are paid.<br><b>Bill checked</b>: you hold the original invoice and the amount matches. Only a checked bill can be marked paid.</div>
     <div class="chips" style="margin:8px 0">${[["open", "Open bills"], ["30", "30 days"], ["90", "90 days"]].map(([k, l]) => `<button class="chip ${bpRange === k ? "info" : ""}" onclick="bpRange='${k}';render()">${l}</button>`).join("")}</div>
     ${billCards || `<section class="card"><div class="mut">No ${bpRange === "open" ? "open " : ""}bills.</div></section>`}
     ${ticked.length ? `<div class="bottom-act"><button class="btn primary full" onclick="bpMarkPaid()">Mark ${ticked.length} bill${ticked.length === 1 ? "" : "s"} paid</button></div>` : ""}
@@ -119,8 +119,33 @@ function viewBills() {
     <section class="card"><h2>Download for the sheets</h2><div class="tiny mut" style="margin-bottom:8px">One line per item, the columns of the expense ledger: date, store, item, qty, unit, unit price, amount, supplier, SI, paid now or bill, who paid, run.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="bpExport('paid_now')">Expenses CSV</button><button class="btn" onclick="bpExport('bill')">Bills CSV</button><button class="btn" onclick="go('#/money')">Funds</button><button class="btn" onclick="go('#/purchases')">Other purchases</button></div></section>`, { back: "#/finance" });
 }
+/* v0.34 (migration 059, Stefan 27 Nov: "Cherry should be the one confirming if she received the bills"): the office ticks
+   "Bill checked" when the original invoice is in hand and the amount matches; "Amount differs" keeps the bill unchecked with a note.
+   Only checked bills can be ticked for "Mark paid" (the database refuses the rest too). */
+const bpWho = k => { const p = k && typeof Store !== "undefined" && Store.person ? Store.person(k) : null; return p ? (p.short || p.name) : (k || ""); };
+function bpCheckCell(b) {
+  if (b.paid_on) return chip("ok", "paid " + esc(dayName(b.paid_on)));
+  if (b.checked_on) return `${chip("ok", "checked")}<div class="tiny mut">by ${esc(bpWho(b.checked_by))}, ${esc(dayName(String(b.checked_on).slice(0, 10)))}${b.check_note ? " · " + esc(b.check_note) : ""}</div><button class="btn ghost sm" style="margin-top:4px" onclick="bpCheck('${b.id}',null)">Undo</button>`;
+  return `${b.check_note ? chip("warn", "amount differs") + `<div class="tiny mut">${esc(b.check_note)}</div>` : chip("", "to check")}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px"><button class="btn sm primary" onclick="bpCheck('${b.id}',true)">Bill checked</button><button class="btn ghost sm" onclick="bpCheck('${b.id}',false)">Amount differs</button></div>`;
+}
+async function bpCheck(id, ok) {
+  const b = MONEY.find(m => m.id === id); if (!b || bpCheck.busy) return;
+  let note = null;
+  if (ok === false) { note = prompt("What does the invoice say? Write the amount and what is different.", b.check_note || ""); if (note === null) return; if (!note.trim()) return toast("Write what the invoice says first"); }
+  const dev = typeof sb === "undefined" || (window.OS_LOADED && window.OS_LOADED.dev);
+  if (dev) Object.assign(b, { checked_on: ok ? new Date().toISOString() : null, checked_by: ok === null ? null : (window.DB_ME || "cherry"), check_note: ok === null ? null : note });
+  else {
+    bpCheck.busy = true; const r = await sb.rpc("os_bill_check", { p_receipt: id, p_ok: ok, p_note: note }); bpCheck.busy = false;
+    if (r.error) return toast("Not saved: " + r.error.message);
+    Object.assign(b, { checked_on: r.data.checked_on, checked_by: r.data.checked_by, check_note: r.data.check_note });
+  }
+  if (!b.checked_on) delete bpSel[id];
+  toast(ok ? "Bill checked." : ok === false ? "Saved: amount differs. The bill stays unchecked." : "Check undone."); render();
+}
+const bpToCheck = () => MONEY.filter(m => m.mode === "bill" && !m.paid_on && !m.checked_on);
 function bpMarkPaid() {
-  const ids = Object.keys(bpSel).filter(k => bpSel[k]); if (!ids.length) return;
+  const ids = Object.keys(bpSel).filter(k => bpSel[k] && (MONEY.find(m => m.id === k) || {}).checked_on); if (!ids.length) return toast("Check the bills first");
   const note = prompt("Paid how? (e.g. bank transfer 15 Nov, check no.)", ""); if (note === null) return;
   S.billPaid = S.billPaid || []; S.billPaid.push({ id: "pay-" + Date.now(), receipts: ids, paid_on: today(), note: note || null, synced: false });
   MONEY.forEach(m => { if (ids.includes(m.id)) m.paid_on = today(); }); bpSel = {};
