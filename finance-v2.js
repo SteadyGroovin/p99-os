@@ -424,16 +424,24 @@ function finSup(i) { const s = FIN.eSups[i]; FIN.eSup = FIN.eSup === s ? "all" :
    One read-only page across the stores from os_owner_overview: sales (Sales Monitoring sheets, cash + GCash, as far as they are
    loaded), cash (the morning round counts yesterday's cash; POS-checked for Pizza 99 and Burger Kong), spend and bills (Receive),
    stock (v_reorder, counts). Mike's login is role "owner": this page and his account, nothing to do, no alerts. */
-const OV = { data: null, at: 0, loading: false, err: null };
+const OV = { data: null, at: 0, loading: false, err: null, t0: 0, tries: 0 };
+/* v0.37.0 live check: opened straight on #/overview, the first call went out before sign-in had settled and never came back
+   ("Loading" for good). So a call older than 8 s counts as lost, and while there is no data the page retries every 3 s (8 times). */
 async function ovLoad(force) {
-  if (typeof sb === "undefined" || !sb.rpc || (window.OS_LOADED && window.OS_LOADED.dev) || OV.loading || (!force && OV.data && Date.now() - OV.at < 120e3)) return;
-  OV.loading = true; const r = await sb.rpc("os_owner_overview"); OV.loading = false;
-  if (r.error) OV.err = r.error.message; else { OV.err = null; OV.data = r.data; OV.at = Date.now(); }
+  if (typeof sb === "undefined" || !sb.rpc || (window.OS_LOADED && window.OS_LOADED.dev)) return;
+  if (OV.loading && Date.now() - OV.t0 < 8000) return;
+  if (!force && OV.data && Date.now() - OV.at < 120e3) return;
+  OV.loading = true; OV.t0 = Date.now(); const t0 = OV.t0; let r;
+  try { r = await sb.rpc("os_owner_overview"); } catch (e) { r = { error: e }; }
+  if (t0 !== OV.t0) return;   /* a newer call took over */
+  OV.loading = false;
+  if (r.error) OV.err = r.error.message || String(r.error); else { OV.err = null; OV.data = r.data; OV.at = Date.now(); OV.tries = 0; }
   if (/^#\/overview/.test(location.hash || "") || (role() === "owner" && !location.hash)) render();
 }
 function viewOverview() {
   if (!canOpen("overview")) return shell("Overview", "", `<div class="alert info">For the owners.</div>`, { back: "#/today" });
-  if (!OV.loading && (!OV.data || Date.now() - OV.at > 120e3)) setTimeout(() => ovLoad(), 0);
+  if (!OV.data || Date.now() - OV.at > 120e3) setTimeout(() => ovLoad(), 0);
+  if (!OV.data && OV.tries < 8) setTimeout(() => { if (!OV.data && /^#\/overview|^$/.test(location.hash || "")) { OV.tries++; render(); } }, 3000);
   const D = OV.data;
   if (!D) return shell("Overview", "every store", `<section class="card"><div class="mut">${OV.err ? "Could not load the overview: " + esc(OV.err) : "Loading every store…"}</div></section>`);
   const L = D.stores || [], n = k => L.reduce((a, s) => a + (+s[k] || 0), 0);
