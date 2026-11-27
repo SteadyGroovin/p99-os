@@ -417,30 +417,36 @@ let MN = { edit: {}, q: "", show: "all", busy: false, skipped: [] };
 function mnRows() {
   return REORDER.map(r => ({ r, it: odItem(r) })).filter(x => x.it).map(x => {
     const per = x.it.sizeUnknown ? null : (x.it.per || 1), c = v => v == null || per == null ? null : Math.round(v / per * 10) / 10;
-    return Object.assign(x, { per, now: c(x.r.expected), perDay: c(x.r.per_day), min: c(x.r.min), par: c(x.r.par_set),
-      sugMin: x.r.per_day ? c(x.r.rop) : null, sugPar: x.r.per_day ? c(x.r.target) : null });
+    /* v0.38 (migration 063): where the app has no usage (the crepe shops, HO, storage), the grey numbers come from Cherry's November
+       purchases (item_proposal, sent as r.prop); a proposed supplier shows where the item has none */
+    const pr = x.r.prop || null;
+    return Object.assign(x, { per, now: c(x.r.expected), perDay: c(x.r.per_day), min: c(x.r.min), par: c(x.r.par_set), prop: pr,
+      propDay: pr && pr.per_day != null ? c(+pr.per_day) : null, supProp: !x.r.supplier && pr && pr.sup ? pr.sup : null,
+      sugMin: x.r.per_day ? c(x.r.rop) : pr && pr.min != null ? c(+pr.min) : null, sugPar: x.r.per_day ? c(x.r.target) : pr && pr.par != null ? c(+pr.par) : null });
   });
 }
 function viewMinimums() {
   if (!canOpen("minimums")) return shell("Minimums", "", `<div class="alert info">For the store lead, the admin officer and the owners.</div>`, { back: "#/stock" });
   bpStyle();
   const all = mnRows(), q = MN.q.trim().toLowerCase();
-  const rows = all.filter(x => (!q || x.it.name.toLowerCase().includes(q)) && (MN.show === "all" || (MN.show === "unset" ? x.min == null : x.r.order_now)))
+  const hasProp = x => (x.min == null && x.sugMin != null && x.prop) || x.supProp;
+  const rows = all.filter(x => (!q || x.it.name.toLowerCase().includes(q)) && (MN.show === "all" || (MN.show === "unset" ? x.min == null : MN.show === "prop" ? hasProp(x) : x.r.order_now)))
     .sort((a, b) => (a.it.cat || "").localeCompare(b.it.cat || "") || a.it.name.localeCompare(b.it.name));
   const nSet = all.filter(x => x.min != null).length, changed = Object.keys(MN.edit);
   const val = (x, k) => MN.edit[x.r.item] && MN.edit[x.r.item][k] !== undefined ? MN.edit[x.r.item][k] : (x[k] == null ? "" : x[k]);
   const inp = (x, k, sug) => x.per == null ? "" : `<input class="mninp" type="number" inputmode="decimal" min="0" step="any" value="${esc(String(val(x, k)))}" placeholder="${sug == null ? "" : esc(String(sug))}" onchange="mnSet('${esc(x.r.item)}','${k}',this.value)">`;
   let cat = null;
   const body = rows.map(x => { const head = x.it.cat !== cat ? `<tr class="gh"><td colspan="5">${esc(x.it.cat || "Other")}</td></tr>` : ""; cat = x.it.cat;
-    return head + `<tr style="cursor:default"><td class="nm">${esc(x.it.name)}<div class="tiny mut" style="font-weight:400">${x.per == null ? `size of one ${esc(x.it.unit)} unknown: answer the pack size first` : `in ${esc(x.it.unit)}${x.r.spare ? ` · ${esc(x.r.spare)} in stock` : ""}`}</div></td>
+    return head + `<tr style="cursor:default"><td class="nm">${esc(x.it.name)}<div class="tiny mut" style="font-weight:400">${x.per == null ? `size of one ${esc(x.it.unit)} unknown: answer the pack size first` : `in ${esc(x.it.unit)}${x.r.spare ? ` · ${esc(x.r.spare)} in stock` : ""}`}${x.supProp ? `<div class="tiny" style="font-weight:400;margin-top:2px">No supplier · ${odCanSend() && x.prop && x.prop.sup_known !== false ? `<label style="cursor:pointer"><input type="checkbox" ${MN.edit[x.r.item] && MN.edit[x.r.item].supplier ? "checked" : ""} onchange="mnSup('${esc(x.r.item)}',this.checked)"> ${esc(x.supProp)}</label>` : `November: ${esc(x.supProp)}`}${x.prop && x.prop.sup_known === false ? ` <span class="band-warn">not in Suppliers yet</span>` : ""}</div>` : ""}</div></td>
       <td class="n num">${x.now == null ? `<span class="mut">${x.r.expected == null ? "not counted" : "?"}</span>` : x.now < 0 ? `<span class="band-bad">below 0</span>` : fmt(x.now)}</td>
-      <td class="n num mut h1">${x.perDay == null ? "—" : fmt(x.perDay)}</td>
+      <td class="n num mut h1">${x.perDay != null ? fmt(x.perDay) : x.propDay != null ? `<span title="${esc((x.prop && x.prop.basis) || "bought a day in November")}">~${fmt(x.propDay)}</span>` : "—"}</td>
       <td class="n">${inp(x, "min", x.sugMin)}</td><td class="n">${inp(x, "par", x.sugPar)}</td></tr>`; }).join("");
   return shell("Minimums", `${esc(curStore())} · ${nSet} of ${all.length} items set`, `
-    <div class="alert info"><b>Order below</b>: when the stock drops to this, the item goes on the order list and the alert goes out. <b>Fill up to</b>: how much there should be after the delivery; the order quantity is the difference. Both in the unit you count. Grey numbers are what the app proposes from the usage; leave the field empty to keep them.</div>
+    <div class="alert info"><b>Order below</b>: when the stock drops to this, the item goes on the order list and the alert goes out. <b>Fill up to</b>: how much there should be after the delivery; the order quantity is the difference. Both in the unit you count. Grey numbers are what the app proposes from the usage, or where there is no usage from what was bought in November (~ a day); leave the field empty to keep them.</div>
     ${MN.skipped.length ? `<div class="alert warn">Not saved: ${MN.skipped.map(k => esc(k.name) + " (" + esc(k.why) + ")").join(", ")}.</div>` : ""}
     <div class="mntool"><input type="search" placeholder="Search items" value="${esc(MN.q)}" oninput="MN.q=this.value;clearTimeout(MN.t);MN.t=setTimeout(render,250)">
-      <div class="chips">${[["all", `All (${all.length})`], ["unset", `Not set (${all.length - nSet})`], ["due", `Due now (${all.filter(x => x.r.order_now).length})`]].map(([k, l]) => `<button class="chip ${MN.show === k ? "info" : ""}" onclick="MN.show='${k}';render()">${l}</button>`).join("")}</div></div>
+      <div class="chips">${[["all", `All (${all.length})`], ["unset", `Not set (${all.length - nSet})`], ["prop", `From November (${all.filter(hasProp).length})`], ["due", `Due now (${all.filter(x => x.r.order_now).length})`]].map(([k, l]) => `<button class="chip ${MN.show === k ? "info" : ""}" onclick="MN.show='${k}';render()">${l}</button>`).join("")}</div></div>
+    ${all.some(hasProp) ? `<div style="margin:6px 0 10px"><button class="btn" onclick="mnFill()">Fill in the November proposals (${all.filter(hasProp).length})</button> <span class="tiny mut">Fills the empty boxes${odCanSend() ? " and ticks the proposed suppliers" : ""}. Check them, change what is wrong, then Save.</span></div>` : ""}
     ${rows.length ? `<div class="itwrap"><table class="itbl mntbl"><thead><tr><th>Item</th><th class="n">Now</th><th class="n h1">Uses a day</th><th class="n">Order below</th><th class="n">Fill up to</th></tr></thead><tbody>${body}</tbody></table></div>` : `<section class="card"><div class="mut">No items here.</div></section>`}
     ${changed.length ? `<div class="bottom-act"><button class="btn primary full" ${MN.busy ? "disabled" : ""} onclick="mnSave()">Save ${changed.length} item${changed.length === 1 ? "" : "s"}</button></div>` : ""}`, { back: "#/stock" });
 }
@@ -451,19 +457,32 @@ function mnSet(code, k, v) {
   if (Object.keys(e).every(f => e[f] === (x[f] == null ? null : x[f]))) delete MN.edit[code];   /* back to what is saved: nothing to save */
   render();
 }
+function mnSup(code, on) { const x = mnRows().find(y => y.r.item === code); if (!x || !x.supProp) return; const e = MN.edit[code] = MN.edit[code] || {}; if (on) e.supplier = x.supProp; else delete e.supplier; if (!Object.keys(e).length) delete MN.edit[code]; render(); }
+function mnFill() {   /* v0.38: copy the grey proposals into the empty boxes (and the proposed supplier for Hannah / Stefan) */
+  let n = 0;
+  mnRows().forEach(x => { const e = MN.edit[x.r.item] || {};
+    if (x.per != null && x.min == null && x.sugMin != null && x.prop && e.min === undefined) { e.min = x.sugMin; if (x.par == null && x.sugPar != null) e.par = x.sugPar; }
+    if (x.supProp && odCanSend() && x.prop && x.prop.sup_known !== false) e.supplier = x.supProp;
+    if (Object.keys(e).length) { MN.edit[x.r.item] = e; n++; } });
+  MN.show = "prop"; toast(n ? `${n} filled in. Check them, then Save.` : "Nothing to fill in."); render();
+}
 async function mnSave() {
-  const rows = Object.keys(MN.edit).map(code => { const x = mnRows().find(y => y.r.item === code) || {}; const e = MN.edit[code];
-    return { code, min: e.min !== undefined ? e.min : (x.min == null ? null : x.min), par: e.par !== undefined ? e.par : (x.par == null ? null : x.par) }; });
+  const rows = Object.keys(MN.edit).map(code => { const x = mnRows().find(y => y.r.item === code) || {}; const e = MN.edit[code]; const o = { code };
+    if (e.min !== undefined || e.par !== undefined) { o.min = e.min !== undefined ? e.min : (x.min == null ? null : x.min); o.par = e.par !== undefined ? e.par : (x.par == null ? null : x.par); }
+    if (e.supplier) o.supplier = e.supplier;
+    return o; });
   const bad = rows.find(r => r.min != null && r.par != null && r.par < r.min);
   if (bad) return toast(`${(Store.item(bad.code) || {}).name || bad.code}: "fill up to" must be at least "order below"`);
   if (typeof sb === "undefined" || (window.OS_LOADED && window.OS_LOADED.dev)) {   /* dev page: keep it in memory */
-    rows.forEach(r => { const ro = REORDER.find(x => x.item === r.code), it = Store.item(r.code), per = it && it.per || 1; if (ro) Object.assign(ro, { min: r.min == null ? null : r.min * per, par_set: r.par == null ? null : r.par * per }); });
+    rows.forEach(r => { const ro = REORDER.find(x => x.item === r.code), it = Store.item(r.code), per = it && it.per || 1; if (!ro) return;
+      if ("min" in r) Object.assign(ro, { min: r.min == null ? null : r.min * per, par_set: r.par == null ? null : r.par * per, prop: null });
+      if (r.supplier) ro.supplier = r.supplier; });
     MN.edit = {}; MN.skipped = []; toast(`${rows.length} saved (dev).`); return render();
   }
   MN.busy = true; render();
   const res = await sb.rpc("os_set_minimums", { p_store: curStore(), p_rows: rows }); MN.busy = false;
   if (res.error) { toast("Not saved: " + res.error.message); return render(); }
   MN.skipped = res.data.skipped || []; MN.edit = {};
-  toast(`${res.data.saved} saved. The order list and alerts use them now.`);
+  toast(`${res.data.saved} saved${res.data.suppliers ? `, ${res.data.suppliers} supplier${res.data.suppliers === 1 ? "" : "s"} set` : ""}. The order list and alerts use them now.`);
   if (typeof Sync !== "undefined" && Sync.reload) await Sync.reload(); render();
 }
