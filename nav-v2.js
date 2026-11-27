@@ -110,8 +110,8 @@ function homeStripHTML() {
   if (canOpen("approve")) { const n = (S.orders || []).filter(o => o.status === "requested" && o.approval_needed).length; cards.push(["Orders to approve", n, "#/approve"]); }
   if (canOpen("order")) cards.push(["Items to order", REORDER.filter(r => r.order_now).length, "#/order"]);
   if (canOpen("receive") && typeof skDesk === "function" && skDesk()) cards.push(["Receipts to itemise", skToItemise().length, "#/receive"]);   /* v0.29 quick receipt */
-  if (canOpen("bills")) cards.push(["Bills open", MONEY.filter(m => m.mode === "bill" && !m.paid_on).length, "#/bills"]);
-  if (canOpen("bills") && typeof bpToCheck === "function") { const tc = bpToCheck(); cards.push(["Bills to check", `${tc.length}<div class="tiny mut">${peso(tc.reduce((a, m) => a + (+m.total || 0), 0))}</div>`, "#/bills"]); }   /* v0.34 (migration 059) */
+  if (canOpen("bills")) cards.push(["Bills open", (typeof bpRows === "function" ? bpRows() : MONEY.filter(m => m.mode === "bill")).filter(m => !m.paid_on).length, "#/bills"]);   /* v0.35: every store once os_bills_office has loaded */
+  if (canOpen("bills") && typeof bpToCheck === "function") { if (typeof bpLoad === "function" && !BP.all) setTimeout(() => bpLoad(), 0); const tc = bpToCheck(); cards.push(["Bills to check", `${tc.length}<div class="tiny mut">${peso(tc.reduce((a, m) => a + (+m.total || 0), 0))}</div>`, "#/bills"]); }   /* v0.34 (migration 059) */
   if (canOpen("sizes")) cards.push(["Pack sizes missing", szMissing(), "#/sizes"]);
   if (canOpen("recipes")) cards.push(["Recipes not confirmed", (typeof RECIPES !== "undefined" ? RECIPES : []).filter(r => !r.confirmed).length, "#/recipes"]);
   if (canOpen("questions") && typeof qLoad === "function") { qLoad(); cards.push(["Questions to answer", QQ.state === "ok" ? qOpenN() : "…", "#/questions"]); }   /* v0.28 */
