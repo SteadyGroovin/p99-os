@@ -27,11 +27,15 @@ const isOffice = () => ["walk", "admin", "master"].includes(role());
 const canManage = () => role() !== "crew";
 
 /* ---------- photos: the device camera, downscaled, kept on this device until the database exists ---------- */
+const PHOTO_BIG = {};   /* v0.33: a sharper copy of the last few captures, in memory only, for the invoice reader. The kept photo stays 900 px to spare the phone's storage */
 function takePhoto(cb) {
   const inp = document.createElement("input"); inp.type = "file"; inp.accept = "image/*"; inp.setAttribute("capture", "environment");
   inp.onchange = () => { const f = inp.files && inp.files[0]; if (!f) return; const url = URL.createObjectURL(f); const img = new Image();
     img.onload = () => { const c = document.createElement("canvas"); const s = Math.min(1, 900 / Math.max(img.width, img.height)); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); const id = "ph-" + Date.now(); S.photos[id] = c.toDataURL("image/jpeg", 0.72); save(); cb(id); };
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); const id = "ph-" + Date.now(); S.photos[id] = c.toDataURL("image/jpeg", 0.72);
+      try { const s2 = Math.min(1, 2000 / Math.max(img.width, img.height)), c2 = document.createElement("canvas"); c2.width = Math.round(img.width * s2); c2.height = Math.round(img.height * s2); c2.getContext("2d").drawImage(img, 0, 0, c2.width, c2.height);
+        PHOTO_BIG[id] = c2.toDataURL("image/jpeg", 0.82); Object.keys(PHOTO_BIG).slice(0, -3).forEach(k => delete PHOTO_BIG[k]); } catch (e) { /* the 900 px photo is used instead */ }
+      URL.revokeObjectURL(url); save(); cb(id); };
     img.src = url; };
   inp.click();
 }

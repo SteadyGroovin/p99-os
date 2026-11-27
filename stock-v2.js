@@ -260,6 +260,57 @@ function skRcCheck(lines, total) {   /* the line amounts against the total on th
   if (Math.abs(sum - total) <= 0.05) return { ok: true, txt: `Lines ${skP(sum)} = total on the receipt ✓` };
   if (Math.abs(sum + vat - total) <= 0.5) return { ok: true, txt: `Lines ${skP(sum)} + 12% VAT ${skP(vat)} = ${skP(total)} ✓` };
   return { ok: false, txt: `Lines add up to ${skP(sum)} (${skP(sum + vat)} with 12% VAT), but the total is ${skP(total)}. Check each line amount and the total.` }; }
+/* ---------- v0.33 (2026-11-26) read the invoice from the photo ----------
+   Stefan: "I would like that they just photograph the invoice, and the things are auto-filled."
+   The edge function invoice-read looks at the photo and the store's item list and answers with the same fields the crew types:
+   invoice qty, inside each, line amount, the pack it came in, plus supplier, total and invoice number. Nothing is saved by the read:
+   the lines land in the form, marked "from the photo", and the crew still checks each one and ticks Counted.
+   Switched on per database: os_setting invoice_read = true (set once the API key is stored). Off: the screen is as before. */
+const skReaderOn = () => typeof sb !== "undefined" && typeof OS_SETTINGS !== "undefined" && !!OS_SETTINGS && OS_SETTINGS.invoice_read === true;
+async function skReadInvoice() {
+  if (!rc || !rc.photo || !skReaderOn() || (rc.read && rc.read.busy)) return render();
+  const body = { store: skStore(), supplier: rc.supplier || null }; const local = PHOTO_BIG[rc.photo] || S.photos[rc.photo];
+  if (local && String(local).startsWith("data:")) body.image = local;
+  else { const path = typeof Sync !== "undefined" && Sync.photos ? Sync.photos[rc.photo] : null; if (!path) { toast("That photo is not on this device."); return; } body.photo_path = path; }
+  const mine = rc; rc.read = { busy: true }; render();
+  let data = null, error = null; try { ({ data, error } = await sb.functions.invoke("invoice-read", { body })); } catch (e) { error = e; }
+  if (error && !data && error.context && typeof error.context.json === "function") { try { data = await error.context.json(); } catch (e) { /* no readable answer */ } }   /* a refusal (not switched on, not signed in) carries its reason in the body */
+  if (rc !== mine) return;   /* the form was closed or saved meanwhile */
+  if (error || !data || !data.ok) rc.read = { failed: (data && data.error) || "The reader is not reachable right now. Type the lines by hand." };
+  else skApplyReading(data);
+  render();
+}
+function skApplyReading(d) {
+  const out = { n: 0, unsure: 0, skipped: [], problem: d.problem || null, readable: d.readable !== false, supplierPrinted: null };
+  if (!out.readable) { rc.read = out; return; }
+  (d.lines || []).forEach(x => { const it = x.item ? Store.item(x.item) : null; if (!it) { out.skipped.push(x); return; }
+    const pk = x.pack != null && padAlt(it)[x.pack] ? x.pack : null; if (rc.lines.some(l => l.item === it.id && (l.pk == null ? null : l.pk) === pk)) return;   /* already on the list */
+    if (x.invoice_qty != null && x.inside_each != null && x.inside_each < 1) { x.invoice_qty = Math.round(x.invoice_qty * x.inside_each * 1000) / 1000; x.inside_each = 1; }   /* "800 × 0.001" (grams on a kg item) reads as 0.8 × 1 */
+    const l = skRcLine(it.id, { outer: x.invoice_qty != null ? String(x.invoice_qty) : "", inside: x.inside_each != null ? String(x.inside_each) : "", insideAuto: false, amt: x.amount != null ? String(x.amount) : "", pk,
+      fromPhoto: true, unsure: !x.sure, photoNote: x.note || null, printed: x.printed || "" });
+    skRcCalc(l); rc.lines.push(l); out.n++; if (!x.sure) out.unsure++; });
+  if (!rc.supplier && d.supplier && SUPPLIERS.includes(d.supplier)) { rc.supplier = d.supplier; rc.pay_mode = skDefaultPay(d.supplier, rc.kind) || rc.pay_mode; }
+  if (!rc.supplier) out.supplierPrinted = d.supplier_printed || null;
+  if ((rc.total === "" || rc.total == null) && d.total != null) { rc.total = String(d.total); out.total = rc.total; }      /* remembered so the form can say "from the photo" until the crew changes it */
+  if (!rc.invoice && d.invoice_no) { rc.invoice = String(d.invoice_no); out.invoice = rc.invoice; }
+  if (skDesk() && !rc.edit && d.day && d.day <= today()) rc.day = d.day;   /* the office may date a receipt; a store receives today */
+  rc.read = out;
+}
+function skReadCard() {
+  if (!rc || !rc.photo || !skReaderOn() || rc.kind === "pullout") return ""; const r = rc.read;
+  if (!r) return `<div class="rread"><button class="btn" onclick="skReadInvoice()">${ic("camera-01")} Read the invoice from the photo</button><div class="tiny mut">Fills the lines, the total and the invoice number. You check them.</div></div>`;
+  if (r.busy) return `<div class="alert info rread">Reading the invoice… about half a minute. You can pick the supplier meanwhile.</div>`;
+  const again = `<button class="chip" onclick="rc.read=null;skReadInvoice()">Read again</button>`;
+  if (r.failed) return `<div class="alert warn rread">${esc(r.failed)} ${again}</div>`;
+  if (!r.readable) return `<div class="alert warn rread">The photo could not be read as an invoice${r.problem ? ": " + esc(r.problem) : "."} Take a sharper photo, or type the lines. ${again}</div>`;
+  const q = x => `${x.invoice_qty != null ? fmt(x.invoice_qty) : "?"}${x.inside_each != null && x.inside_each !== 1 ? " × " + fmt(x.inside_each) : ""}`;
+  return `<div class="alert ${r.n && !r.unsure && !r.skipped.length ? "ok" : "info"} rread"><b>${r.n ? `${r.n} line${r.n === 1 ? "" : "s"} filled from the photo.` : "No line could be matched to an item."}</b> ${r.n ? (rc.edit ? "Check each one against the photo, then save." : "Check each one against the paper, then count and tick.") : ""}
+    ${r.unsure ? `<div class="band-warn tiny" style="margin-top:4px">${r.unsure} line${r.unsure === 1 ? " is" : "s are"} marked "not sure". Look at ${r.unsure === 1 ? "it" : "them"} first.</div>` : ""}
+    ${r.supplierPrinted ? `<div class="tiny" style="margin-top:4px">Supplier on the paper: <b>${esc(r.supplierPrinted)}</b>. Pick it in the list.</div>` : ""}
+    ${r.problem ? `<div class="tiny" style="margin-top:4px">${esc(r.problem)}</div>` : ""}
+    ${r.skipped.length ? `<div class="tiny" style="margin-top:6px"><b>On the paper, but not on the item list</b> (add with "Any item"):${r.skipped.map(x => `<div>· ${esc(x.printed || "?")} · ${q(x)}${x.amount != null ? " · " + skP(x.amount) : ""}</div>`).join("")}</div>` : ""}</div>`;
+}
+
 /* v0.12 money side of a delivery: paid now (expense, from which fund) or bill (supplier on terms → 1–15 / 16–end run) */
 function skDefaultPay(sup, kind) { if (kind === "purchase") return "paid_now"; const i = SUPPLIER_INFO[sup]; return i && i.pay_mode === "terms" ? "bill" : i && i.pay_mode === "paid_now" ? "paid_now" : null; }
 function skPickSupplier(s) { rc.supplier = s; rc.pay_mode = skDefaultPay(s, rc.kind) || rc.pay_mode; rc.po = null; render(); }
@@ -284,7 +335,7 @@ function viewReceive() {
   const recent = [...new Set(S.receipts.filter(r => r.kind === rc.kind).sort((a, b) => a.day < b.day ? 1 : -1).map(r => r.supplier))].filter(s => srcs.includes(s)).slice(0, 6);
   const freq = {}; S.receipts.filter(r => r.supplier === rc.supplier).forEach(r => r.lines.forEach(l => freq[l.item] = (freq[l.item] || 0) + 1));
   const usual = Object.keys(freq).sort((a, b) => freq[b] - freq[a]).filter(id => Store.item(id) && !rc.lines.some(l => l.item === id)).slice(0, 8);
-  const itemOpts = ITEMS.filter(i => !rc.supplier || !i.supplier || i.supplier === rc.supplier || rc.kind !== "delivery").map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join("");
+  const itemOpts = ITEMS.filter(i => i.cat !== "prep (made here)" && (!rc.supplier || !i.supplier || i.supplier === rc.supplier || rc.kind !== "delivery")).map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join("");
   const lines = rc.lines.map((l, i) => { const it = Store.item(l.item); const lp = Store.lastPrice(l.item); const amt = skAmt(l); const alts = padAlt(it), pk = skPk(l), f = skF(l);
     const inv = skInvP(l), u = esc(pk ? pk.unit : it.unit), uL = esc(skU(l)), got = l.qty != null ? Math.round(l.qty / f * 1000) / 1000 : null;   /* v0.32: inv, got and the labels are in the pack the line came in */
     const base = inv && it.per && it.per !== 1 ? ` <span class="mut">(${fmt(skInv(l) * it.per)} ${esc(it.base)})</span>` : "";
@@ -292,13 +343,15 @@ function viewReceive() {
     const countRow = inv ? `<div class="rcount ${l.counted ? "ok" : ""}"><label class="rtick"><input type="checkbox" ${l.counted ? "checked" : ""} onchange="rc.lines[${i}].counted=this.checked;render()"> <span>Counted</span></label>
         <label class="rpin"><span>came</span><input class="in num" inputmode="decimal" aria-label="${u}s that came" value="${got != null ? got : ""}" onchange="skRcSet(${i},'got',this.value)"><span class="tiny mut">${u}</span></label>
         ${got != null && got < inv ? `<span class="band-warn tiny">${fmt(Math.round((inv - got) * 1000) / 1000)} ${u} short of the invoice</span>` : got > inv ? `<span class="band-warn tiny">${fmt(Math.round((got - inv) * 1000) / 1000)} ${u} more than the invoice</span>` : `<span class="tiny mut">count the ${u}s, then tick</span>`}</div>` : "";
-    return `<div class="rline"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">${inv ? `= <b class="ink2">${fmt(inv)} ${uL}</b>${base}${l.price != null ? ` · ${skP(l.price * f)} per ${u}` : ""}` : `Copy the line from the invoice`}</div></div>
+    const ph = l.fromPhoto && !l.counted ? "auto" : "";   /* v0.33: filled from the photo and not counted yet */
+    return `<div class="rline"><div class="main"><div class="name">${esc(it.name)}</div><div class="meta">${inv ? `= <b class="ink2">${fmt(inv)} ${uL}</b>${base}${l.price != null ? ` · ${skP(l.price * f)} per ${u}` : ""}` : `Copy the line from the invoice`}</div>
+        ${l.fromPhoto ? `<div class="tiny ${l.unsure ? "band-warn" : "mut"}">From the photo${l.printed ? `: ${esc(l.printed)}` : ""}${l.unsure ? ` · not sure${l.photoNote ? ": " + esc(l.photoNote) : ""}` : ""}</div>` : ""}</div>
       <button class="btn ghost danger rx" onclick="rc.lines.splice(${i},1);render()" aria-label="Remove ${esc(it.name)}">${ic("x-close")}</button>
       ${pkRow}
-      ${rc.kind !== "pullout" ? `<div class="rinv"><label class="rpin"><span>Invoice qty</span><input class="in num" inputmode="decimal" aria-label="Quantity on the invoice for ${esc(it.name)}" placeholder="e.g. 2" value="${esc(l.outer)}" onchange="skRcSet(${i},'outer',this.value)"></label>
-        <span class="rx2">×</span><label class="rpin ${l.insideAuto ? "auto" : ""}"><span>inside each</span><input class="in num" inputmode="decimal" aria-label="${u}s inside each on the invoice" placeholder="1" value="${esc(l.inside)}" onchange="skRcSet(${i},'inside',this.value)"><span class="tiny mut">${u}</span></label>
+      ${rc.kind !== "pullout" ? `<div class="rinv"><label class="rpin ${ph}"><span>Invoice qty</span><input class="in num" inputmode="decimal" aria-label="Quantity on the invoice for ${esc(it.name)}" placeholder="e.g. 2" value="${esc(l.outer)}" onchange="skRcSet(${i},'outer',this.value)"></label>
+        <span class="rx2">×</span><label class="rpin ${l.insideAuto || ph ? "auto" : ""}"><span>inside each</span><input class="in num" inputmode="decimal" aria-label="${u}s inside each on the invoice" placeholder="1" value="${esc(l.inside)}" onchange="skRcSet(${i},'inside',this.value)"><span class="tiny mut">${u}</span></label>
         <div class="tiny mut rhint">${l.insideAuto ? `×${esc(l.inside)} from the last delivery: check the invoice` : `Invoice says CASE X 12 → type 12 · single ${u}s → 1`}</div>
-        <label class="rpin"><span>Line amount ₱</span><input class="in num ramt" inputmode="decimal" aria-label="Amount column for ${esc(it.name)}" placeholder="${lp && inv ? fmt(Math.round(lp.price * skInv(l) * 100) / 100) : "amount"}" value="${esc(l.amt)}" onchange="skRcSet(${i},'amt',this.value)"></label>
+        <label class="rpin ${ph}"><span>Line amount ₱</span><input class="in num ramt" inputmode="decimal" aria-label="Amount column for ${esc(it.name)}" placeholder="${lp && inv ? fmt(Math.round(lp.price * skInv(l) * 100) / 100) : "amount"}" value="${esc(l.amt)}" onchange="skRcSet(${i},'amt',this.value)"></label>
         <div class="pflag">${l.price != null ? skPriceFlag(l.item, l.price) : lp ? `<span class="tiny mut">last ${skP(lp.price * f)} per ${u} on ${esc(dayName(lp.day))}</span>` : `<span class="tiny mut">no earlier price</span>`}</div></div>` : ""}
       ${rc.kind !== "pullout" && !rc.edit ? countRow : ""}
       ${it.sizeUnknown ? `<div class="tiny" style="grid-column:1/-1;margin-top:6px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><span class="${l.size > 0 || l.noSize ? "band-ok" : "band-warn"}">One ${esc(it.unit)} holds</span><input class="in num" inputmode="decimal" style="width:96px" aria-label="Size of one ${esc(it.unit)} in ${esc(it.base)}" placeholder="size" value="${l.size > 0 ? l.size : ""}" onchange="rc.lines[${i}].size=this.value===''?null:parseFloat(this.value);rc.lines[${i}].noSize=false;render()"><span>${esc(it.base)}</span><label style="display:flex;gap:4px;align-items:center"><input type="checkbox" ${l.noSize ? "checked" : ""} onchange="rc.lines[${i}].noSize=this.checked;render()"> not printed</label></div>` : ""}
@@ -314,10 +367,12 @@ function viewReceive() {
   const todo = desk && !rc.edit ? skToItemise() : [];
   const queue = todo.length ? `<section class="card"><h2>Add the items <span class="tiny mut">${todo.length} saved with only a photo</span></h2><div class="list">${todo.slice(0, 12).map(r => `<button class="row tap" onclick="skRcEdit('${r.id}')"><div class="main"><div class="name">${esc(r.supplier || "—")} · ${esc(dayName(r.day))}</div><div class="meta">${r.total != null ? peso(r.total) + " · " : ""}${r.pay_mode === "bill" ? "bill" : "paid now"}${r.invoice ? " · " + esc(r.invoice) : ""}</div></div>${r.photo ? thumb(r.photo) : ""}<span class="chip warn"><i class="dot"></i>items</span></button>`).join("")}</div></section>` : "";
   return shell(rc.edit ? "Add the items" : "Receive", rc.edit ? `${esc(rc.supplier || "")} · ${esc(dayName(rc.day))}` : dayLong(today()), `${queue}
-    ${rc.edit && rc.photo ? `<div>${thumb(rc.photo, "big")}</div><div class="tiny mut">Type what the photo shows, then save. The total and payment stay as the store entered them; correct them if the paper says otherwise.</div>` : ""}
+    ${rc.edit && rc.photo ? `<div>${thumb(rc.photo, "big")}</div><div class="tiny mut">${skReaderOn() ? "Let the app read the photo, or type what it shows" : "Type what the photo shows"}, then save. The total and payment stay as the store entered them; correct them if the paper says otherwise.</div>${skReadCard()}` : ""}
     <ol class="rsteps">${steps.map(([ok, l], i) => `<li class="${ok ? "ok" : ""}"><span>${ok ? "✓" : i + 1}</span><em class="rl">${l}</em></li>`).join("")}</ol>
     ${rc.edit ? "" : `<div class="seg">${RECEIPT_KINDS.map(([k, l]) => `<button class="btn ${rc.kind === k ? "on" : ""}" onclick="${k === "pullout" ? "rc.kind='pullout';render()" : `rc.kind='${k}';rc.supplier='';rc.po=null;rc.pay_mode=${k === "purchase" ? "'paid_now'" : "null"};render()`}">${esc(l.split(" (")[0])}</button>`).join("")}</div>
     <div class="tiny mut">Not for stock (uniform, repair, decoration)? Use <a href="#/purchases">Purchases</a>.</div>`}
+    ${skReaderOn() && !rc.edit ? `<section class="card"><h2>Start with the photo <span class="tiny mut">the app fills in the lines</span></h2>
+      <div>${photoBtn(rc.kind === "purchase" ? "Photo of the receipt" : "Photo of the invoice", "rc.photo=id;rc.read=null;skReadInvoice()", rc.photo)}${thumb(rc.photo, "big")}</div>${skReadCard()}</section>` : ""}
     ${locRow}
     <section class="card"><div class="field"><label>${rc.kind === "pullout" ? "From" : "Supplier / store"}</label><select class="in" onchange="skPickSupplier(this.value)"><option value="">— choose —</option>${srcs.map(s => `<option ${rc.supplier === s ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
       ${recent.length ? `<div class="chips" style="margin-top:8px">${recent.map(s => `<button class="chip ${rc.supplier === s ? "info" : ""}" onclick="skPickSupplier(${esc(JSON.stringify(s))})">${esc(s)}</button>`).join("")}</div>` : ""}
@@ -331,13 +386,13 @@ function viewReceive() {
     ${short.length ? `<div class="alert warn">Short against the order: ${short.map(x => `${esc(x.it.name)} ${fmt(x.got)} of ${fmt(x.want)} ${esc(x.it.unit)}`).join(" · ")}. Save anyway if that is what came; the rest stays open.</div>` : ""}
     <section class="card"><h2>Money</h2>
       ${desk ? `<div class="field"><label>Day on the receipt</label><input class="in" type="date" max="${today()}" value="${esc(rc.day || today())}" onchange="rc.day=this.value||today();render()"></div>` : ""}
-      <div class="field"><label>Total on the receipt (₱, required)</label><input class="in num" inputmode="decimal" value="${esc(rc.total)}" placeholder="${priced.length ? fmt(Math.round(tot * 100) / 100) : "e.g. 1250"}" oninput="rc.total=this.value" onchange="render()"><div class="tiny mut" style="margin-top:4px">The grand total at the bottom of the invoice (Total amount due).</div></div>
+      <div class="field"><label>Total on the receipt (₱, required)</label><input class="in num" inputmode="decimal" value="${esc(rc.total)}" placeholder="${priced.length ? fmt(Math.round(tot * 100) / 100) : "e.g. 1250"}" oninput="rc.total=this.value" onchange="render()"><div class="tiny mut" style="margin-top:4px">The grand total at the bottom of the invoice (Total amount due).</div>${rc.read && rc.read.total != null && rc.read.total === String(rc.total) ? `<div class="tiny band-warn" style="margin-top:2px">From the photo. Check it against the paper.</div>` : ""}</div>
       ${(() => { const c = totOk ? skRcCheck(rc.lines, parseFloat(rc.total)) : null; return c ? `<div class="alert ${c.ok ? "ok" : "warn"}">${esc(c.txt)}</div>` : ""; })()}
-      <div class="field"><label>Invoice / SI / DR number</label><input class="in" value="${esc(rc.invoice)}" placeholder="if the paper has one" oninput="rc.invoice=this.value"></div>
+      <div class="field"><label>Invoice / SI / DR number</label><input class="in" value="${esc(rc.invoice)}" placeholder="if the paper has one" oninput="rc.invoice=this.value" onchange="render()">${rc.read && rc.read.invoice != null && rc.read.invoice === rc.invoice ? `<div class="tiny band-warn" style="margin-top:2px">From the photo. Check it against the paper.</div>` : ""}</div>
       <div class="field"><label>Payment (required)</label><div class="seg"><button class="btn ${rc.pay_mode === "paid_now" ? "on" : ""}" onclick="rc.pay_mode='paid_now';render()">Paid now</button><button class="btn ${rc.pay_mode === "bill" ? "on" : ""}" ${rc.kind === "purchase" ? "disabled" : ""} onclick="rc.pay_mode='bill';render()">Bill (pay later)</button></div>
         ${rc.pay_mode === "paid_now" ? `<div class="chips" style="margin-top:8px">${PAY_SOURCES.map(([k, l]) => `<button class="chip ${rc.pay_source === k ? "info" : ""}" onclick="rc.pay_source='${k}';render()">${l}</button>`).join("")}</div><div class="tiny mut" style="margin-top:4px">Who paid. It becomes an expense of that fund.</div>`
           : rc.pay_mode === "bill" ? `<div class="tiny mut" style="margin-top:4px">Goes into the ${esc(skRunLabel(today()))} run of ${esc(rc.supplier || "the supplier")}. Keep the paper with today's unpaid receipts.</div>` : ""}</div></section>
-    ${rc.kind !== "pullout" ? `<div>${photoBtn(rc.kind === "purchase" ? "Photo of the receipt (required)" : "Photo of the invoice or goods (required)", "rc.photo=id;render()", rc.photo)}${thumb(rc.photo, "big")}</div>` : ""}
+    ${rc.kind !== "pullout" && !(skReaderOn() && !rc.edit) ? `<div>${photoBtn(rc.kind === "purchase" ? "Photo of the receipt (required)" : "Photo of the invoice or goods (required)", "rc.photo=id;render()", rc.photo)}${thumb(rc.photo, "big")}</div>` : ""}
     <div class="bottom-act"><button class="btn primary full" ${need.length ? "disabled" : ""} onclick="rcSave()">${rc.lines.length ? `Save · ${rc.lines.length} line${rc.lines.length === 1 ? "" : "s"}` : rc.kind === "delivery" && rc.photo ? "Save · photo only" : "Save · 0 lines"}${totOk ? " · " + peso(parseFloat(rc.total)) : ""}</button></div>
     ${need.length ? `<div class="tiny mut" style="text-align:center">Needed: ${need.join(", ")}.</div>` : ""}${padHTML()}`, { back: rc.edit ? "#/receive" : role() === "crew" ? "#/today" : "#/stock" });
 }
