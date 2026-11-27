@@ -151,7 +151,7 @@ function finMonth(m) {
 
 /* ---------- entry ---------- */
 function viewFinance(sub, id) {
-  if (role() !== "master") return shell("P&L", "", `<section class="card"><h2>Finance is for the owners</h2><div class="small mut">Expenses, payables, the book and the P&L are visible to Stefan and Mike only. Ask one of them if you need a figure.</div><div style="margin-top:12px"><button class="btn" onclick="go('#/more')">Back to More</button></div></section>`, { back: "#/more" });
+  if (role() !== "master") return shell("P&L", "", `<section class="card"><h2>Finance is for the owners</h2><div class="small mut">Expenses, payables, the book and the P&L are visible to Stefan only. Ask him if you need a figure.</div><div style="margin-top:12px"><button class="btn" onclick="go('#/more')">Back to More</button></div></section>`, { back: "#/more" });
   const sb2 = ["", "book", "expenses", "payables", "pl"].includes(sub || "") ? (sub || "") : "";
   if (!FIN.data) {
     if (!FIN.loading && !FIN.err) setTimeout(finLoad, 0);
@@ -418,3 +418,58 @@ function viewFinPL() {
 }
 function finPickPL(m) { FIN.plMonth = m; render(); }
 function finSup(i) { const s = FIN.eSups[i]; FIN.eSup = FIN.eSup === s ? "all" : s; FIN.eDays = 10; render(); }
+
+/* ---------- OVERVIEW (owners) ---------- */
+/* v0.37 (migration 062, Stefan 28 Nov: "Mike … should just get the perfect overview, and we take care of the ordering").
+   One read-only page across the stores from os_owner_overview: sales (Sales Monitoring sheets, cash + GCash, as far as they are
+   loaded), cash (the morning round counts yesterday's cash; POS-checked for Pizza 99 and Burger Kong), spend and bills (Receive),
+   stock (v_reorder, counts). Mike's login is role "owner": this page and his account, nothing to do, no alerts. */
+const OV = { data: null, at: 0, loading: false, err: null };
+async function ovLoad(force) {
+  if (typeof sb === "undefined" || !sb.rpc || (window.OS_LOADED && window.OS_LOADED.dev) || OV.loading || (!force && OV.data && Date.now() - OV.at < 120e3)) return;
+  OV.loading = true; const r = await sb.rpc("os_owner_overview"); OV.loading = false;
+  if (r.error) OV.err = r.error.message; else { OV.err = null; OV.data = r.data; OV.at = Date.now(); }
+  if (/^#\/overview/.test(location.hash || "") || (role() === "owner" && !location.hash)) render();
+}
+function viewOverview() {
+  if (!canOpen("overview")) return shell("Overview", "", `<div class="alert info">For the owners.</div>`, { back: "#/today" });
+  if (!OV.loading && (!OV.data || Date.now() - OV.at > 120e3)) setTimeout(() => ovLoad(), 0);
+  const D = OV.data;
+  if (!D) return shell("Overview", "every store", `<section class="card"><div class="mut">${OV.err ? "Could not load the overview: " + esc(OV.err) : "Loading every store…"}</div></section>`);
+  const L = D.stores || [], n = k => L.reduce((a, s) => a + (+s[k] || 0), 0);
+  const pct = (a, b) => b ? Math.round((a - b) / b * 100) : null;
+  const dlt = (a, b) => { const p = pct(a, b); return p == null ? "" : `<span class="${p >= 0 ? "ok" : "bad"}" style="font-weight:600">${p >= 0 ? "+" : ""}${p}%</span>`; };
+  const s7 = n("sales7"), p7 = n("sales_prev7");
+  const salesTo = D.sales_to ? dayName(D.sales_to) : "—";
+  const tiles = `<div class="grid2 ovtiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+    ${tile("Sales, 7 days", peso(s7), `to ${esc(salesTo)} · ${dlt(s7, p7) || "—"} vs the 7 days before`, "")}
+    ${tile("Sales, month", peso(n("sales_mtd")), `${esc(monthName ? monthName(String(D.sales_to || D.today).slice(0, 7)) : "")} to ${esc(salesTo)}`, "")}
+    ${tile("Spent this month", peso(n("spend_mtd")), `deliveries and purchases · ${n("deliveries_mtd")} deliveries`, "")}
+    ${tile("Bills open", peso(n("bills_open_amt")), `${n("bills_open")} bills · ${peso(n("released"))} released to pay`, "")}</div>`;
+  const att = [];
+  L.forEach(s => {   /* one line per store */
+    const w = [];
+    if (!s.full_count || addDays(D.today, -8) > s.full_count) w.push(`no full count ${s.full_count ? "since " + esc(dayName(s.full_count)) : "yet"}`);
+    if (s.gap7_n && Math.abs(+s.gap7) >= 500) w.push(`cash ${+s.gap7 < 0 ? "short" : "over"} ${peso(Math.abs(+s.gap7))} against the till in 7 days`);
+    if (+s.out >= 10) w.push(`${s.out} items at zero or below (a delivery or a count is missing)`);
+    if (w.length) att.push(`<b>${esc(s.name)}</b>: ${w.join(" · ")}`);
+  });
+  if (n("to_check")) att.push(`${n("to_check")} bills not checked yet by the office (${peso(n("to_check_amt"))})`);
+  if (n("to_release")) att.push(`${peso(n("to_release"))} checked, waiting for Stefan's release`);
+  if (String(D.month) >= "2026-12-01" && n("deliveries_mtd") > n("deliveries_with_order")) att.push(`${n("deliveries_mtd") - n("deliveries_with_order")} deliveries this month without an order in the app`);
+  const row = s => `<tr style="cursor:default">
+    <td class="nm"><b>${esc(s.name)}</b></td>
+    <td class="n num">${s.sales7 != null ? peso(+s.sales7) : "—"}<div class="tiny">${dlt(+s.sales7, +s.sales_prev7)}</div></td>
+    <td class="n num">${s.cash_sales != null ? peso(+s.cash_sales) : "—"}<div class="tiny mut">${s.cash_day ? "counted " + esc(dayName(s.cash_day)) : "no run"}</div></td>
+    <td class="n num">${s.gap7_n ? `<span class="${Math.abs(+s.gap7) >= 500 ? "bad" : ""}">${+s.gap7 > 0 ? "+" : +s.gap7 < 0 ? "−" : ""}${peso(Math.abs(+s.gap7))}</span>` : `<span class="mut">—</span>`}<div class="tiny mut">${s.runs7} runs</div></td>
+    <td class="n num">${peso(+s.spend_mtd)}</td>
+    <td class="n num">${peso(+s.bills_open_amt)}<div class="tiny mut">${s.to_check ? s.to_check + " to check" : "all checked"}</div></td>
+    <td class="n num">${s.order_due}<div class="tiny mut">${s.count_first ? s.count_first + " count first" : ""}</div></td>
+    <td class="mut">${s.full_count ? esc(dayName(s.full_count)) : "never"}</td></tr>`;
+  const table = `<section class="card"><h2>Per store</h2><div class="itwrap flat"><table class="itbl"><thead><tr><th>Store</th><th class="n">Sales 7 d</th><th class="n">Cash yesterday</th><th class="n">Cash vs till 7 d</th><th class="n">Spent, month</th><th class="n">Bills open</th><th class="n">To order</th><th>Full count</th></tr></thead><tbody>${L.map(row).join("")}</tbody></table></div></section>`;
+  return shell("Overview", "every store · read only", `
+    ${tiles}
+    <section class="card"><h2>Needs attention</h2>${att.length ? `<ul class="small" style="margin:0;padding-left:18px">${att.map(a => `<li>${a}</li>`).join("")}</ul>` : `<div class="mut">Nothing stands out.</div>`}</section>
+    ${table}
+    <div class="tiny mut" style="margin:8px 2px">Sales: the Sales Monitoring sheets (cash and GCash), loaded to ${esc(salesTo)}. Cash yesterday: cash counted on the morning round, cash only; "vs till" only where the till reports cash (Pizza 99, Burger Kong). Spent and bills: what the stores receive in the app. To order: items under their minimum with a fresh count; the office orders them. Updated ${esc(new Date(OV.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}. <a href="#/overview" onclick="ovLoad(true);return false">Refresh</a></div>`);
+}

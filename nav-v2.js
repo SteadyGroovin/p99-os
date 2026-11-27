@@ -20,7 +20,7 @@ const MODULES = [
   ["sales", "Sales", "#/sales", "cash", "Till"], ["cash", "Cash count", "#/cash", "cash", "Till"], ["walk", "Morning run", "#/walk", "sun", "Till"],
   ["stock", "Stock", "#/stock", "grid", "Inventory"], ["count", "Count", "#/count", "grid", "Inventory"], ["receive", "Receive", "#/receive", "box", "Inventory"], ["transfers", "Transfers", "#/transfers", "box", "Inventory"], ["variance", "Variance", "#/variance", "grid", "Inventory"], ["minimums", "Minimums", "#/minimums", "grid", "Inventory"],
   ["order", "Order", "#/order", "coins", "Buying"], ["approve", "Approve", "#/approve", "check", "Buying"], ["bills", "Bills", "#/bills", "coins", "Buying"], ["purchases", "Purchases", "#/purchases", "coins", "Buying"], ["suppliers", "Suppliers", "#/suppliers", "coins", "Buying"],
-  ["money", "Funds", "#/money", "finance", "Money"], ["finance", "P&L", "#/finance", "finance", "Money"], ["books", "Month close", "#/books", "finance", "Money"], ["accounts", "Accounts", "#/accounts", "finance", "Money"],
+  ["overview", "Overview", "#/overview", "finance", "Money"], ["money", "Funds", "#/money", "finance", "Money"], ["finance", "P&L", "#/finance", "finance", "Money"], ["books", "Month close", "#/books", "finance", "Money"], ["accounts", "Accounts", "#/accounts", "finance", "Money"],
   ["tasks", "Tasks", "#/tasks", "list", "Team"], ["questions", "Questions", "#/questions", "list", "Team"], ["report", "Tickets", "#/report", "alert", "Team"], ["clean", "Clean", "#/clean", "check", "Team"], ["logins", "Logins", "#/logins", "dots", "Team"],
   ["papers", "Papers", "#/papers", "list", "Office"],
   ["items", "Items", "#/items", "box", "Catalogue"], ["recipes", "Recipes", "#/recipes", "list", "Catalogue"], ["sizes", "Pack sizes", "#/sizes", "box", "Catalogue"],
@@ -33,7 +33,7 @@ const moduleOf = seg => SEG_MODULE[seg] || seg;
 const modsFor = () => MODULES.filter(m => canOpen(m[0]));
 const SETUP = MODULES.filter(m => ["users", "stores", "rules"].includes(m[0]))   /* v0.19.6: nothing that is already in the menu (Stefan: "that also shouldn't be double") */.map(m => [m[1], m[2], ({ users: "who has which login and what they see", stores: "where stock is sent and received", suppliers: "terms, delivery days, what we buy, prices", recipes: "what each pizza, slice and batch uses", sizes: "how much is inside a can, pack or box", accounts: "expense categories, as in the accounting book", books: "what each fund held, lock a finished month", rules: "₱ limit for Mike's approval, safety days" })[m[0]]]);
 const PIN_KEY = "rocketos_pins";
-const PIN_DEFAULT = { master: ["sales", "stock", "money"], finance: ["receive", "bills", "money"], admin: ["bills", "money", "tasks"], officer: ["walk", "stock", "tasks"], lead: ["tasks", "count", "order"], walk: ["tasks", "report", "receive"], crew: ["count", "receive", "clean"] };
+const PIN_DEFAULT = { owner: ["overview"], master: ["sales", "stock", "money"], finance: ["receive", "bills", "money"], admin: ["bills", "money", "tasks"], officer: ["walk", "stock", "tasks"], lead: ["tasks", "count", "order"], walk: ["tasks", "report", "receive"], crew: ["count", "receive", "clean"] };
 function pins() {
   let p = null; try { p = JSON.parse(localStorage.getItem(PIN_KEY) || "null"); } catch (e) { }
   const r = financeLogin() ? "finance" : officeLogin() ? "admin" : officerLogin() ? "officer" : role(); const ok = modsFor().map(m => m[0]);
@@ -41,7 +41,7 @@ function pins() {
   for (const id of ok) { if (list.length >= 3) break; if (!list.includes(id)) list.push(id); }
   return list.slice(0, 3);
 }
-const homeHref = () => role() === "walk" && !officeLogin() ? "#/walk" : "#/today";
+const homeHref = () => role() === "owner" ? "#/overview" : role() === "walk" && !officeLogin() ? "#/walk" : "#/today";   /* v0.37: Mike opens on his overview */
 const modIcon = id => (MODULES.find(m => m[0] === id) || [])[3] || "dots";
 const modLabel = id => (MODULES.find(m => m[0] === id) || [])[1] || id;
 const modShort = id => modLabel(id);   /* Stefan: short names everywhere */
@@ -51,6 +51,8 @@ function canOpen(s0) {
   const r = role(), adm = officeLogin(), fin = financeLogin(), m = r === "master";
   /* v0.22 (Stefan, 15 Nov, Burger Kong access for Cath): the store lead sees tasks, inventory (stock, count, receive) and ordering for her own store */
   /* v0.23 (Stefan, 15 Nov: Hannah gets inventory, buying and the team): every store and D'Mall Storage, the all-stores stock, Papers. v0.23.2 (16 Nov): plus the morning run and the cash count (migration 040). Not sales, funds, bills, approving or roles. v0.23.3 (16 Nov, migration 043): plus recipes */
+  if (r === "owner") return ["", "overview", "more", "settings", "who", "password", "modules"].includes(s0);   /* v0.37 (migration 062): Mike watches, one read-only page */
+  if (s0 === "overview") return m;
   if (s0 === "logins") return m || r === "officer";   /* v0.30: Hannah creates and resets the store logins (edge function store-login) */
   if (r === "officer") return ["", "today", "walk", "cash", "stock", "stock-all", "count", "receive", "receipts", "transfers", "transfer", "variance", "minimums", "items", "item", "sizes", "order", "suppliers", "supplier", "recipes", "recipe", "tasks", "task", "report", "clean", "papers", "questions", "more", "settings", "who", "password", "modules"].includes(s0);
   if (s0 === "questions") return m || adm;   /* v0.28 (migration 052): open questions for the officer, the office and the owners */
@@ -61,7 +63,7 @@ function canOpen(s0) {
   if (s0 === "books") return m || (adm && !fin);                 /* month close and opening balances: not Finance (Stefan, 2026-11-08) */
   if (["bills", "money", "stores", "accounts"].includes(s0)) return m || adm;
   if (s0 === "purchases") return m || adm || r === "lead";
-  if (s0 === "order") return m || r === "lead" || fin;           /* Cherry and the store lead order; Mike approves above the limit */
+  if (s0 === "order") return m || r === "lead";                  /* v0.37: Hannah (officer list above) and Stefan send; the lead sees the list and tells Hannah. Not Cherry */
   if (s0 === "sizes") return m || r === "lead";
   if (["recipes", "recipe"].includes(s0)) return m || (adm && !fin) || r === "lead";
   if (["suppliers", "supplier"].includes(s0)) return m || adm || r === "lead";
@@ -112,6 +114,8 @@ function homeStripHTML() {
   if (canOpen("order")) cards.push(["Items to order", REORDER.filter(r => r.order_now && !odStale(r)).length + (REORDER.some(r => r.order_now && odStale(r)) ? `<div class="tiny mut">+ ${REORDER.filter(r => r.order_now && odStale(r)).length} to count first</div>` : ""), "#/order"]);
   if (canOpen("receive") && typeof skDesk === "function" && skDesk()) cards.push(["Receipts to itemise", skToItemise().length, "#/receive"]);   /* v0.29 quick receipt */
   if (canOpen("bills")) cards.push(["Bills open", (typeof bpRows === "function" ? bpRows() : MONEY.filter(m => m.mode === "bill")).filter(m => !m.paid_on).length, "#/bills"]);   /* v0.35: every store once os_bills_office has loaded */
+  if (role() === "master" && typeof bpToRelease === "function") { const tr = bpToRelease(); cards.push(["Bills to release", `${tr.length}<div class="tiny mut">${peso(bpSum(tr))}</div>`, "#/bills"]); }   /* v0.37 */
+  if (financeLogin() && typeof bpToPay === "function") { const tp = bpToPay(); cards.push(["Bills to pay", `${tp.length}<div class="tiny mut">${peso(bpSum(tp))}</div>`, "#/bills"]); }
   if (canOpen("bills") && typeof bpToCheck === "function") { if (typeof bpLoad === "function" && !BP.all) setTimeout(() => bpLoad(), 0); const tc = bpToCheck(); cards.push(["Bills to check", `${tc.length}<div class="tiny mut">${peso(tc.reduce((a, m) => a + (+m.total || 0), 0))}</div>`, "#/bills"]); }   /* v0.34 (migration 059) */
   if (canOpen("sizes")) cards.push(["Pack sizes missing", szMissing(), "#/sizes"]);
   if (canOpen("recipes")) cards.push(["Recipes not confirmed", (typeof RECIPES !== "undefined" ? RECIPES : []).filter(r => !r.confirmed).length, "#/recipes"]);
@@ -182,11 +186,11 @@ function viewRules() {
   const v = k => { const x = OS_SETTINGS[k]; return x == null ? "" : String(x).replace(/"/g, ""); };
   return shell("Rules", "how the Order today list and approvals work", `
     <section class="card">
-      <div class="field"><label>Orders above ₱ go to Mike for approval</label><input class="in num" id="r-ap" inputmode="decimal" placeholder="no limit set" value="${esc(v("approval_peso"))}"></div>
+      <div class="field"><label>Orders above ₱ go to Stefan for approval</label><input class="in num" id="r-ap" inputmode="decimal" placeholder="no limit set" value="${esc(v("approval_peso"))}"></div>
       <div class="field"><label>Safety days (extra days of stock on top of delivery time)</label><input class="in num" id="r-sd" inputmode="numeric" value="${esc(v("default_safety_days"))}"></div>
       <div class="field"><label>Days one order should cover</label><input class="in num" id="r-oc" inputmode="numeric" value="${esc(v("order_cover_days"))}"></div>
       <button class="btn primary full" onclick="ruSave()">Save rules</button>
-      <div class="tiny mut" style="margin-top:8px">Imported and Manila suppliers marked "Mike approves" always wait for him, whatever the amount.</div></section>`, { back: "#/settings" });
+      <div class="tiny mut" style="margin-top:8px">Suppliers marked "Stefan approves" always wait for him, whatever the amount. Empty limit: orders go straight out. Hannah and Stefan place the orders.</div></section>`, { back: "#/settings" });
 }
 function ruSave() {
   const g = id => { const t = (document.getElementById(id).value || "").trim(); return t === "" ? null : +t; };

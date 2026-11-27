@@ -9,7 +9,7 @@
 let odEdit = {};          // "supplier|item" -> qty the lead typed (buy units)
 let odAll = false;        // also list items that are not due yet
 let bpSel = {};           // receipt id -> ticked for "mark paid"
-let bpRange = "check";    // check | open | 30 | 90 (v0.35: the office opens on "To check")
+let bpRange = "check";    // check | release | pay | open | 30 | 90 (v0.35: the office opens on "To check"; v0.37: release = Stefan, pay = released, unpaid)
 
 const odQ = v => v == null || isNaN(v) ? "—" : fmt(Math.round(v * 10) / 10);
 function odItem(r) { return Store.item(r.item); }
@@ -24,8 +24,21 @@ function odOpenFor(item) { return (S.orders || []).filter(o => (o.status === "ap
 async function odRefresh() { if (typeof Sync !== "undefined" && Sync.reload) { await Sync.reload(); toast("Levels refreshed."); } }
 
 /* ---------- ORDER TODAY (lead, master) ---------- */
+/* v0.37 (migration 062, Stefan 28 Nov: "we take care of the ordering"): Hannah (admin officer) and Stefan send orders; the store lead sees
+   the same list and taps "Tell Hannah", which puts a task on Hannah's list with the items. Cherry no longer orders; Mike only watches. */
+const odCanSend = () => ["master", "officer"].includes(role());
+function odHannah() { const ps = typeof tkPeople === "function" ? tkPeople() : []; return (ps.find(p => /hannah/i.test(p.name || "") || /hannah/i.test(p.short || "")) || {}).id || "hannah"; }   /* person.app_key 'hannah' */
+function odTell(sup) {
+  const rs = REORDER.filter(r => (r.supplier || "") === sup && odItem(r) && (odAll || r.order_now));
+  const lines = rs.map(r => { const it = odItem(r); const left = odLeft(r); return `${it.name}: ${left == null ? "not counted" : left < 0 ? "out" : odQ(left) + " " + it.unit + " left"}`; });
+  const at = nowISO(); const me = typeof tkMe === "function" ? tkMe() : S.me;
+  S.tasks = S.tasks || [];
+  S.tasks.unshift({ id: "k-" + Date.now(), title: `${curStore()} needs ${sup ? "from " + sup : "these items"}: ${rs.length} item${rs.length === 1 ? "" : "s"}`, detail: lines.join("\n"), owner: odHannah(), due: today(), status: "open",
+    store: curStore(), area: "Inventory", sort: 0, source: (typeof fname === "function" && fname(me)) || "Order", created: at, log: [{ at, by: me, ev: "created" }] });
+  save(); toast("Hannah has it in her tasks."); render();
+}
 function viewOrder() {
-  const r0 = role(); if (!["lead", "master", "officer"].includes(r0) && !officeLogin()) return shell("Order", "", `<div class="alert info">Orders are placed by the store lead.</div>`, { back: "#/stock" });   /* v0.36: the admin officer and the office order too (their menu listed Order already) */
+  const r0 = role(); if (!["lead", "master", "officer"].includes(r0)) return shell("Order", "", `<div class="alert info">Hannah orders for every store. Tell her what you need.</div>`, { back: "#/stock" });
   bpStyle();
   const rows = REORDER.filter(r => odItem(r) && (odAll || r.order_now));
   const groups = {}; rows.forEach(r => { const g = r.supplier || ""; (groups[g] = groups[g] || []).push(r); });
@@ -34,23 +47,25 @@ function viewOrder() {
   const card = sup => {
     const info = SUPPLIER_INFO[sup] || {}; const rs = groups[sup].sort((a, b) => (a.cover == null ? 99 : a.cover) - (b.cover == null ? 99 : b.cover));
     const lines = rs.map(r => { const it = odItem(r); const left = odLeft(r); const q = odQty(r); const open = odOpenFor(r.item);
-      return `<div class="row"><div class="main"><div class="name">${esc(it.name)}${r.needs_approval ? ` <span class="chip warn">Mike approves</span>` : ""}</div>
+      return `<div class="row"><div class="main"><div class="name">${esc(it.name)}${r.needs_approval ? ` <span class="chip warn">Stefan approves</span>` : ""}</div>
         <div class="meta">${odStale(r) ? `<span class="band-warn">count first${r.count_day ? ` (counted ${esc(dayName(r.count_day))})` : ""}</span> · ` : ""}${left == null ? "not counted yet" : left < 0 ? "below zero: deliveries or a count are missing" : `${odQ(left)} ${esc(it.unit)} left`}${r.cover != null ? ` · ${skCoverChip({ cover: r.cover })}` : ""}${r.lead ? ` · arrives in ${fmt(r.lead)} d` : ""}${open.length ? ` · <span class="band-warn">already ordered ${esc(dayName(open[0].day))}</span>` : ""}${it.sizeUnknown ? ` · <span class="mut">size of one ${esc(it.unit)} unknown: check the quantity</span>` : ""}${r.spare ? `<div class="bpspare">${ic("package", "sm")} <b>${esc(r.spare)}</b> in stock. <a href="#/transfers" onclick="event.stopPropagation()">Transfer it</a> before buying.</div>` : ""}</div></div>
         <div class="right" style="display:flex;align-items:center;gap:6px"><button class="btn ghost" onclick="odEdit['${esc(odKey(sup, r.item))}']=Math.max(0,${q}-1);render()" aria-label="less">−</button>
           <div class="v num" style="min-width:2.5em;text-align:center">${fmt(q)}</div><button class="btn ghost" onclick="odEdit['${esc(odKey(sup, r.item))}']=${q}+1;render()" aria-label="more">+</button>
           <div class="l" style="min-width:3em">${esc(r.buy_unit || it.unit)}</div></div></div>`; }).join("");
     const n = rs.filter(r => odQty(r) > 0).length;
-    const btn = !sup ? `<div class="alert warn">These items have no supplier yet. Set one on the item card (Stock → Items) to order them here.</div>`
-      : `<button class="btn primary full" ${n ? "" : "disabled"} onclick="odSend(${esc(JSON.stringify(sup))})">Send order to ${esc(sup)} · ${n} item${n === 1 ? "" : "s"}${rs.some(r => r.needs_approval) || info.needs_approval ? " · Mike approves first" : ""}</button>`;
+    const btn = !odCanSend() ? `<button class="btn full" ${rs.length ? "" : "disabled"} onclick="odTell(${esc(JSON.stringify(sup))})">Tell Hannah · ${rs.length} item${rs.length === 1 ? "" : "s"}</button>`
+      : !sup ? `<div class="alert warn">These items have no supplier yet. Set one on the item card (Stock → Items) to order them here.</div>`
+      : `<button class="btn primary full" ${n ? "" : "disabled"} onclick="odSend(${esc(JSON.stringify(sup))})">Send order to ${esc(sup)} · ${n} item${n === 1 ? "" : "s"}${rs.some(r => r.needs_approval) || info.needs_approval ? " · Stefan approves first" : ""}</button>`;
     return `<section class="card"><h2>${esc(sup || "No supplier set")} <span class="tiny mut">${info.lead ? `${fmt(info.lead)} day${+info.lead === 1 ? "" : "s"} to arrive` : ""}${info.order_days ? ` · orders ${esc(info.order_days)}` : ""}</span></h2><div class="list">${lines}</div><div style="margin-top:10px">${btn}</div></section>`;
   };
   const mine = (S.orders || []).filter(o => o.status !== "cancelled" && o.status !== "received").sort((a, b) => a.day < b.day ? 1 : -1);
   return shell("Order", dayLong(today()), `
-    <div class="alert info">The list shows what drops under its reorder point before the next delivery can arrive. Quantities are in the unit you buy. Change them with − and +, then send per supplier.</div>
+    ${odCanSend() ? `<div class="alert info">The list shows what drops under its reorder point before the next delivery can arrive. Quantities are in the unit you buy. Change them with − and +, then send per supplier. Check the storage room and head office first.</div>`
+      : `<div class="alert info"><b>Hannah orders for every store.</b> This is what the app thinks you need from your counts. Something urgent, or missing here? Tap <b>Tell Hannah</b>.</div>`}
     ${uncounted ? `<div class="tiny mut">${uncounted} item${uncounted === 1 ? "" : "s"} not counted yet: count them once so they can show up here.</div>` : ""}
     <div class="chips" style="margin:8px 0"><button class="chip ${odAll ? "" : "info"}" onclick="odAll=false;render()">Due now (${REORDER.filter(r => r.order_now).length})</button><button class="chip ${odAll ? "info" : ""}" onclick="odAll=true;render()">All items</button><button class="chip" onclick="odRefresh()">Refresh levels</button>${canOpen("minimums") ? `<button class="chip" onclick="go('#/minimums')">Minimums</button>` : ""}</div>
     ${sups.length ? sups.map(card).join("") : `<section class="card"><div class="mut">Nothing is due. Everything counted lasts past its next delivery.</div></section>`}
-    ${mine.length ? `<section class="card"><h2>Open orders</h2><div class="list">${mine.map(o => `<div class="row"><div class="main"><div class="name">${esc(o.supplier)} ${chip(o.status === "approved" ? "ok" : "warn", o.status === "draft" ? "sending" : o.status === "requested" ? "waiting for Mike" : "approved")}</div><div class="meta">${esc(dayName(o.day))} · ${o.lines.map(l => `${fmt(l.qty)} ${esc(l.unit || "")} ${esc((Store.item(l.item) || {}).name || l.item)}`).join(" · ")}${o.decision_note ? ` · “${esc(o.decision_note)}”` : ""}</div></div>${odDelBtn(o)}</div>`).join("")}</div><div class="tiny mut" style="margin-top:6px">Receive the delivery with the order: Stock → Receive, pick the supplier, tap the order.</div></section>` : ""}`, { back: "#/stock" });
+    ${mine.length ? `<section class="card"><h2>Open orders</h2><div class="list">${mine.map(o => `<div class="row"><div class="main"><div class="name">${esc(o.supplier)} ${chip(o.status === "approved" ? "ok" : "warn", o.status === "draft" ? "sending" : o.status === "requested" ? "waiting for Stefan" : "approved")}</div><div class="meta">${esc(dayName(o.day))} · ${o.lines.map(l => `${fmt(l.qty)} ${esc(l.unit || "")} ${esc((Store.item(l.item) || {}).name || l.item)}`).join(" · ")}${o.decision_note ? ` · “${esc(o.decision_note)}”` : ""}</div></div>${odDelBtn(o)}</div>`).join("")}</div><div class="tiny mut" style="margin-top:6px">Receive the delivery with the order: Stock → Receive, pick the supplier, tap the order.</div></section>` : ""}`, { back: "#/stock" });
 }
 function odSend(sup) {
   const rs = REORDER.filter(r => (r.supplier || "") === sup && odItem(r) && (odAll || r.order_now) && odQty(r) > 0);
@@ -60,7 +75,7 @@ function odSend(sup) {
   S.orders.push({ id: "po-" + Date.now(), day: today(), supplier: sup, by: S.me, status: "draft", expected: addDays(today(), lead), note: null, synced: false,
     lines: rs.map(r => ({ item: r.item, qty: odQty(r), unit: r.buy_unit || odItem(r).unit })) });
   rs.forEach(r => delete odEdit[odKey(sup, r.item)]);
-  save(); toast(rs.some(r => r.needs_approval) || info.needs_approval ? "Sent to Mike for approval." : "Order saved. Place it with " + sup + ".");
+  save(); toast(rs.some(r => r.needs_approval) || info.needs_approval ? "Sent to Stefan for approval." : "Order saved. Place it with " + sup + ".");
   render();
 }
 
@@ -81,7 +96,7 @@ async function odDelete(id) {
 
 /* ---------- APPROVE (master) ---------- */
 function viewApprove() {
-  if (role() !== "master") return shell("Approve", "", `<div class="alert info">Only Mike or Stefan approve orders.</div>`, { back: "#/today" });
+  if (role() !== "master") return shell("Approve", "", `<div class="alert info">Only Stefan approves orders.</div>`, { back: "#/today" });
   const open = (S.orders || []).filter(o => o.status === "requested" && o.approval_needed);
   const list = open.map(o => { const est = o.lines.reduce((a, l) => a + (l.price != null ? l.price * l.qty : 0), 0);
     return `<section class="card"><h2>${esc(o.supplier)} <span class="tiny mut">${esc(dayName(o.day))}${o.by_email ? " · " + esc(o.by_email) : ""}</span></h2>
@@ -128,18 +143,23 @@ async function bpLoad(force) {
   if (/^(#\/(bills|today|home))?$/.test(location.hash || "")) render();
 }
 const bpToCheck = () => bpRows().filter(m => !m.paid_on && !m.checked_on);
+/* v0.37 (migration 062): Stefan releases checked bills before the 15th and month end; Cherry pays only released bills */
+const bpToRelease = () => bpRows().filter(m => !m.paid_on && m.checked_on && !m.released_on);
+const bpToPay = () => bpRows().filter(m => !m.paid_on && m.released_on);
+const bpSum = l => l.reduce((a, b) => a + (+b.total || 0), 0);
 function bpList() {
   const since = ["30", "90"].includes(bpRange) ? addDays(today(), -parseInt(bpRange, 10)) : null;
   const gk = b => bpRange === "check" ? b.store || "" : (b.supplier || "") + "|" + (b.run || "");   /* the order the table shows */
   return bpRows().filter(b => (BP.store === "all" || b.store === BP.store) &&
-    (bpRange === "check" ? !b.paid_on && !b.checked_on : bpRange === "open" ? !b.paid_on : b.day >= since))
+    (bpRange === "check" ? !b.paid_on && !b.checked_on : bpRange === "release" ? !b.paid_on && b.checked_on && !b.released_on : bpRange === "pay" ? !b.paid_on && b.released_on : bpRange === "open" ? !b.paid_on : b.day >= since))
     .map((b, i) => [b, i]).sort((x, y) => gk(x[0]) < gk(y[0]) ? -1 : gk(x[0]) > gk(y[0]) ? 1 : x[1] - y[1]).map(x => x[0]);
 }
 const bpPhoto = b => b.photo && BP.photos[b.photo];
 const bpStoreChip = s => `<span class="bpst">${esc(s || "—")}</span>`;
 function bpStatus(b) {
   if (b.paid_on) return chip("ok", "paid " + esc(dayName(b.paid_on)));
-  if (b.checked_on) return chip("ok", "checked") + `<div class="tiny mut">${esc(bpWho(b.checked_by))}</div>`;
+  if (b.released_on) return chip("ok", "released") + `<div class="tiny mut">checked ${esc(bpWho(b.checked_by))}</div>`;
+  if (b.checked_on) return chip("", "checked") + `<div class="tiny mut">${esc(bpWho(b.checked_by))} · waiting for release</div>`;
   if (b.check_note) return chip("warn", "differs");
   return chip("", "to check");
 }
@@ -161,7 +181,7 @@ function viewBills() {
     if (byStore) return `${esc(BP_STORE[k] || k)} <span>· ${bs.length} bill${bs.length === 1 ? "" : "s"} · <b>${peso(tot)}</b></span>`;
     const [sup, run] = k.split("|"); return `${sl(sup)} <span>· run ${esc(run || "—")} · paid around ${esc(bs[0].due ? dayName(bs[0].due) : "—")} · ${bs.length} bill${bs.length === 1 ? "" : "s"} · <b>${peso(tot)}</b></span>`; };
   const row = b => `<tr onclick="bpOpen('${b.id}')" title="Open the bill">
-      <td onclick="event.stopPropagation()">${b.paid_on || !b.checked_on ? "" : `<input type="checkbox" aria-label="Tick to mark paid" ${bpSel[b.id] ? "checked" : ""} onchange="bpSel['${b.id}']=this.checked;render()" style="width:18px;height:18px">`}</td>
+      <td onclick="event.stopPropagation()">${b.paid_on || !b.checked_on || (!b.released_on && role() !== "master") ? "" : `<input type="checkbox" aria-label="${b.released_on ? "Tick to mark paid" : "Tick to release"}" ${bpSel[b.id] ? "checked" : ""} onchange="bpSel['${b.id}']=this.checked;render()" style="width:18px;height:18px">`}</td>
       <td>${bpStoreChip(b.store)}</td>
       <td class="mut">${esc(dayName(b.day))}</td>
       <td class="nm" style="font-weight:400"><b>${esc(b.supplier || "—")}</b>${b.invoice ? ` <span class="mut">· ${esc(b.invoice)}</span>` : ""}<div class="sub2 wrap mut">${esc(b.lines || "")}</div></td>
@@ -176,14 +196,16 @@ function viewBills() {
   const src = Object.fromEntries(PAY_SOURCES); const expTot = exps.reduce((a, b) => a + (+b.total || 0), 0);
   bpStyle();
   return shell("Bills", "check, then pay", `
+    ${role() === "master" && bpToRelease().length ? `<section class="card bphero"><div><div class="big num">${bpToRelease().length} to release</div><div class="mut">${peso(bpSum(bpToRelease()))} checked by the office, waiting for you. Released bills are what Cherry pays.</div></div><button class="btn primary" onclick="bpRange='release';bpSel={};render()">Show them</button></section>` : ""}
+    ${financeLogin() && bpToPay().length ? `<section class="card bphero"><div><div class="big num">${bpToPay().length} to pay</div><div class="mut">${peso(bpSum(bpToPay()))} released by Stefan</div></div><button class="btn" onclick="bpRange='pay';bpSel={};render()">Show them</button></section>` : ""}
     ${toCheck.length ? `<section class="card bphero"><div><div class="big num">${toCheck.length} to check</div><div class="mut">${peso(toCheck.reduce((a, b) => a + (+b.total || 0), 0))} · hold the paper invoice, compare it with the store's photo and lines</div></div>
       ${shownCheck.length ? `<button class="btn primary" onclick="bpStart()">Start checking${BP.store !== "all" ? " " + esc(BP_STORE[BP.store] || BP.store) : ""}</button>` : ""}</section>` : rows.length ? `<div class="alert ok">Every open bill is checked.</div>` : ""}
     ${BP.err ? `<div class="alert bad">Could not load every store's bills: ${esc(BP.err)}. Showing ${esc(curStore())} only.</div>` : ""}
-    <div class="chips" style="margin:8px 0">${[["check", `To check (${toCheck.length})`], ["open", "Open bills"], ["30", "30 days"], ["90", "90 days"]].map(([k, l]) => `<button class="chip ${bpRange === k ? "info" : ""}" onclick="bpRange='${k}';render()">${l}</button>`).join("")}</div>
+    <div class="chips" style="margin:8px 0">${[["check", `To check (${toCheck.length})`], ["release", `To release (${bpToRelease().length})`], ["pay", `To pay (${bpToPay().length})`], ["open", "Open bills"], ["30", "30 days"], ["90", "90 days"]].map(([k, l]) => `<button class="chip ${bpRange === k ? "info" : ""}" onclick="bpRange='${k}';render()">${l}</button>`).join("")}</div>
     ${storeChips}
     ${table}
-    ${ticked.length ? `<div class="bottom-act"><button class="btn primary full" onclick="bpMarkPaid()">Mark ${ticked.length} bill${ticked.length === 1 ? "" : "s"} paid · ${peso(ticked.reduce((a, k) => a + (+(bpRows().find(b => b.id === k) || {}).total || 0), 0))}</button></div>` : ""}
-    <div class="tiny mut" style="margin:8px 2px">Tap a bill to open it. <b>Checked</b>: you hold the original invoice and the amount matches. Only checked bills can be ticked and marked paid, on the 15th and at month end.</div>
+    ${bpActBar(ticked)}
+    <div class="tiny mut" style="margin:8px 2px">Tap a bill to open it. <b>Checked</b>: the office holds the original invoice and it matches the order and the delivery. <b>Released</b>: Stefan lets it be paid. Only released bills can be ticked and marked paid, on the 15th and at month end.</div>
     <section class="card"><h2>Paid now <span class="tiny mut">${esc(curStore())} · ${since ? "since " + esc(dayName(since)) : "last 7 days"} · ${peso(expTot)}</span></h2>${exps.length ? `<div class="itwrap flat"><table class="itbl"><thead><tr><th>Day</th><th>Supplier</th><th class="h1">What</th><th class="h1">Paid from</th><th class="n">Total</th></tr></thead><tbody>${exps.map(e => `<tr style="cursor:default"><td class="mut">${esc(dayName(e.day))}</td><td class="nm">${sl(e.supplier)}<div class="sub2 wrap">${esc(e.lines || "")} · ${esc(src[e.source] || e.source || "")}</div></td><td class="h1 wrapc mut">${esc(e.lines || "")}</td><td class="h1 mut">${esc(src[e.source] || e.source || "")}</td><td class="n num">${peso(+e.total)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="mut">Nothing paid now in this period.</div>`}</section>
     <section class="card"><h2>Download for the sheets</h2><div class="tiny mut" style="margin-bottom:8px">One line per item, the columns of the expense ledger: date, store, item, qty, unit, unit price, amount, supplier, SI, paid now or bill, who paid, run.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="bpExport('paid_now')">Expenses CSV</button><button class="btn" onclick="bpExport('bill')">Bills CSV</button><button class="btn" onclick="go('#/money')">Funds</button><button class="btn" onclick="go('#/purchases')">Other purchases</button></div></section>
@@ -206,7 +228,7 @@ function bpSheet() {
   const itemsTbl = b.items && b.items.length ? `<table class="itbl bpitems"><thead><tr><th class="n">Qty</th><th>Item</th><th class="n">Amount</th></tr></thead><tbody>${b.items.map(i => `<tr style="cursor:default"><td class="n num">${esc(i.qty)} <span class="mut">${esc(i.unit)}</span></td><td style="white-space:normal">${esc(i.name)}</td><td class="n num">${i.total == null ? `<span class="mut">no price</span>` : peso(+i.total)}</td></tr>`).join("")}</tbody></table>
       ${Math.abs(sum - b.total) > 1 ? `<div class="alert warn" style="margin-top:6px">The lines add up to ${peso(sum)}, the bill says ${peso(b.total)}.</div>` : ""}` : `<div class="mut">${esc(b.lines || "No lines: the store saved the photo and the total.")}</div>`;
   const acts = b.paid_on ? `<div class="mut">Paid ${esc(dayName(b.paid_on))}.</div><button class="btn" onclick="bpNext(1)">Next ›</button>`
-    : b.checked_on ? `<div>${chip("ok", "checked")} <span class="tiny mut">by ${esc(bpWho(b.checked_by))}, ${esc(dayName(String(b.checked_on).slice(0, 10)))}</span></div><div class="bpbtns"><button class="btn ghost" onclick="bpCheck('${b.id}',null)">Undo</button><button class="btn" onclick="bpNext(1)">Next ›</button></div>`
+    : b.checked_on ? `<div>${chip("ok", "checked")}${b.released_on ? " " + chip("ok", "released") : ""} <span class="tiny mut">by ${esc(bpWho(b.checked_by))}, ${esc(dayName(String(b.checked_on).slice(0, 10)))}</span></div><div class="bpbtns"><button class="btn ghost" onclick="bpCheck('${b.id}',null)">Undo</button><button class="btn" onclick="bpNext(1)">Next ›</button></div>`
     : BP.differ ? `<div class="bpdiff"><label class="tiny mut">Amount on the paper invoice</label><input id="bpAmt" type="number" inputmode="decimal" step="0.01" placeholder="${esc(String(b.total))}">
         <label class="tiny mut">What is different</label><input id="bpWhy" type="text" placeholder="e.g. 2 kg less mango, price ₱140 not ₱150" value="${esc(b.check_note || "")}">
         <div class="bpbtns"><button class="btn primary" onclick="bpDiffSave('${b.id}')">Save: amount differs</button><button class="btn ghost" onclick="BP.differ=false;render()">Cancel</button></div></div>`
@@ -281,8 +303,28 @@ async function bpCheck(id, ok, note = null) {
   toast(ok ? "Checked." : ok === false ? "Saved: amount differs. The bill stays unchecked." : "Check undone.");
   if (BP.queue && ok !== null) bpNext(1); else render();
 }
+function bpActBar(ticked) {
+  const L = ticked.map(k => bpRows().find(b => b.id === k)).filter(Boolean), rel = L.filter(b => b.checked_on && !b.released_on && !b.paid_on), pay = L.filter(b => b.released_on && !b.paid_on);
+  const bs = [];
+  if (role() === "master" && rel.length) bs.push(`<button class="btn primary full" onclick="bpRelease(true)">Release ${rel.length} bill${rel.length === 1 ? "" : "s"} · ${peso(bpSum(rel))}</button>`);
+  if (pay.length) bs.push(`<button class="btn ${bs.length ? "" : "primary"} full" onclick="bpMarkPaid()">Mark ${pay.length} paid · ${peso(bpSum(pay))}</button>`);
+  if (role() === "master" && pay.length && !rel.length) bs.push(`<button class="btn ghost full" onclick="bpRelease(false)">Take back the release</button>`);
+  return bs.length ? `<div class="bottom-act" style="display:flex;flex-direction:column;gap:6px">${bs.join("")}</div>` : "";
+}
+async function bpRelease(on) {
+  const ids = Object.keys(bpSel).filter(k => { const b = bpRows().find(m => m.id === k); return bpSel[k] && b && !b.paid_on && (on ? b.checked_on && !b.released_on : b.released_on); });
+  if (!ids.length || bpRelease.busy) return;
+  const set = v => bpRows().concat(MONEY).forEach(m => { if (ids.includes(m.id)) Object.assign(m, v); });
+  if (!bpLive()) set(on ? { released_on: new Date().toISOString(), released_by: window.DB_ME || "stefan" } : { released_on: null, released_by: null });
+  else {
+    bpRelease.busy = true; const r = await sb.rpc("os_bill_release", { p_ids: ids, p_on: on }); bpRelease.busy = false;
+    if (r.error) return toast("Not saved: " + r.error.message);
+    set(on ? { released_on: r.data.released_on, released_by: r.data.released_by } : { released_on: null, released_by: null });
+  }
+  bpSel = {}; toast(on ? `${ids.length} released. Cherry can pay them.` : `Release taken back on ${ids.length}.`); render();
+}
 function bpMarkPaid() {
-  const ids = Object.keys(bpSel).filter(k => bpSel[k] && (bpRows().find(m => m.id === k) || {}).checked_on); if (!ids.length) return toast("Check the bills first");
+  const ids = Object.keys(bpSel).filter(k => { const b = bpRows().find(m => m.id === k) || {}; return bpSel[k] && b.checked_on && b.released_on; }); if (!ids.length) return toast("Only bills Stefan released can be marked paid");
   const note = prompt("Paid how? (e.g. bank transfer 15 Nov, check no.)", ""); if (note === null) return;
   S.billPaid = S.billPaid || []; S.billPaid.push({ id: "pay-" + Date.now(), receipts: ids, paid_on: today(), note: note || null, synced: false });
   bpRows().concat(MONEY).forEach(m => { if (ids.includes(m.id)) m.paid_on = today(); }); bpSel = {};
@@ -317,12 +359,13 @@ async function pushOn() {
     if (error) throw error; try { localStorage.setItem("p99os_push", "on"); } catch (e) { } toast("Order alerts are on for this phone."); render();
   } catch (e) { toast("Could not switch alerts on: " + (e.message || e)); }
 }
-/* v0.36: who gets order alerts — store leads (their stores), the admin officer and the office (all stores), the owners (mornings) */
-const pushWho = () => ["lead", "master", "officer"].includes(role()) || officeLogin();
+/* v0.36: who gets order alerts — store leads (their stores), the admin officer and the office (all stores), the owners (mornings)
+   v0.37 (migration 062): Hannah (every run) and Stefan (mornings) get the order list; store leads only "count first"; Cherry and Mike none */
+const pushWho = () => ["lead", "master", "officer"].includes(role());
 function pushNudge() {
   if (!window.DB_USER || !pushWho() || typeof pushReady !== "function" || pushState()) return "";
   bpStyle();
-  return `<section class="card bpnudge"><div><b>Turn on order alerts</b><div class="tiny mut">${role() === "lead" ? "A message on this phone at 6 am and 6 pm when something at your store must be ordered." : "A message on this phone when a store must order, with stock in the storage room or head office."}${pushReady() ? "" : " Install the app on the home screen first (Share → Add to Home Screen)."}</div></div><button class="btn primary" onclick="pushOn()">Turn on</button></section>`;
+  return `<section class="card bpnudge"><div><b>Turn on order alerts</b><div class="tiny mut">${role() === "lead" ? "A message on this phone at 6 am when items at your store need a count, so Hannah orders the right amount." : "A message on this phone when a store must order, with stock in the storage room or head office."}${pushReady() ? "" : " Install the app on the home screen first (Share → Add to Home Screen)."}</div></div><button class="btn primary" onclick="pushOn()">Turn on</button></section>`;
 }
 function pushState() { try { return localStorage.getItem("p99os_push") === "on"; } catch (e) { return false; } }
 
