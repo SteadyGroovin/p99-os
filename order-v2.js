@@ -120,7 +120,8 @@ function apDecide(id, decision) {
    with the invoice photo the store took, a "To check" list and check mode (one bill at a time: photo left, lines and total right,
    Checked / Amount differs / Skip, then the next). os_load carries one store's money only, so the list comes from os_bills_office.
    Dev page and offline: falls back to the selected store's bills from os_load (MONEY). */
-const BP = { all: null, at: 0, loading: false, err: null, store: "all", photos: {}, queue: null, pos: 0, differ: false };
+const BP = { all: null, at: 0, loading: false, err: null, store: "all", photos: {}, queue: null, pos: 0, differ: false,
+  open: {}, allOpen: false, done: {}, differId: null };   /* v0.39: bills open in place in the list (open), "Show every bill open" (allOpen), checked this visit stay in To check (done) */
 const BP_STORE = { P99: "Pizza 99", BK: "Burger Kong", DC: "Dragon Crepe", MCC: "My Crepes Cafe", MCBC: "Beach Club", HO: "Head office", STO: "Storage" };
 const bpLive = () => typeof sb !== "undefined" && sb.rpc && !(window.OS_LOADED && window.OS_LOADED.dev);
 const bpItemsText = b => (b.items || []).map(i => `${i.qty} ${i.unit} ${i.name}`).join("; ") || b.lines || b.note || "";
@@ -151,7 +152,7 @@ function bpList() {
   const since = ["30", "90"].includes(bpRange) ? addDays(today(), -parseInt(bpRange, 10)) : null;
   const gk = b => bpRange === "check" ? b.store || "" : (b.supplier || "") + "|" + (b.run || "");   /* the order the table shows */
   return bpRows().filter(b => (BP.store === "all" || b.store === BP.store) &&
-    (bpRange === "check" ? !b.paid_on && !b.checked_on : bpRange === "release" ? !b.paid_on && b.checked_on && !b.released_on : bpRange === "pay" ? !b.paid_on && b.released_on : bpRange === "open" ? !b.paid_on : b.day >= since))
+    (bpRange === "check" ? !b.paid_on && (!b.checked_on || BP.done[b.id]) : bpRange === "release" ? !b.paid_on && b.checked_on && !b.released_on : bpRange === "pay" ? !b.paid_on && b.released_on : bpRange === "open" ? !b.paid_on : b.day >= since))
     .map((b, i) => [b, i]).sort((x, y) => gk(x[0]) < gk(y[0]) ? -1 : gk(x[0]) > gk(y[0]) ? 1 : x[1] - y[1]).map(x => x[0]);
 }
 const bpPhoto = b => b.photo && BP.photos[b.photo];
@@ -180,14 +181,15 @@ function viewBills() {
   const head = k => { const bs = groups[k]; const tot = bs.reduce((a, b) => a + (+b.total || 0), 0);
     if (byStore) return `${esc(BP_STORE[k] || k)} <span>· ${bs.length} bill${bs.length === 1 ? "" : "s"} · <b>${peso(tot)}</b></span>`;
     const [sup, run] = k.split("|"); return `${sl(sup)} <span>· run ${esc(run || "—")} · paid around ${esc(bs[0].due ? dayName(bs[0].due) : "—")} · ${bs.length} bill${bs.length === 1 ? "" : "s"} · <b>${peso(tot)}</b></span>`; };
-  const row = b => `<tr onclick="bpOpen('${b.id}')" title="Open the bill">
+  const isOpen = b => BP.allOpen || BP.open[b.id];
+  const row = b => `<tr class="${isOpen(b) ? "bpon" : ""}" onclick="bpToggle('${b.id}')" title="${isOpen(b) ? "Close the lines" : "Show the lines and the photo"}">
       <td onclick="event.stopPropagation()">${b.paid_on || !b.checked_on || (!b.released_on && role() !== "master") ? "" : `<input type="checkbox" aria-label="${b.released_on ? "Tick to mark paid" : "Tick to release"}" ${bpSel[b.id] ? "checked" : ""} onchange="bpSel['${b.id}']=this.checked;render()" style="width:18px;height:18px">`}</td>
       <td>${bpStoreChip(b.store)}</td>
       <td class="mut">${esc(dayName(b.day))}</td>
-      <td class="nm" style="font-weight:400"><b>${esc(b.supplier || "—")}</b>${b.invoice ? ` <span class="mut">· ${esc(b.invoice)}</span>` : ""}<div class="sub2 wrap mut">${esc(b.lines || "")}</div></td>
+      <td class="nm" style="font-weight:400"><span class="bpcar">›</span><b>${esc(b.supplier || "—")}</b>${b.invoice ? ` <span class="mut">· ${esc(b.invoice)}</span>` : ""}${isOpen(b) ? "" : `<div class="sub2 wrap mut">${esc(b.lines || "")}</div>`}</td>
       <td>${bpPhoto(b) ? `<img class="thumb" src="${bpPhoto(b)}" alt="invoice photo">` : b.photo ? `<span class="tiny mut">photo</span>` : `<span class="tiny mut">no photo</span>`}</td>
       <td class="n num"><b>${peso(+b.total)}</b></td>
-      <td class="st">${bpStatus(b)}</td></tr>`;
+      <td class="st">${bpStatus(b)}${bpQuick(b)}</td></tr>${isOpen(b) ? bpPanel(b) : ""}`;
   const table = list.length ? `<div class="itwrap"><table class="itbl bptbl"><thead><tr><th style="width:30px"></th><th>Store</th><th>Day</th><th>Supplier · invoice</th><th>Photo</th><th class="n">Total</th><th class="st">Status</th></tr></thead><tbody>${keys.map(k => `<tr class="gh"><td colspan="7">${head(k)}</td></tr>` + groups[k].map(row).join("")).join("")}</tbody></table></div><div class="itfoot tiny mut">${list.length} bill${list.length === 1 ? "" : "s"} · ${peso(list.reduce((a, b) => a + (+b.total || 0), 0))}${BP.all ? " · all stores" : " · " + esc(curStore()) + " only"}</div>`
     : `<section class="card"><div class="mut">${BP.loading && !BP.all ? "Loading the bills of every store…" : bpRange === "check" ? "Nothing to check. Every bill in this list is checked." : "No bills here."}</div></section>`;
   const stores = [...new Set(rows.map(b => b.store))].sort();
@@ -203,13 +205,44 @@ function viewBills() {
     ${BP.err ? `<div class="alert bad">Could not load every store's bills: ${esc(BP.err)}. Showing ${esc(curStore())} only.</div>` : ""}
     <div class="chips" style="margin:8px 0">${[["check", `To check (${toCheck.length})`], ["release", `To release (${bpToRelease().length})`], ["pay", `To pay (${bpToPay().length})`], ["open", "Open bills"], ["30", "30 days"], ["90", "90 days"]].map(([k, l]) => `<button class="chip ${bpRange === k ? "info" : ""}" onclick="bpRange='${k}';render()">${l}</button>`).join("")}</div>
     ${storeChips}
+    ${list.length ? `<div class="bptools"><button class="chip ${BP.allOpen ? "info" : ""}" onclick="BP.allOpen=!BP.allOpen;BP.open={};render()">${BP.allOpen ? "Close every bill" : "Show every bill open"}</button><span class="tiny mut">Tap a bill to see its lines and photo here. ✓ checks it without opening anything.</span></div>` : ""}
     ${table}
     ${bpActBar(ticked)}
-    <div class="tiny mut" style="margin:8px 2px">Tap a bill to open it. <b>Checked</b>: the office holds the original invoice and it matches the order and the delivery. <b>Released</b>: Stefan lets it be paid. Only released bills can be ticked and marked paid, on the 15th and at month end.</div>
+    <div class="tiny mut" style="margin:8px 2px">Tap a bill to open it in the list; "Full view" or Start checking shows one bill at a time with the big photo. <b>Checked</b>: the office holds the original invoice and it matches the order and the delivery. <b>Released</b>: Stefan lets it be paid. Only released bills can be ticked and marked paid, on the 15th and at month end.</div>
     <section class="card"><h2>Paid now <span class="tiny mut">${esc(curStore())} · ${since ? "since " + esc(dayName(since)) : "last 7 days"} · ${peso(expTot)}</span></h2>${exps.length ? `<div class="itwrap flat"><table class="itbl"><thead><tr><th>Day</th><th>Supplier</th><th class="h1">What</th><th class="h1">Paid from</th><th class="n">Total</th></tr></thead><tbody>${exps.map(e => `<tr style="cursor:default"><td class="mut">${esc(dayName(e.day))}</td><td class="nm">${sl(e.supplier)}<div class="sub2 wrap">${esc(e.lines || "")} · ${esc(src[e.source] || e.source || "")}</div></td><td class="h1 wrapc mut">${esc(e.lines || "")}</td><td class="h1 mut">${esc(src[e.source] || e.source || "")}</td><td class="n num">${peso(+e.total)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="mut">Nothing paid now in this period.</div>`}</section>
     <section class="card"><h2>Download for the sheets</h2><div class="tiny mut" style="margin-bottom:8px">One line per item, the columns of the expense ledger: date, store, item, qty, unit, unit price, amount, supplier, SI, paid now or bill, who paid, run.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="bpExport('paid_now')">Expenses CSV</button><button class="btn" onclick="bpExport('bill')">Bills CSV</button><button class="btn" onclick="go('#/money')">Funds</button><button class="btn" onclick="go('#/purchases')">Other purchases</button></div></section>
     ${bpSheet()}`, { back: "#/finance" });
+}
+
+/* ---- v0.39 (Stefan, 28 Nov: "save clicks ... a quick view where it doesn't load"): a bill opens in place under its row,
+   lines next to the photo the list already loaded, with Checked / Amount differs right there. ✓ on the row checks without opening. ---- */
+function bpToggle(id) { if (BP.allOpen) { BP.allOpen = false; BP.open = {}; bpList().forEach(b => { if (b.id !== id) BP.open[b.id] = true; }); } else BP.open[id] = !BP.open[id]; if (BP.differId === id) BP.differId = null; render(); }
+const bpSumOk = b => { const it = b.items || []; if (!it.length || it.some(i => i.total == null)) return null; return Math.abs(it.reduce((a, i) => a + (+i.total || 0), 0) - b.total) <= 1; };
+function bpQuick(b) {   /* one tap on the row: check, or undo a check made this visit */
+  if (b.paid_on || !moneyOK()) return "";
+  if (!b.checked_on) return `<button class="bpq" onclick="event.stopPropagation();bpCheck('${b.id}',true)" title="Checked: the paper invoice matches">✓ Check</button>`;
+  return BP.done[b.id] && !b.released_on ? `<button class="bpq ghost" onclick="event.stopPropagation();bpCheck('${b.id}',null)">Undo</button>` : "";
+}
+function bpPanel(b) {
+  const ph = bpPhoto(b), it = b.items || [], sum = it.reduce((a, i) => a + (+i.total || 0), 0), ok = bpSumOk(b);
+  const lines = it.length ? `<table class="itbl bpitems"><thead><tr><th class="n">Qty</th><th>Item</th><th class="n bpu">Unit</th><th class="n">Amount</th></tr></thead><tbody>${it.map(i => `<tr style="cursor:default"><td class="n num">${esc(i.qty)} <span class="mut">${esc(i.unit)}</span></td><td style="white-space:normal">${esc(i.name)}</td><td class="n num mut bpu">${i.total == null || !+i.qty ? "" : peso(+i.total / +i.qty)}</td><td class="n num">${i.total == null ? `<span class="mut">no price</span>` : peso(+i.total)}</td></tr>`).join("")}</tbody>
+      <tfoot><tr style="cursor:default"><td></td><td><b>${it.length} line${it.length === 1 ? "" : "s"}</b></td><td class="bpu"></td><td class="n num"><b>${peso(sum)}</b></td></tr></tfoot></table>
+      ${ok === false ? `<div class="alert warn bpsm">The lines add up to ${peso(sum)}, the bill says ${peso(b.total)}.</div>` : ok ? `<div class="tiny bpgood">${ic("check", "sm")} The lines add up to the bill total.</div>` : ""}`
+    : `<div class="mut">${esc(b.lines || "No lines: the store saved the photo and the total.")}</div>`;
+  const diff = BP.differId === b.id;
+  const acts = b.paid_on ? `<span class="mut">Paid ${esc(dayName(b.paid_on))}.</span>`
+    : b.checked_on ? `<span>${chip("ok", "checked")} <span class="tiny mut">by ${esc(bpWho(b.checked_by))}</span></span>${b.released_on ? "" : `<button class="btn ghost sm" onclick="bpCheck('${b.id}',null)">Undo</button>`}`
+    : diff ? `<div class="bpdiff"><label class="tiny mut">Amount on the paper invoice</label><input id="bpAmt" type="number" inputmode="decimal" step="0.01" placeholder="${esc(String(b.total))}" onkeydown="if(event.key==='Enter')bpDiffSave('${b.id}')">
+        <label class="tiny mut">What is different</label><input id="bpWhy" type="text" placeholder="e.g. 2 kg less mango, price ₱140 not ₱150" value="${esc(b.check_note || "")}" onkeydown="if(event.key==='Enter')bpDiffSave('${b.id}')">
+        <div class="bpbtns"><button class="btn primary sm" onclick="bpDiffSave('${b.id}')">Save: amount differs</button><button class="btn ghost sm" onclick="BP.differId=null;render()">Cancel</button></div></div>`
+    : `${b.check_note ? `<div class="alert warn bpsm">Marked as different: ${esc(b.check_note)}</div>` : ""}<button class="btn primary sm" onclick="bpCheck('${b.id}',true)">${ic("check", "sm")}Checked, matches</button><button class="btn sm" onclick="BP.differId='${b.id}';render();setTimeout(()=>{const e=document.getElementById('bpAmt');e&&e.focus()},50)">Amount differs</button>`;
+  return `<tr class="bpx"><td class="bpxtd" colspan="7"><div class="bpxg">
+      <div class="bpxph">${ph ? `<a href="${ph}" target="_blank" rel="noopener" title="Open the photo full size"><img src="${ph}" alt="invoice photo"></a>` : `<div class="bpnoph">${b.photo ? "Photo still loading" : "No invoice photo"}</div>`}</div>
+      <div class="bpxin"><div class="tiny mut">Invoice ${esc(b.invoice || "—")} · run ${esc(b.run || "—")}${b.due ? ` · paid around ${esc(dayName(b.due))}` : ""}${b.by ? ` · received by ${esc(bpWho(b.by))}` : ""}</div>
+        ${lines}${b.note && it.length ? `<div class="tiny mut" style="margin-top:4px">${esc(b.note)}</div>` : ""}
+        <div class="bpxact">${acts}<button class="btn ghost sm" onclick="bpOpen('${b.id}')">Full view</button></div></div>
+    </div></td></tr>`;
 }
 
 /* ---- check mode: one bill at a time ---- */
@@ -279,6 +312,16 @@ function bpStyle() {
 .bpnoph{min-height:180px;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;border:1px dashed var(--line2);border-radius:10px;color:var(--mut)}
 .bptotal{font-size:28px;font-weight:700;margin:10px 0}
 .bpitems td,.bpitems th{height:auto}.bpact{margin-top:14px;display:grid;gap:8px}.bpbtns{display:flex;gap:8px;flex-wrap:wrap}.bpok{min-width:180px}
+.bpcar{display:inline-block;width:16px;color:var(--mut);font-size:14px;line-height:1;transition:transform .15s}.bpon .bpcar{transform:rotate(90deg)}.bptbl tr.bpon td{border-bottom-color:transparent}
+.bpq{margin-top:4px;font:inherit;font-size:12px;font-weight:700;padding:4px 10px;border-radius:8px;border:1px solid var(--ok,#2a7);background:var(--ok,#2a7);color:#fff;cursor:pointer;white-space:nowrap}.bpq.ghost{background:transparent;color:var(--ink);border-color:var(--line2)}
+.bptools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 8px}
+.bptbl tr.bpx{cursor:default}.bptbl tr.bpx>td{background:var(--surf2);padding:10px 12px 14px;white-space:normal}
+.bpxg{display:grid;grid-template-columns:1fr;gap:12px}@media (min-width:760px){.bpxg{grid-template-columns:minmax(180px,300px) minmax(0,1fr)}}
+.itbl td.bpxtd .bpxph img{width:100%;height:auto;max-height:340px;display:block;object-fit:contain;border-radius:8px;border:1px solid var(--line);background:var(--surf);cursor:zoom-in}.bpxph .bpnoph{min-height:120px}
+.bpxin .bpitems{margin-top:6px;background:var(--surf)}.bpxin .bpitems td,.bpxin .bpitems th{white-space:normal}.bpgood{margin-top:6px;color:var(--ok,#2a7);display:flex;gap:4px;align-items:center}.bpsm{margin-top:6px}
+.bpxact{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.bpxin{min-width:0}.bpxin .bpitems{width:100%;min-width:0}
+@media (max-width:759px){.bpxg{position:sticky;left:12px;width:calc(100vw - 72px)}.bpxin .bpitems .bpu{display:none}.itbl td.bpxtd .bpxph img{max-height:240px}}
 .bpdiff{display:grid;gap:6px}.bpdiff input{font:inherit;padding:10px;border:1px solid var(--line2);border-radius:10px;background:var(--surf);color:var(--ink)}
 .bpspare{margin-top:4px;font-size:13px;color:var(--ink);background:var(--surf2);border-radius:8px;padding:4px 8px;display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap}
 .bpnudge{display:flex;align-items:center;justify-content:space-between;gap:12px;grid-column:1/-1;width:100%;max-width:none;box-sizing:border-box;border-left:4px solid var(--warn,#c80)}.wrap.two > section.card.bpnudge.bpnudge.bpnudge{column-span:all;display:flex}
@@ -300,6 +343,8 @@ async function bpCheck(id, ok, note = null) {
     set({ checked_on: r.data.checked_on, checked_by: r.data.checked_by, check_note: r.data.check_note });
   }
   if (!ok) delete bpSel[id];
+  if (ok) BP.done[id] = true; else if (ok === null) delete BP.done[id];
+  if (ok !== null) BP.differId = null;
   toast(ok ? "Checked." : ok === false ? "Saved: amount differs. The bill stays unchecked." : "Check undone.");
   if (BP.queue && ok !== null) bpNext(1); else render();
 }
