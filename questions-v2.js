@@ -5,6 +5,11 @@
    Status: open → answered (or later = "ask the kitchen") → done. Online only: every save goes straight to the database. */
 
 const QQ = { state: "idle", rows: [], err: "", tab: "open", sec: "all", draft: {}, edit: {}, busy: false };
+/* v0.39.1: what you typed stays on this phone until it is saved, so a failed save or a reload loses nothing */
+try { QQ.draft = JSON.parse(localStorage.getItem("p99os_qdraft") || "{}") || {}; } catch (e) { }
+const qKeep = () => { try {   /* only drafts with something typed in */
+  const keep = {}; Object.keys(QQ.draft).forEach(id => { const d = QQ.draft[id]; if ((d.note || "").trim() || Object.values(d.values || {}).some(v => v !== undefined && v !== "")) keep[id] = d; });
+  localStorage.setItem("p99os_qdraft", JSON.stringify(keep)); } catch (e) { } };
 const qDev = () => typeof sb === "undefined" || (window.OS_LOADED && window.OS_LOADED.dev);
 
 async function qLoad(force) {
@@ -24,9 +29,9 @@ function qDraft(q) {
   if (!QQ.draft[q.id]) QQ.draft[q.id] = { values: Object.assign({}, q.answer || {}), note: q.note || "" };
   return QQ.draft[q.id];
 }
-function qPick(id, k, v) { const q = QQ.rows.find(x => x.id === id); const d = qDraft(q); d.values[k] = d.values[k] === v ? undefined : v; render(); }
-function qSetVal(id, k, v, num) { const q = QQ.rows.find(x => x.id === id); const d = qDraft(q); d.values[k] = v === "" ? undefined : num ? Number(v) : v; }
-function qSetNote(id, v) { const q = QQ.rows.find(x => x.id === id); qDraft(q).note = v; }
+function qPick(id, k, v) { const q = QQ.rows.find(x => x.id === id); const d = qDraft(q); d.values[k] = d.values[k] === v ? undefined : v; qKeep(); render(); }
+function qSetVal(id, k, v, num) { const q = QQ.rows.find(x => x.id === id); const d = qDraft(q); d.values[k] = v === "" ? undefined : num ? Number(v) : v; qKeep(); }
+function qSetNote(id, v) { const q = QQ.rows.find(x => x.id === id); qDraft(q).note = v; qKeep(); }
 
 async function qSave(id, later) {
   if (QQ.busy) return;
@@ -37,10 +42,10 @@ async function qSave(id, later) {
   if (qDev()) Object.assign(q, { answer: values, note: d.note.trim() || null, status: later ? "later" : "answered", answered_by: window.DB_ME || "dev", answered_at: new Date().toISOString() });
   else {
     const r = await sb.rpc("os_answer_question", { p_id: id, p_answer: values, p_note: d.note, p_later: !!later });
-    if (r.error) { QQ.busy = false; return toast("Not saved: " + r.error.message); }
+    if (r.error) { QQ.busy = false; return toast(/jwt|401|expired/i.test(r.error.message + " " + (r.error.code || "")) ? "Not saved: your login ran out. Sign out and in again. What you typed stays here." : "Not saved: " + r.error.message + ". What you typed stays here."); }
     Object.assign(q, r.data);
   }
-  QQ.busy = false; delete QQ.draft[id]; delete QQ.edit[id];
+  QQ.busy = false; delete QQ.draft[id]; delete QQ.edit[id]; qKeep();
   toast(later ? "Marked: ask the kitchen" : "Answer saved"); render();
 }
 
@@ -75,7 +80,7 @@ function qCard(q) {
   return `<section class="card" id="qc-${q.id}">${head}${now}<p style="margin:4px 0 10px"><b>${esc(q.ask)}</b></p>
     <div style="display:grid;gap:12px">${(q.fields || []).map(f => qFieldHTML(q, f, d)).join("")}
       <div class="field"><label for="q-${q.id}-note">Note <span class="mut">(optional)</span></label><textarea class="in" id="q-${q.id}-note" placeholder="${esc(q.placeholder || "Anything different? Write it here.")}" oninput="qSetNote('${q.id}',this.value)">${esc(d.note)}</textarea></div></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn primary" onclick="qSave('${q.id}',false)">Save answer</button><button class="btn" onclick="qSave('${q.id}',true)">Ask the kitchen</button>${QQ.edit[q.id] ? `<button class="btn ghost" onclick="delete QQ.edit['${q.id}'];delete QQ.draft['${q.id}'];render()">Cancel</button>` : ""}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"><button class="btn primary" onclick="qSave('${q.id}',false)">Save answer</button><button class="btn" onclick="qSave('${q.id}',true)">Ask the kitchen</button>${QQ.edit[q.id] ? `<button class="btn ghost" onclick="delete QQ.edit['${q.id}'];delete QQ.draft['${q.id}'];qKeep();render()">Cancel</button>` : ""}</div>
     ${q.status === "later" && q.answered_at ? `<div class="tiny mut" style="margin-top:6px">Marked for the kitchen by ${esc(qWho(q.answered_by))}, ${qWhen(q.answered_at)}</div>` : ""}</section>`;
 }
 

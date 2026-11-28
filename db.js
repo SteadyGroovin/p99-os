@@ -4,12 +4,28 @@
    access comes from a row in os_member (migrations/004). */
 const DB_URL = "https://fuvtcwalsmgufbkozxul.supabase.co";
 const DB_KEY = "sb_publishable_n_au6M6ZgAC38s85asticA_s5Ux-jkF";
-const sb = window.supabase.createClient(DB_URL, DB_KEY, { auth: { persistSession: true, detectSessionInUrl: true, autoRefreshToken: true } });
+/* v0.39.1 (28 Nov): a login whose token ran out while the app sat open got 401 on every save (Hannah's answers, 09:51–10:35).
+   Every database call that comes back 401 now renews the session once and is sent again with the new token. */
+let sbRenewing = null;
+async function sbFetch(input, init) {
+  const res = await fetch(input, init);
+  const url = typeof input === "string" ? input : input.url;
+  if (res.status !== 401 || !/\/(rest|storage|functions)\/v1\//.test(url)) return res;
+  try {
+    if (!sbRenewing) sbRenewing = sb.auth.refreshSession().finally(() => { sbRenewing = null; });
+    const r = await sbRenewing, tok = r && r.data && r.data.session && r.data.session.access_token;
+    if (!tok) return res;
+    const h = new Headers((init && init.headers) || (typeof input === "string" ? undefined : input.headers));
+    h.set("Authorization", "Bearer " + tok);
+    return fetch(input, Object.assign({}, init, { headers: h }));
+  } catch (e) { return res; }
+}
+const sb = window.supabase.createClient(DB_URL, DB_KEY, { auth: { persistSession: true, detectSessionInUrl: true, autoRefreshToken: true }, global: { fetch: sbFetch } });
 const bootEl = document.getElementById("app");
 const bootEsc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /* every release loads as one matching set: GitHub Pages caches files for 10 minutes, and a stale db.js next to a new app.js left Tasks blank (v0.10.0, 2026-11-07) */
-const APP_V = "0.39.0";   /* bump with CACHE in sw.js on every release (missed in v0.31.0) */
+const APP_V = "0.39.1";   /* bump with CACHE in sw.js on every release (missed in v0.31.0) */
 function loadScript(src) {
   return new Promise((ok, no) => { const s = document.createElement("script"); s.src = src + (src.includes("?") ? "&" : "?") + "v=" + APP_V; s.onload = ok; s.onerror = () => no(new Error("could not load " + src)); document.body.appendChild(s); });
 }
